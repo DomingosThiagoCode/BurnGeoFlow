@@ -58,7 +58,7 @@ def preparar_dados(id_: int, pasta: Path, p1_arg: Path | None,
     if baixar_exemplo:
         if id_ != 24340828 or p1_arg is not None:
             raise ErroPipeline("--baixar-exemplo é exclusivo do ID 24340828 sem --p1/--p2.")
-        from burngeoflow.dados import baixar_referencia
+        from burngeoflow.aquisicao.dados_referencia import baixar_referencia
         baixar_referencia(origem)
     faltam = [str(p) for p in (p1, p2) if not p.is_file()]
     if faltam:

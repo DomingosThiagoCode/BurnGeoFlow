@@ -20,7 +20,9 @@ BurnGeoFlow/
 ├── executar_pipeline.py
 ├── burngeoflow/
 │   ├── config.py
-│   ├── aquisicao/earth_engine.py
+│   ├── aquisicao/
+│   │   ├── earth_engine.py
+│   │   └── dados_referencia.py
 │   ├── processamento/
 │   │   ├── componentes.py
 │   │   ├── conectividade.py
@@ -34,8 +36,7 @@ BurnGeoFlow/
 │   ├── validacao/
 │   └── relatorios/
 ├── tests/
-├── dados/
-└── resultados/
+└── dados/                    # entradas locais (ignorar GeoJSONs grandes)
 ```
 
 Os SQLs e o JavaScript antigo do GEE pertencem ao repositório histórico
