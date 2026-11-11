@@ -1,22 +1,20 @@
-# Proveniência científica e escopo
+# Proveniência científica
 
-As rotinas e testes da Etapa 7.1 foram importados do
-[CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio),
-mantendo os algoritmos anteriores para comparação de resultados.
-O novo arquivo `executar_pipeline.py` coordena essa implementação.
+O código científico do BurnGeoFlow foi inicialmente desenvolvido no projeto
+[CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio)
+e migrado para um pacote Python com responsabilidades modulares.
 
-- TR: trajetórias representativas do centroide e extremos N/S/L/O,
-  adaptadas da metodologia de Priscila Backes de Oliveira (IME, 2024).
-- IGT: incrementos geométricos temporais, com base nas diferenças de
-  regiões discutidas por Barbosa e Oliveira (2022).
-- P1: componentes queimados acumulados por data; P2: região principal
-  rastreada ao longo do tempo.
-- Fonte: JRC/GWIS GlobFire v2, derivado de MCD64A1.
+- TR: trajetórias representativas do centroide e dos extremos N/S/L/O,
+  adaptadas do método de Priscila Backes de Oliveira (IME, 2024).
+- IGT: incrementos geométricos temporais por diferença de regiões;
+  referência metodológica: Barbosa e Oliveira (2022).
+- P1: análise das componentes de áreas queimadas acumuladas.
+- P2: região principal selecionada por continuidade geométrica.
+- Dados: JRC/GWIS GlobFire v2, derivados do MODIS MCD64A1.
 
-**Atenção:** a conectividade por vértice aprovada para BurnGeoFlow
-ainda não é a convenção canônica do P1 legado. Sua implementação
-será uma camada derivada, com testes de regressão e sem modificar
-silenciosamente os GeoJSONs originais.
+O código original de experimentação (JavaScript GEE e SQLs PostGIS)
+permanece disponível no CDG_incendio para rastreabilidade, mas não é
+dependência do produto computacional.
 
-Não declaramos validação física independente nem inferência causal
-a partir de fusões, direções de centroides ou fases exploratórias.
+A interpretação dos indicadores está restrita à evolução geométrica das
+áreas queimadas; testes internos não equivalem à validação de campo.
