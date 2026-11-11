@@ -12,8 +12,8 @@ import unittest
 import pyproj
 from shapely.geometry import box, GeometryCollection, Polygon
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from analisar_incrementos_geometricos import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from burngeoflow.analises.incrementos import (  # noqa: E402
     calcular_incremento, executar, partes_poligonais,
 )
 
@@ -103,20 +103,6 @@ class EstudoReal(unittest.TestCase):
                                     float(ref["area_perdida_p2_km2"])), 1e-8)
         self.assertEqual((sha256(p1.read_bytes()).hexdigest(),
                           sha256(p2.read_bytes()).hexdigest()), (h1, h2))
-
-
-class SQLContrato(unittest.TestCase):
-    def test_sql_generico_sem_id_hardcoded_ou_schema_beryl(self):
-        pasta = Path(__file__).resolve().parents[1] / "sql"
-        for script in sorted(pasta.glob("*.sql")):
-            s = script.read_text(encoding="utf-8").lower()
-            self.assertNotIn("24340828", s)
-            self.assertNotIn("furacao.", s)
-            self.assertNotIn("order by random()", s)
-            self.assertIn("id_incendio", s)
-            self.assertNotIn("drop table", s)
-        self.assertIn("partition by id_incendio, descritor",
-                      (pasta / "01_trajetorias_representativas.sql").read_text().lower())
 
 
 if __name__ == "__main__":

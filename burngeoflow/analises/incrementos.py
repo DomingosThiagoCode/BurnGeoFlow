@@ -21,7 +21,7 @@ import pyproj
 import shapely
 from shapely.geometry import mapping, shape
 
-from calcular_metricas_paisagem import carregar_p1, projetar_patches, salvar_csv
+from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
 
 
 CAMPOS_INTERVALOS = [

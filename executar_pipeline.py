@@ -82,37 +82,37 @@ def preparar_dados(id_: int, pasta: Path, p1_arg: Path | None,
 
 def definir_etapas(id_: int, raiz: Path, p1: Path, p2: Path) -> tuple[Etapa, ...]:
     dirs = {n: raiz / "resultados" / f"etapa{n}" for n in range(1, 7)}
-    def py(nome: str) -> list[str]:
-        return [sys.executable, str(ROOT / "scripts" / nome)]
+    def py(modulo: str) -> list[str]:
+        return [sys.executable, "-m", f"burngeoflow.{modulo}"]
     e1, e2, e3, e4, e5, e6 = [dirs[n] for n in range(1, 7)]
     return (
-        Etapa("validar", py("validar_produtos.py") + [str(p1), str(p2)],
+        Etapa("validar", py("validacao.produtos") + [str(p1), str(p2)],
               (e1 / f"validacao_{id_}.json",), e1 / f"validacao_{id_}.json"),
-        Etapa("auditar", py("auditar_espacial.py") + [str(p1), str(p2),
+        Etapa("auditar", py("validacao.espacial") + [str(p1), str(p2),
               "--saida-json", str(e1 / f"auditoria_{id_}.json")],
               (e1 / f"auditoria_{id_}.json",)),
-        Etapa("regularizar_diagnostico", py("comparar_regularizacao.py") +
+        Etapa("regularizar_diagnostico", py("validacao.regularizacao") +
               [str(p1), str(p2), "--saida-json", str(e1 / f"regularizacao_{id_}.json")],
               (e1 / f"regularizacao_{id_}.json",)),
-        Etapa("paisagem", py("calcular_metricas_paisagem.py") +
+        Etapa("paisagem", py("analises.paisagem") +
               [str(p1), "--saida", str(e2)],
               (e2 / f"metricas_patches_{id_}.csv",
                e2 / f"metricas_temporais_{id_}.csv",
                e2 / f"sensibilidade_contato_{id_}.csv")),
-        Etapa("linhagens", py("rastrear_linhagens_patches.py") +
+        Etapa("linhagens", py("processamento.linhagens") +
               [str(p1), "--saida", str(e3)],
               (e3 / f"resumo_transicoes_{id_}.csv",)),
-        Etapa("tr_igt", py("consolidar_tr_igt.py") +
+        Etapa("tr_igt", py("analises.tr_igt") +
               [str(p1), str(p2), "--saida", str(e4)],
               (e4 / f"indicadores_regiao_{id_}.csv",
                e4 / f"incrementos_temporais_{id_}.csv",
                e4 / f"comparacao_tr_igt_{id_}.csv")),
-        Etapa("integrar", py("integrar_etapa5.py") +
+        Etapa("integrar", py("analises.integracao") +
               ["--id", str(id_), "--raiz", str(raiz), "--saida", str(e5)],
               (e5 / f"serie_diaria_integrada_{id_}.csv",
                e5 / f"transicoes_integradas_{id_}.csv",
                e5 / f"relatorio_interpretativo_{id_}.md")),
-        Etapa("robustez", py("validar_cientificamente_etapa6.py") +
+        Etapa("robustez", py("validacao.robustez") +
               ["--id", str(id_), "--raiz", str(raiz), "--saida", str(e6)],
               (e6 / f"resumo_validacao_{id_}.json",
                e6 / f"relatorio_validacao_{id_}.md")),

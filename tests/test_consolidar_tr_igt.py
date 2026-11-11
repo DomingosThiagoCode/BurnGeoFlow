@@ -1,5 +1,4 @@
 """Testes conceituais e regressao do fecho TR x IGT em Python."""
-import importlib.util
 from pathlib import Path
 import sys
 import unittest
@@ -7,10 +6,8 @@ import unittest
 import pyproj
 from shapely.geometry import box
 
-spec = importlib.util.spec_from_file_location(
-    'fecho', Path(__file__).resolve().parents[1]/'scripts/consolidar_tr_igt.py')
-fecho = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fecho)
+from burngeoflow.analises import tr_igt as fecho
+
 
 
 def dados(d0='2020-01-01', d1='2020-01-02', dias=1, nova=1, perda=0):
@@ -86,7 +83,7 @@ class RegressaoGeoJSON(unittest.TestCase):
         if not (p1.exists() and p2.exists()):
             self.skipTest('GeoJSON P1/P2 nao encontrados neste ambiente')
         with tempfile.TemporaryDirectory() as pasta:
-            r=subprocess.run([sys.executable,str(raiz/'scripts/consolidar_tr_igt.py'),
+            r=subprocess.run([sys.executable,'-m', 'burngeoflow.analises.tr_igt',
                               str(p1),str(p2),'--saida',pasta],capture_output=True,text=True)
             self.assertEqual(r.returncode,0,r.stderr[-3500:])
             obj=json.loads((Path(pasta)/'resumo_consolidado_tr_igt_24340828.json').read_text())

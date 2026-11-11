@@ -147,8 +147,8 @@ def comparar_linhas(linha_tr: dict, linha_igt: dict, *, n_reducao: int,
 
 def executar(p1: Path, p2: Path, saida: Path) -> dict:
     """Executa novamente TR/IGT, cruza resultados e documenta a proveniencia."""
-    from analisar_regiao_movel import executar as executar_tr
-    from analisar_incrementos_geometricos import executar as executar_igt
+    from burngeoflow.analises.regioes_moveis import executar as executar_tr
+    from burngeoflow.analises.incrementos import executar as executar_igt
     tr = executar_tr(p1, p2, saida)
     igt = executar_igt(p1, p2, saida)
     if tr["id_incendio"] != igt["id_incendio"] or tr["transicoes"] != igt["transicoes"]:

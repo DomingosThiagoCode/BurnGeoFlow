@@ -11,7 +11,7 @@ from statistics import median
 import pyproj
 import shapely
 from shapely.geometry import mapping
-from integrar_etapa5 import ler_tabela, ler_geometrias, segmentar_fases
+from burngeoflow.analises.integracao import ler_tabela, ler_geometrias, segmentar_fases
 
 def num(r,c,optional=False):
     s=r.get(c)
@@ -310,7 +310,7 @@ científica pelo orientador ainda pendentes.
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--id",type=int,required=True)
-    ap.add_argument("--raiz",type=Path,default=Path(__file__).resolve().parents[1])
+    ap.add_argument("--raiz",type=Path,default=Path(__file__).resolve().parents[2])
     ap.add_argument("--saida",type=Path,default=None)
     ap.add_argument("--sem-mapa",action="store_true")
     args=ap.parse_args()

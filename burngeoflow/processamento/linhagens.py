@@ -20,7 +20,7 @@ import sys
 import pyproj
 import shapely
 
-from calcular_metricas_paisagem import (
+from burngeoflow.analises.paisagem import (
     Patch, carregar_p1, projetar_patches, salvar_csv,
 )
 

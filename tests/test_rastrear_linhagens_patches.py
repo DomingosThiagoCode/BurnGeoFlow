@@ -12,10 +12,10 @@ import unittest
 
 from shapely.geometry import box, mapping
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from calcular_metricas_paisagem import Patch  # noqa: E402
-from rastrear_linhagens_patches import (  # noqa: E402
+from burngeoflow.analises.paisagem import Patch  # noqa: E402
+from burngeoflow.processamento.linhagens import (  # noqa: E402
     analisar_linhagens, eventos_bipartidos, executar, vincular_por_area,
 )
 

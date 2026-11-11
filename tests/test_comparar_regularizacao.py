@@ -5,7 +5,7 @@ import unittest
 import shapely
 from shapely.geometry import Polygon
 
-from scripts.comparar_regularizacao import partes_poligonais
+from burngeoflow.validacao.regularizacao import partes_poligonais
 
 
 class TesteComparacaoRegularizacao(unittest.TestCase):
