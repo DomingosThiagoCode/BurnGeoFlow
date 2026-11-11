@@ -159,6 +159,8 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
         print(f"[EXEC] {etapa.nome}", flush=True)
         for arquivo in etapa.artefatos:
             arquivo.parent.mkdir(parents=True, exist_ok=True)
+            if arquivo.is_file():
+                arquivo.unlink()  # Evita aceitar arquivo antigo se a etapa nao escrever novo.
         resultado = subprocess.run(
             etapa.comando, cwd=ROOT, capture_output=True,
             text=True, encoding="utf-8", errors="replace", check=False

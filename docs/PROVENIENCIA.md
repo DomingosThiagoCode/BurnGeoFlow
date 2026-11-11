@@ -3,7 +3,7 @@
 As rotinas e testes da Etapa 7.1 foram importados do
 [CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio),
 mantendo os algoritmos anteriores para comparação de resultados.
-O novo arquivo \`executar_pipeline.py\` coordena essa implementação.
+O novo arquivo `executar_pipeline.py` coordena essa implementação.
 
 - TR: trajetórias representativas do centroide e extremos N/S/L/O,
   adaptadas da metodologia de Priscila Backes de Oliveira (IME, 2024).

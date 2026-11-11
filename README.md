@@ -30,7 +30,7 @@ Para reproduzir a amostra do Pantanal, ID GlobFire 24340828:
 python executar_pipeline.py --id 24340828 --baixar-exemplo
 ~~~
 
-O parâmetro \`--baixar-exemplo\` transfere os GeoJSONs históricos de
+O parâmetro `--baixar-exemplo` transfere os GeoJSONs históricos de
 [CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio),
 verificando hashes de integridade antes de processar. Após esse primeiro
 download, basta executar:
@@ -45,19 +45,19 @@ Para outros IDs já exportados em GeoJSON:
 python executar_pipeline.py --id 123456 --p1 C:\dados\P1_componentes_123456.geojson --p2 C:\dados\P2_regiao_movel_123456.geojson
 ~~~
 
-Use \`--refazer\` para forçar uma nova execução. Use \`--saida .\` caso queira
+Use `--refazer` para forçar uma nova execução. Use `--saida .` caso queira
 gravar os arquivos de saída na raiz do checkout, formato consumido pelos
 testes herdados.
 
 ## Produtos
 
-Cada execução é isolada em \`execucoes/<ID>/\` com diretórios
-\`dados/estudo_caso_<ID>/\`, \`resultados/etapa1/\` a
-\`resultados/etapa6/\`, \`logs/\` e \`execucao.json\`.
+Cada execução é isolada em `execucoes/<ID>/` com diretórios
+`dados/estudo_caso_<ID>/`, `resultados/etapa1/` a
+`resultados/etapa6/`, `logs/` e `execucao.json`.
 
 O manifesto mantém hashes SHA-256 das entradas e estado das oito tarefas
 de processamento. Etapas concluídas podem ser reutilizadas enquanto as
-entradas não mudarem. Depois de alterar o código, utilize \`--refazer\`.
+entradas não mudarem. Depois de alterar o código, utilize `--refazer`.
 
 Os módulos importados processam P1 (componentes da área acumulada),
 linhagens e P2 (região móvel), indicadores TR/IGT, síntese e auditoria interna.
