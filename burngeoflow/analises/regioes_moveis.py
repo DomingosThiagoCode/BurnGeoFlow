@@ -24,7 +24,7 @@ import pyproj
 import shapely
 from shapely.geometry import Point, LineString, shape, mapping
 
-from calcular_metricas_paisagem import (
+from burngeoflow.analises.paisagem import (
     Patch, carregar_p1, indice_forma_vetorial, projetar_patches, salvar_csv,
 )
 

@@ -27,7 +27,7 @@ import shapely
 from shapely.geometry import shape, Polygon, MultiPolygon
 from shapely.ops import unary_union
 
-from calcular_metricas_paisagem import carregar_p1, projetar_patches, salvar_csv
+from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
 
 
 CAMPOS_TRANSICOES = [
@@ -546,7 +546,7 @@ fases é exploratória, sensível à janela e ao modelo ajustado.
 
 ## Execução e proveniência
 
-Script: scripts/integrar_etapa5.py. CLI parametrizada por ID, exige P1/P2,
+Script: burngeoflow.analises.integracao. CLI parametrizada por ID, exige P1/P2,
 Etapa 2, Etapa 3 e Etapa 4 já processados para o evento.
 Resultados não são calculados a partir dos CSVs históricos do Beryl.
 As verificações usam equivalência geométrica P1/P2 e conservação de área,
@@ -558,7 +558,7 @@ sem modificar GeoJSON originais.
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--id",type=int,required=True,help="ID do evento GlobFire")
-    parser.add_argument("--raiz",type=Path,default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--raiz",type=Path,default=Path(__file__).resolve().parents[2])
     parser.add_argument("--saida",type=Path,default=None)
     args=parser.parse_args()
     pasta=args.saida or (args.raiz/"resultados"/"etapa5")
