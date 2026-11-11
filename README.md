@@ -67,21 +67,53 @@ Os arquivos gerados ficam em `execucoes/<ID>/`, incluindo resultados
 de cada etapa, logs e um manifesto com SHA-256 das entradas. A opção
 `--refazer` força nova execução após modificações no código.
 
-## Integração GEE
+## Aquisição automática GEE (Etapa 7.2)
 
-A API Python do Earth Engine ficará em `burngeoflow/aquisicao/earth_engine.py`.
-A consulta da coleção e a autenticação estão estruturadas, mas **gerar e
-exportar P1/P2 sem intervenção ainda é pendência da Etapa 7.2**. Portanto
-`--origem gee` ainda não processa um evento.
+O Earth Engine pode ser utilizado sem copiar JavaScript ou exportar manualmente pelo Google Drive.
+O Python constrói P1 (componentes acumulados por data) e P2 (região principal contínua),
+baixa GeoJSON por páginas e valida o par antes de executar as análises.
+**A equivalência com os GeoJSONs históricos do Pantanal exige teste real autenticado.**
 
-Instalação das dependências opcionais:
+### Preparação no Windows / PowerShell
 
 ```powershell
 pip install -r requirements-gee.txt
+Copy-Item .env.example .env
+# Edite EE_PROJECT_ID no .env com o ID do projeto Google Cloud
+earthengine authenticate
 ```
 
-Preencha a variável `EE_PROJECT_ID` em um `.env` local a partir de
-`.env.example`. Não versione tokens ou credenciais.
+### Adquirir e executar o pipeline
+
+```powershell
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee
+```
+
+Para adquirir e validar os GeoJSONs sem executar as análises:
+
+```powershell
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --somente-aquisicao
+```
+
+O ano é opcional; se omitido, o programa consulta as coleções anuais de 2020 a 2001.
+O comando mínimo `python executar_pipeline.py --id 24340828` opera em modo `auto`:
+usa o par P1/P2 local se existir, caso contrário tenta obter pelo GEE.
+
+O teste offline do caso de referência continua disponível:
+
+```powershell
+python executar_pipeline.py --id 24340828 --baixar-exemplo
+```
+
+As credenciais OAuth ficam no computador, nunca no repositório; `.env` está no
+`.gitignore`. A exportação usa `ee.data.computeFeatures`, com paginação, sem
+depender do Drive. Em eventos grandes a API pode exceder a capacidade ou
+cotas e encerrar a aquisição com erro sem publicar entradas incompletas.
+**A exportação em lotes por tarefas do GEE ainda não está implementada.**
+
+Documentação oficial: [API Python](https://developers.google.com/earth-engine/guides/python_install),
+[computeFeatures](https://developers.google.com/earth-engine/apidocs/ee-data-computefeatures)
+e [GlobFire v2](https://developers.google.com/earth-engine/datasets/catalog/JRC_GWIS_GlobFire_v2_DailyPerimeters).
 
 ## Escopo e qualidade
 

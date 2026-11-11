@@ -120,7 +120,8 @@ def definir_etapas(id_: int, raiz: Path, p1: Path, p2: Path) -> tuple[Etapa, ...
 
 
 def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None = None,
-            baixar_exemplo: bool = False, refazer: bool = False) -> dict:
+            baixar_exemplo: bool = False, refazer: bool = False,
+            origem: str = "GeoJSON local") -> dict:
     if id_ <= 0:
         raise ErroPipeline("ID deve ser positivo.")
     raiz = saida.resolve()
@@ -141,7 +142,7 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
     )
     manifesto = {
         "software": "BurnGeoFlow", "versao": "7.1.0",
-        "id_incendio": id_, "origem": "GeoJSON local",
+        "id_incendio": id_, "origem": origem,
         "entradas_sha256": hashes, "inicio_utc": agora(),
         "ressalva": "Auditoria geométrica interna, não validação física por sensores.",
         "etapas": etapas_anteriores,
@@ -202,24 +203,93 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--id", type=int, required=True)
-    ap.add_argument("--origem", choices=("local", "gee"), default="local")
-    ap.add_argument("--p1", type=Path)
-    ap.add_argument("--p2", type=Path)
-    ap.add_argument("--saida", type=Path, help="Pasta da execução")
-    ap.add_argument("--baixar-exemplo", action="store_true")
-    ap.add_argument("--refazer", action="store_true")
+    ap.add_argument("--id", type=int, required=True, help="ID numérico GlobFire")
+    ap.add_argument(
+        "--origem", choices=("auto", "local", "gee"), default="auto",
+        help="auto: reutiliza dados locais; senão consulta GEE (padrão)",
+    )
+    ap.add_argument("--ano", type=int,
+                    help="Ano da coleção GlobFire (2001-2020); acelera busca no GEE")
+    ap.add_argument("--projeto", type=str,
+                    help="ID do projeto Google Cloud (ou EE_PROJECT_ID no .env)")
+    ap.add_argument("--autenticar", action="store_true",
+                    help="Solicita login OAuth antes da consulta ao GEE")
+    ap.add_argument("--pagina-gee", type=int, default=50,
+                    help="Número de feições por página na exportação GEE")
+    ap.add_argument("--somente-aquisicao", action="store_true",
+                    help="Obtém e valida P1/P2 do GEE sem executar as análises")
+    ap.add_argument("--p1", type=Path, help="GeoJSON P1 para modo local")
+    ap.add_argument("--p2", type=Path, help="GeoJSON P2 para modo local")
+    ap.add_argument("--saida", type=Path, help="Diretório da execução")
+    ap.add_argument("--baixar-exemplo", action="store_true",
+                    help="Baixa o caso de referência 24340828 sem usar GEE")
+    ap.add_argument("--refazer", action="store_true",
+                    help="Refaz etapas científicas, mesmo que já concluídas")
     args = ap.parse_args(argv)
-    if args.origem == "gee":
-        print("[PENDENTE] Etapa 7.2: integração GEE ainda não implementada.",
-              file=sys.stderr)
-        return 2
+    raiz = (args.saida or ROOT / "execucoes" / str(args.id)).resolve()
+
     try:
-        executar(args.id, saida=args.saida or ROOT / "execucoes" / str(args.id),
-                 p1=args.p1, p2=args.p2,
-                 baixar_exemplo=args.baixar_exemplo, refazer=args.refazer)
+        if args.id <= 0:
+            raise ErroPipeline("ID GlobFire deve ser positivo.")
+        if (args.p1 is None) != (args.p2 is None):
+            raise ErroPipeline("--p1 e --p2 devem ser informados juntos.")
+        if args.baixar_exemplo and args.origem == "gee":
+            raise ErroPipeline("--baixar-exemplo não pode ser combinado com --origem gee.")
+        if args.origem == "gee" and args.p1 is not None:
+            raise ErroPipeline("--p1 e --p2 são opções do modo local.")
+        if args.somente_aquisicao and args.origem == "local":
+            raise ErroPipeline("--somente-aquisicao exige --origem gee ou auto sem cache.")
+
+        cache_execucao = raiz / "dados" / f"estudo_caso_{args.id}"
+        cache_referencia = ROOT / "dados" / f"estudo_caso_{args.id}"
+        def par_cache(pasta: Path) -> tuple[Path, Path] | None:
+            a = pasta / f"P1_componentes_{args.id}.geojson"
+            b = pasta / f"P2_regiao_movel_{args.id}.geojson"
+            return (a, b) if a.is_file() and b.is_file() else None
+
+        entrada_p1, entrada_p2 = args.p1, args.p2
+        dados_locais = bool(args.baixar_exemplo or args.p1)
+        if not dados_locais:
+            candidatos = par_cache(cache_execucao) or par_cache(cache_referencia)
+            if candidatos:
+                entrada_p1, entrada_p2 = candidatos
+                dados_locais = True
+
+        modo = args.origem
+        if modo == "auto":
+            modo = "local" if dados_locais and not args.somente_aquisicao else "gee"
+        if modo == "local":
+            if args.somente_aquisicao:
+                raise ErroPipeline("--somente-aquisicao exige aquisição GEE.")
+            executar(
+                args.id, saida=raiz, p1=entrada_p1, p2=entrada_p2,
+                baixar_exemplo=args.baixar_exemplo, refazer=args.refazer,
+            )
+            return 0
+
+        from burngeoflow.aquisicao.earth_engine import adquirir
+        p1, p2, metadata = adquirir(
+            args.id,
+            raiz / "dados" / f"estudo_caso_{args.id}",
+            ano=args.ano,
+            projeto=args.projeto,
+            autenticar=args.autenticar,
+            pagina=args.pagina_gee,
+        )
+        if args.somente_aquisicao:
+            print(json.dumps(metadata, indent=2, ensure_ascii=False))
+            return 0
+        executar(
+            args.id, saida=raiz, p1=p1, p2=p2,
+            refazer=args.refazer, origem="Google Earth Engine / GlobFire v2",
+        )
     except (ErroPipeline, OSError, ValueError) as exc:
         print(f"[ERRO] {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        # Também captura falhas de autenticação, API e exportação do GEE.
+        # Mantém os detalhes nos rastros de exceção no código para depuração.
+        print(f"[ERRO] {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     return 0
 
