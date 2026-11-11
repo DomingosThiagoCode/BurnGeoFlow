@@ -11,11 +11,14 @@ A rotina só substitui P1/P2 depois de validar ambos os GeoJSONs.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event, Thread
+from time import monotonic
 from typing import Any, Callable
 
 from burngeoflow.config import ConfiguracaoGEE, carregar_configuracao_gee
@@ -281,8 +284,54 @@ def construir_produtos(
     return p1, p2, qtd_datas
 
 
+def informar_terminal(mensagem: str) -> None:
+    """Mostra mensagens imediatamente no terminal."""
+    print(mensagem, flush=True)
+
+
+def tempo_decorrido(segundos: float) -> str:
+    """Tempo já decorrido, não previsão de término."""
+    minutos, segundos_restantes = divmod(int(max(0, segundos)), 60)
+    return f"{minutos:02d}:{segundos_restantes:02d}"
+
+
+@contextmanager
+def aviso_espera(
+    etapa: str, *, informar: Callable[[str], None] = informar_terminal,
+    intervalo_s: float = 30.0,
+):
+    """Aviso periódico enquanto o cliente espera uma resposta síncrona do GEE.
+
+    Não significa que o servidor avançou; não consulta o GEE novamente.
+    O thread daemon para ao receber a resposta ou uma exceção.
+    """
+    if intervalo_s <= 0:
+        raise ValueError("Intervalo do aviso precisa ser positivo.")
+    fim = Event()
+    inicio = monotonic()
+    informar(f"[GEE] {etapa}: extraindo dados, aguarde... ")
+    
+    def avisar() -> None:
+        while not fim.wait(intervalo_s):
+            informar(
+                f"[GEE] {etapa}: aguardando resposta do servidor há "
+                f"{tempo_decorrido(monotonic() - inicio)}. "
+                "Sem porcentagem ou previsão de conclusão."
+            )
+
+    thread = Thread(target=avisar, daemon=True, name="burngeoflow-gee-heartbeat")
+    thread.start()
+    try:
+        yield
+    finally:
+        fim.set()
+        thread.join(timeout=1)
+
 def obter_geojson(
-    ee: Any, colecao: Any, *, pagina: int = 50, limite: int = 50000
+    ee: Any, colecao: Any, *, pagina: int = 50, limite: int = 50000,
+    rotulo: str = "GeoJSON",
+    informar: Callable[[str], None] = informar_terminal,
+    intervalo_aviso_s: float = 30.0,
 ) -> dict:
     """Obtém feições por páginas. O GEE retorna EPSG:4326 em GeoJSON.
 
@@ -293,12 +342,19 @@ def obter_geojson(
     feicoes: list[dict] = []
     token: str | None = None
     vistos: set[str] = set()
+    indice_pagina = 0
     while True:
         params: dict[str, Any] = {"expression": colecao, "pageSize": pagina}
         if token is not None:
             params["pageToken"] = token
+        indice_pagina += 1
         try:
-            resposta = ee.data.computeFeatures(params)
+            with aviso_espera(
+                f"{rotulo}, página {indice_pagina}",
+                informar=informar,
+                intervalo_s=intervalo_aviso_s,
+            ):
+                resposta = ee.data.computeFeatures(params)
         except Exception as exc:
             raise ErroAquisicao(
                 f"Falha na exportação paginada, após {len(feicoes)} feições: "
@@ -308,6 +364,8 @@ def obter_geojson(
                 or not isinstance(resposta.get("features"), list)):
             raise ErroAquisicao("Resposta inválida de computeFeatures.")
         feicoes.extend(resposta["features"])
+        informar(f"[GEE] {rotulo}: página {indice_pagina} recebida; "
+                f"{len(feicoes)} feições obtidas até agora.")
         if len(feicoes) > limite:
             raise ErroAquisicao(
                 f"Limite de {limite} feições excedido. "
@@ -327,6 +385,8 @@ def obter_geojson(
                 or not isinstance(f.get("geometry"), dict)
                 or not isinstance(f.get("properties"), dict)):
             raise ErroAquisicao(f"Feição {indice} inválida na resposta GEE.")
+    informar(f"[GEE] {rotulo}: extração concluída, "
+            f"{len(feicoes)} feições recebidas.")
     return {"type": "FeatureCollection", "features": feicoes}
 
 
@@ -379,7 +439,7 @@ def adquirir(
     autenticar: bool = False,
     pagina: int = 50,
     ee_modulo: Any | None = None,
-    informar: Callable[[str], None] = print,
+    informar: Callable[[str], None] = informar_terminal,
 ) -> tuple[Path, Path, dict]:
     """Executa consulta, geração e exportação P1/P2; ee_modulo permite mock."""
     if ee_modulo is None:
@@ -396,8 +456,12 @@ def adquirir(
         ee_modulo, evento, id_incendio, ano_usado
     )
     informar(f"[GEE] {n_datas} datas; exportando P1 e P2")
-    p1 = obter_geojson(ee_modulo, p1_ee, pagina=pagina)
-    p2 = obter_geojson(ee_modulo, p2_ee, pagina=pagina)
+    p1 = obter_geojson(ee_modulo, p1_ee, pagina=pagina,
+                       rotulo="P1 (componentes)", informar=informar)
+    informar("[GEE] P1 recebido. Iniciando extração de P2 (região móvel).")
+    p2 = obter_geojson(ee_modulo, p2_ee, pagina=pagina,
+                       rotulo="P2 (região móvel)", informar=informar)
+    informar("[GEE] P2 recebido. Validando os dois GeoJSONs...")
     if len(p2["features"]) != n_datas:
         raise ErroAquisicao(
             f"P2 contém {len(p2['features'])} geometrias e eram esperadas {n_datas}."
@@ -405,6 +469,7 @@ def adquirir(
     caminho_p1, caminho_p2, resumo = publicar_geojsons(
         pasta, id_incendio, p1, p2
     )
+    informar("[GEE] P1 e P2 validados e gravados no disco.")
     metadados = {
         "id_incendio": id_incendio,
         "ano_dataset": ano_usado,

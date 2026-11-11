@@ -54,6 +54,40 @@ class TestePaginacao(unittest.TestCase):
         self.assertEqual(len(resposta["features"]), 2)
         self.assertEqual(compute.call_args_list[1].args[0]["pageToken"], "p2")
 
+    def test_mensagens_ao_receber_pagina(self):
+        p1, _ = exemplo()
+        mensagens = []
+        ee = SimpleNamespace(data=SimpleNamespace(
+            computeFeatures=Mock(return_value={"features": p1["features"]})
+        ))
+        obter_geojson(ee, "expr", rotulo="P1", informar=mensagens.append)
+        self.assertTrue(any("extraindo dados" in m for m in mensagens))
+        self.assertTrue(any("página 1 recebida" in m for m in mensagens))
+        self.assertTrue(any("extração concluída" in m for m in mensagens))
+
+    def test_heartbeat_periodico_e_interrompido_ao_terminar(self):
+        from burngeoflow.aquisicao.earth_engine import aviso_espera
+        import time
+        mensagens = []
+        with aviso_espera("P2", informar=mensagens.append, intervalo_s=0.01):
+            time.sleep(0.055)
+        self.assertTrue(any("aguardando resposta do servidor" in m
+                            for m in mensagens))
+        final = len(mensagens)
+        time.sleep(0.035)
+        self.assertEqual(len(mensagens), final)
+        self.assertTrue(all("%" not in m for m in mensagens))
+
+    def test_heartbeat_para_apos_excecao(self):
+        from burngeoflow.aquisicao.earth_engine import aviso_espera
+        import time
+        mensagens = []
+        with self.assertRaises(RuntimeError):
+            with aviso_espera("P1", informar=mensagens.append, intervalo_s=0.01):
+                raise RuntimeError("falhou")
+        final = len(mensagens)
+        time.sleep(0.035)
+        self.assertEqual(len(mensagens), final)
     def test_token_repetido_falha(self):
         p1, _ = exemplo()
         resposta = {"features": p1["features"], "next_page_token": "repete"}

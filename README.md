@@ -110,6 +110,20 @@ As credenciais OAuth ficam no computador, nunca no repositório; `.env` está no
 depender do Drive. Em eventos grandes a API pode exceder a capacidade ou
 cotas e encerrar a aquisição com erro sem publicar entradas incompletas.
 **A exportação em lotes por tarefas do GEE ainda não está implementada.**
+### Acompanhamento enquanto o GEE calcula
+
+A avaliação de geometrias pelo Earth Engine é síncrona e não informa
+percentual de conclusão nem tempo restante confiável. Por isso, a cada
+página solicitada o programa imprime imediatamente **extraindo dados, aguarde...**
+e, a cada **30 segundos**, informa o tempo decorrido enquanto aguarda.
+Quando uma página retorna, mostra quantas feições já foram recebidas e
+indica o início de P2 quando P1 termina.
+
+Os avisos significam apenas que o **Python ainda está esperando o servidor**;
+não comprovam que o processamento remoto está avançando. Se o GEE retornar
+uma falha, ela será informada. O programa não cria GeoJSONs incompletos.
+Uma execução iniciada antes dessa atualização não passa a emitir os avisos.
+
 
 Documentação oficial: [API Python](https://developers.google.com/earth-engine/guides/python_install),
 [computeFeatures](https://developers.google.com/earth-engine/apidocs/ee-data-computefeatures)
