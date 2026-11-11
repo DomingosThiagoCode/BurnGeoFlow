@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+execucoes/
+dados/estudo_caso_*/
+resultados/
+logs/
+execucao.json

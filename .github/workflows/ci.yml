@@ -1,0 +1,38 @@
+name: CI BurnGeoFlow
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  regressao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt
+      - name: Teste do orquestrador
+        run: python -m unittest discover -s tests -p "test_pipeline.py" -v
+      - name: Executar caso base
+        run: python executar_pipeline.py --id 24340828 --baixar-exemplo --saida .
+      - name: Testes cientificos originais
+        run: python -m unittest discover -s tests -v
+      - name: Conferir retomada
+        run: |
+          python executar_pipeline.py --id 24340828 --saida .
+          python -c "import json; m=json.load(open('execucao.json')); assert len(m['etapas'])==8 and all(x['status']=='concluido' for x in m['etapas'].values())"
+      - name: Anexar logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: burngeoflow-24340828
+          path: |
+            execucao.json
+            logs/
+          retention-days: 14
