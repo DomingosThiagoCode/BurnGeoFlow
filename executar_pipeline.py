@@ -283,6 +283,9 @@ def main(argv: list[str] | None = None) -> int:
             args.id, saida=raiz, p1=p1, p2=p2,
             refazer=args.refazer, origem="Google Earth Engine / GlobFire v2",
         )
+    except KeyboardInterrupt:
+        print("\n[GEE] Execução interrompida pelo usuário (Ctrl+C).", file=sys.stderr)
+        return 130
     except (ErroPipeline, OSError, ValueError) as exc:
         print(f"[ERRO] {exc}", file=sys.stderr)
         return 1
