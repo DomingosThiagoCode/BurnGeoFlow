@@ -1,12 +1,14 @@
 # Arquitetura do BurnGeoFlow
 
 O BurnGeoFlow é um pacote Python independente do projeto de pesquisa original.
+A pasta `resultados/` na raiz não é necessária: cada execução grava em `execucoes/<ID>/resultados/`.
 
 | Local | Responsabilidade |
 | --- | --- |
 | executar_pipeline.py | Entrada CLI, execução, logs, retomada |
 | burngeoflow/config.py | Configuração não sensível do acesso GEE |
 | burngeoflow/aquisicao/earth_engine.py | Autenticação e consulta GlobFire; geração automática de P1/P2 pendente |
+| burngeoflow/aquisicao/dados_referencia.py | Baixa amostra pública com hash para testes de regressão |
 | burngeoflow/processamento/componentes.py | Organização das componentes P1 por data |
 | burngeoflow/processamento/conectividade.py | Contatos geométricos, incluindo vértices |
 | burngeoflow/processamento/linhagens.py | Linhagens temporais pais-filhos |

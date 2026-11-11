@@ -6,7 +6,7 @@ import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from executar_pipeline import ErroPipeline, preparar_dados, definir_etapas, salvar_json
-from burngeoflow.dados import git_hash
+from burngeoflow.aquisicao.dados_referencia import git_hash
 
 
 class TestePipeline(unittest.TestCase):

@@ -1,4 +1,4 @@
-"""Recupera amostra pública de regressão do CDG_incendio, com SHA Git."""
+"""Obtém amostra pública de regressão do CDG_incendio, com SHA Git."""
 from __future__ import annotations
 
 from hashlib import sha1
