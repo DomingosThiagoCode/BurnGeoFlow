@@ -18,3 +18,12 @@ dependência do produto computacional.
 
 A interpretação dos indicadores está restrita à evolução geométrica das
 áreas queimadas; testes internos não equivalem à validação de campo.
+
+## Portabilidade da aquisição
+
+A geração Python aplica as decisões do JavaScript no CDG_incendio:
+união acumulada por IDate, componentes classificados por área e P2
+selecionado pela maior sobreposição com a observação anterior, com
+fallback por distância. O processamento não representa movimento
+físico da frente de fogo. A equivalência numérica e geométrica com
+a exportação histórica requer teste autenticado, ainda não realizado.

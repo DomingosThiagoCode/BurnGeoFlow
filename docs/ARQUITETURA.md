@@ -7,7 +7,7 @@ A pasta `resultados/` na raiz não é necessária: cada execução grava em `exe
 | --- | --- |
 | executar_pipeline.py | Entrada CLI, execução, logs, retomada |
 | burngeoflow/config.py | Configuração não sensível do acesso GEE |
-| burngeoflow/aquisicao/earth_engine.py | Autenticação e consulta GlobFire; geração automática de P1/P2 pendente |
+| burngeoflow/aquisicao/earth_engine.py | Consulta GlobFire, constrói P1/P2 acumulados e exporta GeoJSON por páginas |
 | burngeoflow/aquisicao/dados_referencia.py | Baixa amostra pública com hash para testes de regressão |
 | burngeoflow/processamento/componentes.py | Organização das componentes P1 por data |
 | burngeoflow/processamento/conectividade.py | Contatos geométricos, incluindo vértices |
@@ -26,6 +26,8 @@ O JavaScript do GEE e os SQLs de experimentação continuam preservados no
 [CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio),
 não no produto BurnGeoFlow.
 
-O modo GEE de aquisição completa ainda não está liberado: a Etapa 7.2
-implementará a transformação e exportação automática de P1/P2, e deverá
-demonstrar equivalência com a linha de base Pantanal 24340828.
+A Etapa 7.2 implementa P1/P2 pelo GEE e exporta via `ee.data.computeFeatures`.
+O GitHub Actions testa a aquisição com mocks, sem credenciais Google.
+A equivalência geométrica com os resultados históricos do Pantanal 24340828
+precisa ser aferida numa execução autenticada real. Para eventos grandes,
+a exportação paginada pode exigir futura alternativa em lote.
