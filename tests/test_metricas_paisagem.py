@@ -12,8 +12,8 @@ import unittest
 
 from shapely.geometry import Point, box, mapping
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from calcular_metricas_paisagem import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from burngeoflow.analises.paisagem import (  # noqa: E402
     Patch, calcular_metricas, carregar_p1, examinar_contatos,
     executar, indice_forma_vetorial, projetar_patches,
     sensibilidade_contato_vetorial,

@@ -7,8 +7,8 @@ from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
-from validar_cientificamente_etapa6 import (
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from burngeoflow.validacao.robustez import (
     angular, direcoes, contatos, fases_sensiveis, executar)
 
 class TestesSinteticos(unittest.TestCase):

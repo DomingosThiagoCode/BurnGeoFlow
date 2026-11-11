@@ -83,7 +83,8 @@ def preparar_dados(id_: int, pasta: Path, p1_arg: Path | None,
 def definir_etapas(id_: int, raiz: Path, p1: Path, p2: Path) -> tuple[Etapa, ...]:
     dirs = {n: raiz / "resultados" / f"etapa{n}" for n in range(1, 7)}
     def py(nome: str) -> list[str]:
-        return [sys.executable, str(ROOT / "scripts" / nome)]
+        modulos = {"validar_produtos.py":"burngeoflow.validacao.produtos","auditar_espacial.py":"burngeoflow.validacao.espacial","comparar_regularizacao.py":"burngeoflow.validacao.regularizacao","calcular_metricas_paisagem.py":"burngeoflow.analises.paisagem","rastrear_linhagens_patches.py":"burngeoflow.processamento.linhagens","analisar_regiao_movel.py":"burngeoflow.analises.regioes_moveis","analisar_incrementos_geometricos.py":"burngeoflow.analises.incrementos","consolidar_tr_igt.py":"burngeoflow.analises.tr_igt","integrar_etapa5.py":"burngeoflow.analises.integracao","validar_cientificamente_etapa6.py":"burngeoflow.validacao.robustez"}
+        return [sys.executable, "-m", modulos[nome]]
     e1, e2, e3, e4, e5, e6 = [dirs[n] for n in range(1, 7)]
     return (
         Etapa("validar", py("validar_produtos.py") + [str(p1), str(p2)],

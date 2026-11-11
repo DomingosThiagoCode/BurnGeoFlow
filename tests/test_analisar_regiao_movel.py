@@ -12,12 +12,12 @@ import unittest
 import pyproj
 from shapely.geometry import box, mapping, Point
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from analisar_regiao_movel import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from burngeoflow.analises.regioes_moveis import (  # noqa: E402
     PONTOS, analisar, distancia_direcao, executar, indicadores_poligono,
     pontos_cardeais, reproduzir_rastreamento, vertices_exteriores,
 )
-from calcular_metricas_paisagem import Patch, projetar_patches  # noqa: E402
+from burngeoflow.analises.paisagem import Patch, projetar_patches  # noqa: E402
 
 
 def patch(dia, rank, geom, incendio=123):

@@ -6,7 +6,7 @@ from pathlib import Path
 import shapely
 from shapely.geometry import Polygon
 
-from scripts.auditar_espacial import (
+from burngeoflow.validacao.espacial import (
     Feicao,
     agrupar,
     evolucao_temporal,

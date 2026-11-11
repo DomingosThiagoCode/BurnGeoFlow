@@ -14,8 +14,8 @@ import unittest
 from shapely.geometry import box
 from shapely.ops import unary_union
 
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
-from integrar_etapa5 import (decompor_transicao, segmentar_fases,
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from burngeoflow.analises.integracao import (decompor_transicao, segmentar_fases,
                             marcar_fases, executar, conferir_proximo,
                             ler_tabela, valor)
 
