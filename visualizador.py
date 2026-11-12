@@ -73,10 +73,10 @@ def main():
         )
         if evento_id is not None:
             st.code(
-                f"python executar_pipeline.py --id {evento_id} "
-                "--origem gee --ano 2020",
+                f"python executar_pipeline.py --id {evento_id} --origem gee",
                 language="powershell",
             )
+            st.caption("Se souber o ano, adicione --ano AAAA para acelerar a busca.")
 
     if evento_id is None:
         st.info("Selecione um ID disponível no menu lateral.")
