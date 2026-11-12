@@ -168,6 +168,13 @@ já registrado nos resumos. A análise P2 pode receber polígonos cuja
 projeção revela auto-interseções, mesmo após a validação estrutural.
 
 TR e IGT verificam agora o P2 com a mesma projeção do P1.
+**Definição geométrica comum TR/IGT:** a área nova é `área(R(t+1) \\ R(t))`
+e a área reduzida é `área(R(t) \\ R(t+1))`, ambas calculadas por
+diferença espacial explícita em LAEA (não como subtração de áreas
+totais e interseções). A conferência cruzada mantém o limite de **0,1 m²**
+e informa datas e valores em caso de discrepância. Nenhuma divergência
+é ignorada. Falhas das etapas aparecem também no terminal, além dos logs.
+
 **A consolidação `tr_igt.py` usa a mesma geometria P1 LAEA canônica** para
 o cálculo das diferenças entre datas, depois de reconciliar cada P2 com
 seu componente correspondente. Assim, não reintroduz os P2 inválidos no
