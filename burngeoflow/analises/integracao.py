@@ -29,6 +29,7 @@ from shapely.ops import unary_union
 
 from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
 from burngeoflow.validacao.topologia_p2 import reconciliar_p2
+from burngeoflow.validacao.sobreposicoes import diagnosticar_grupo
 
 
 CAMPOS_TRANSICOES = [
@@ -112,10 +113,12 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
     if len(reparados_p1) != reparos:
         raise ValueError("Inconsistencia na contagem de reparos P1 em LAEA")
     grupos = defaultdict(list)
+    patches_por_dia = defaultdict(list)
     chaves = {}
     indice = {}
     for p in patches:
         grupos[p.data].append(p.geometria)
+        patches_por_dia[p.data].append(p)
         if (p.data,p.rank) in chaves:
             raise ValueError("P1 tem rank/data duplicado")
         chaves[(p.data,p.rank)] = p.geometria
@@ -177,8 +180,26 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
     totais = {}
     for d,g in grupos.items():
         total = unary_union(g)
-        if abs(total.area-sum(x.area for x in g)) > 1:
-            raise ValueError(f"Patches P1 sobrepoem em area: {d}")
+        excesso = max(0.0, sum(x.area for x in g) - total.area)
+        if excesso > 1:
+            detalhamento = diagnosticar_grupo(patches_por_dia[d])
+            if diagnostico is not None:
+                diagnostico["sobreposicao_p1"] = detalhamento
+            principal = detalhamento["pares_mais_relevantes"]
+            referencia = (
+                f"ranks {principal[0]['rank_a']}/{principal[0]['rank_b']}, "
+                f"intersecao {principal[0]['intersecao_m2']:.4f} m2"
+                if principal else "sem par identificado"
+            )
+            raise ValueError(
+                f"Patches P1 sobrepoem em area: {d}; "
+                f"excesso_soma_uniao={excesso:.4f} m2; "
+                f"pares={detalhamento['numero_pares_sobrepostos']}; "
+                f"maior par: {referencia}. "
+                "Audite sem alterar os dados: "
+                f"python -m burngeoflow.validacao.sobreposicoes --id {incendio} "
+                f"--data {d}"
+            )
         totais[d] = total
     return totais, selecionados, grupos, crs
 
