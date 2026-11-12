@@ -7,6 +7,9 @@ Distingue area em duplicidade na soma/união da soma das interseções dos pares
 from __future__ import annotations
 
 import argparse
+from datetime import date
+from hashlib import sha256
+import pyproj
 from collections import defaultdict
 import json
 from pathlib import Path
@@ -110,6 +113,126 @@ def diagnosticar_arquivo(p1: Path, *, data: str | None = None,
     }
 
 
+
+
+def _intersecao_valida(a, b, *, conversor=None) -> dict:
+    """Area de intersecao, somente para geometrias topologicamente validas.
+
+    A comparacao WGS84 é reprojetada ao LAEA da analise, em vez de usar
+    valores de area em graus quadrados. Overlay de geometrias invalidas
+    nao oferece evidencia confiavel, por isso retorna 'indeterminada'.
+    """
+    if not a.is_valid or not b.is_valid:
+        return {"area_m2": None, "situacao": "geometria_invalida"}
+    try:
+        inter = a.intersection(b)
+        if conversor is not None and not inter.is_empty:
+            inter = shapely.transform(
+                inter, conversor.transform, interleaved=False,
+            )
+        if not inter.is_valid:
+            return {"area_m2": None, "situacao": "intersecao_projetada_invalida"}
+        return {"area_m2": float(inter.area), "situacao": "calculada"}
+    except (shapely.GEOSException, ValueError, pyproj.exceptions.ProjError) as exc:
+        return {
+            "area_m2": None,
+            "situacao": "erro_na_operacao_topologica",
+            "erro": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def _classificar_origem(original, projetada, corrigida) -> str:
+    if original["area_m2"] is None:
+        return "INDETERMINADO_ORIGINAL_INVALIDO_OU_OVERLAY_IMPOSSIVEL"
+    if original["area_m2"] > 0:
+        return "JA_EXISTIA_NO_GEOJSON_ORIGINAL"
+    if corrigida["area_m2"] is None:
+        return "INDETERMINADO_APOS_REPARO"
+    if corrigida["area_m2"] == 0:
+        return "SEM_SOBREPOSICAO_DE_AREA"
+    if projetada["area_m2"] is None:
+        return "SURGIU_NA_PROJECAO_OU_REPARO_SEM_SEPARACAO_CONFIAVEL"
+    if projetada["area_m2"] > 0:
+        return "SURGIU_ANTES_DO_REPARO_NA_PROJECAO"
+    return "SURGIU_NO_REPARO"
+
+
+def verificar_origem(p1_path: Path, *, data: str, principal: int = 1,
+                    outros: tuple[int, ...] = (10, 16, 18)) -> dict:
+    """Compara 3 estados dos mesmos ranks; nao altera fontes, nao chama GEE."""
+    date.fromisoformat(data)
+    if principal < 1 or not outros or any(r < 1 or r == principal for r in outros):
+        raise ValueError("Ranks precisam ser positivos e diferentes do principal")
+    if len(set(outros)) != len(outros):
+        raise ValueError("Ranks repetidos na comparacao")
+    patches = carregar_p1(p1_path)
+    indice = {p.rank: p for p in patches if p.data == data}
+    exigidos = {principal, *outros}
+    ausentes = exigidos - set(indice)
+    if ausentes:
+        raise ValueError(f"{data}: ranks inexistentes {sorted(ausentes)}")
+    originais = {r: indice[r].geometria for r in exigidos}
+    # Fundamental: projetar_patches usa o centro da extensao de TODAS as
+    # datas do incendio, nao apenas dos quatro patches selecionados.
+    crs, reparados = projetar_patches(patches)
+    tx = pyproj.Transformer.from_crs(
+        "EPSG:4326",
+        pyproj.CRS.from_proj4(crs["definicao_laea_proj4"]),
+        always_xy=True,
+    )
+    projetados = {
+        r: shapely.transform(g, tx.transform, interleaved=False)
+        for r, g in originais.items()
+    }
+    corrigidos = {r: indice[r].geometria for r in exigidos}
+    estados = {}
+    for r in sorted(exigidos):
+        a, b, c = originais[r], projetados[r], corrigidos[r]
+        estados[str(r)] = {
+            "original_valida_wgs84": bool(a.is_valid),
+            "original_motivo_invalidade": (
+                None if a.is_valid else explain_validity(a)
+            ),
+            "projetada_valida_antes_make_valid": bool(b.is_valid),
+            "projetada_motivo_invalidade": (
+                None if b.is_valid else explain_validity(b)
+            ),
+            "corrigida_valida": bool(c.is_valid),
+            "reparo_aplicado": bool(indice[r].reparado_apos_projecao),
+        }
+    pares = []
+    for outro in outros:
+        origem = _intersecao_valida(
+            originais[principal], originais[outro], conversor=tx,
+        )
+        pre = _intersecao_valida(projetados[principal], projetados[outro])
+        pos = _intersecao_valida(corrigidos[principal], corrigidos[outro])
+        pares.append({
+            "rank_principal": principal, "rank_outro": outro,
+            "original_wgs84_intersecao_convertida_laea": origem,
+            "projetada_laea_antes_reparo": pre,
+            "projetada_laea_apos_reparo": pos,
+            "classificacao": _classificar_origem(origem, pre, pos),
+        })
+    return {
+        "data": data,
+        "id_incendio": indice[principal].incendio,
+        "arquivo": str(p1_path.resolve()),
+        "sha256_p1": sha256(p1_path.read_bytes()).hexdigest(),
+        "projecao_laea": crs["definicao_laea_proj4"],
+        "reparos_totais_evento": reparados,
+        "ranks": estados,
+        "pares": pares,
+        "nota_metodologica": (
+            "Area original calculada pela intersecao em WGS84 e convertida "
+            "para a LAEA local. Operacoes sobre geometria invalida nao sao "
+            "aceitas. Se apos a projecao a geometria ainda for invalida, "
+            "nao e possivel separar confiavelmente efeito da projecao e "
+            "efeito de make_valid. Nao equivale a validacao externa."
+        ),
+        "arquivos_originais_modificados": False,
+    }
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--id", type=int, required=True)
@@ -117,6 +240,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--p1", type=Path, help="GeoJSON P1; padrão: execucoes/<ID>/dados/...")
     ap.add_argument("--saida", type=Path, help="Caminho JSON do diagnóstico")
     ap.add_argument("--top-n", type=int, default=15)
+    ap.add_argument("--verificar-origem", action="store_true",
+                    help="Compara antes/após LAEA e make_valid, sem alterar P1")
+    ap.add_argument("--principal", type=int, default=1)
+    ap.add_argument("--outros", type=int, nargs="+", default=[10, 16, 18])
     args = ap.parse_args(argv)
     raiz = Path(__file__).resolve().parents[2] / "execucoes" / str(args.id)
     p1 = args.p1 or (
@@ -128,6 +255,44 @@ def main(argv: list[str] | None = None) -> int:
         / f"diagnostico_sobreposicoes_p1_{args.id}.json"
     )
     try:
+        if args.verificar_origem:
+            if not args.data:
+                raise ValueError("--verificar-origem exige --data")
+            relatorio = verificar_origem(
+                p1, data=args.data, principal=args.principal,
+                outros=tuple(args.outros),
+            )
+            destino = args.saida or (
+                raiz / "resultados" / "etapa5"
+                / f"verificacao_origem_p1_{args.id}_{args.data}.json"
+            )
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            destino.write_text(
+                json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            print(f"[VERIFICACAO ORIGEM] {args.data} | Relatorio: {destino}")
+            for rank, estado in relatorio["ranks"].items():
+                print(
+                    f"  rank {rank}: original_valido="
+                    f"{estado['original_valida_wgs84']}, "
+                    f"LAEA_pre_reparo_valido="
+                    f"{estado['projetada_valida_antes_make_valid']}, "
+                    f"reparo={estado['reparo_aplicado']}"
+                )
+            for par in relatorio["pares"]:
+                def fmt(etapa):
+                    valor = etapa["area_m2"]
+                    return ("INDETERMINADO" if valor is None
+                            else f"{valor:.9f} m2")
+                print(
+                    f"  ranks {par['rank_principal']}/{par['rank_outro']}: "
+                    f"original={fmt(par['original_wgs84_intersecao_convertida_laea'])}; "
+                    f"LAEA_sem_reparo={fmt(par['projetada_laea_antes_reparo'])}; "
+                    f"LAEA_final={fmt(par['projetada_laea_apos_reparo'])}"
+                )
+                print(f"    => {par['classificacao']}")
+            return 0
         relatorio = diagnosticar_arquivo(p1, data=args.data, top_n=args.top_n)
         destino.parent.mkdir(parents=True, exist_ok=True)
         destino.write_text(

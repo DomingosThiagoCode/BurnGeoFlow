@@ -189,6 +189,26 @@ o cache local de P1 e **não altera os dados, não chama GEE e não prossegue
 com a integração**. A diferença soma/união não necessariamente é igual
 à soma das interseções por pares quando há sobreposição tripla.
 
+### Verificar a origem das sobreposições, antes e depois dos reparos
+
+Para o evento 24340828 e a data 18/09/2020, compare os ranks 1/10,
+1/16 e 1/18 com a mesma projeção LAEA empregada no pipeline:
+
+```powershell
+python -m burngeoflow.validacao.sobreposicoes --id 24340828 --data 2020-09-18 --verificar-origem
+```
+
+Esse modo registra para cada par a interseção (em m²) nos estados
+**P1 original WGS84**, **LAEA antes de `make_valid`** e
+**LAEA após `make_valid`**. O resultado vai para
+`execucoes/24340828/resultados/etapa5/verificacao_origem_p1_24340828_2020-09-18.json`.
+Permite trocar os ranks com `--principal N --outros X Y Z`.
+
+O modo declara **indeterminada** a interseção de qualquer polígono
+inválido. Se o estado intermediário LAEA for inválido, não se pode
+isolar a contribuição da reprojeção da contribuição do reparo.
+Essa verificação preserva os GeoJSONs e não chama o GEE,
+mas não substitui a validação externa nem remove alertas científicos.
 ### Etapa 5 com geometrias P1/P2 regularizadas
 
 A integração da Etapa 5 não deve rejeitar automaticamente um P1 que
