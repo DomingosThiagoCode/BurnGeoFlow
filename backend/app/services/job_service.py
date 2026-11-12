@@ -29,7 +29,11 @@ class JobService:
                 comando, cwd=ROOT, stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 close_fds=True, env={**os.environ, "PYTHONUNBUFFERED": "1"},
-                start_new_session=True,
+                start_new_session=(os.name != "nt"),
+                creationflags=(
+                    subprocess.CREATE_NEW_PROCESS_GROUP
+                    if os.name == "nt" else 0
+                ),
             )
         except (OSError, ValueError) as exc:
             self.store.finalizar(

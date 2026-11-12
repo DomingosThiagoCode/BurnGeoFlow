@@ -129,3 +129,19 @@ não solicitam login interativo.
 
 Para verificar, use:
 `python -m unittest discover -s backend/tests -v`.
+
+
+## Distribuição unificada
+
+Depois de executar `cd frontend && npm ci && npm run build` uma vez,
+use `python iniciar_burngeoflow.py`. O FastAPI serve os arquivos
+gerados em `frontend/dist/` na mesma origem da API, mantendo as rotas
+`/api` e `/docs` prioritárias. A interface compilada utiliza
+a URL de origem da página como endpoint padrão, inclusive quando a porta
+local muda. No modo desenvolvimento, o Vite mantém endpoint 8000.
+
+O backend **não** remove a CLI nem altera os GeoJSONs. O código no navegador
+usa mensagens assíncronas e solicita geometrias por dia e camada.
+A execução remota de subprocessos fica restrita ao worker local e aos
+argumentos conhecidos. Não iniciar esta aplicação em 0.0.0.0 sem revisão
+de autenticação e controles de acesso.

@@ -24,7 +24,8 @@ def repo(request: Request) -> RepositorioEventos:
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "service": "burngeoflow-api", "read_only": True}
+    return {"status": "ok", "service": "burngeoflow-api",
+            "jobs_enabled": True, "scientific_data_read_only": True}
 
 
 @router.get("/events", response_model=list[EventoListado])
