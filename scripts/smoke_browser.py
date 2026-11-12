@@ -78,7 +78,35 @@ def responder_api(route):
             "p2_area_laea_km2": str(i + 8),
             "numero_patches": "1",
             "dominancia_cobertura_p2_pct": "80",
+            "dominancia_maior_patch_pct": "80",
+            "indice_forma_medio_ponderado_area": "1.5",
         } for i, d in enumerate(DATAS)]
+    elif caminho.endswith("/analysis"):
+        nomes = ("centroide", "norte", "sul", "leste", "oeste")
+        dados = {
+            "disponivel": True,
+            "pontos": [{
+                "id_incendio": str(EVENTO), "data": d, "ponto": nome,
+                "x_laea_m": str(1000 + i * 200 + j * 40),
+                "y_laea_m": str(2000 + i * 100 + j * 70),
+            } for i, d in enumerate(DATAS) for j, nome in enumerate(nomes)],
+            "segmentos": [{
+                "id_incendio": str(EVENTO),
+                "data_anterior": DATAS[i-1], "data_atual": DATAS[i],
+                "ponto": nome, "azimute_geodesico_graus": str(50+j*25),
+                "distancia_geodesica_km": "1.5",
+            } for i in range(1, len(DATAS)) for j, nome in enumerate(nomes)],
+            "indicadores": [{
+                "id_incendio": str(EVENTO),
+                "data_anterior": DATAS[i-1], "data_atual": DATAS[i],
+                "deslocamento_centroide_km": "1.5",
+                "avanco_norte_km": "0.5", "avanco_sul_km": "0.1",
+                "avanco_leste_km": "0.7", "avanco_oeste_km": "0.2",
+                "delta_amplitude_ns_km": "0.4", "delta_amplitude_lo_km": "0.5",
+                "indice_forma_atual": "1.7", "delta_indice_forma": "0.1",
+                "perimetro_atual_km": "10.0", "jaccard_geometrico": "0.7",
+            } for i in range(1, len(DATAS))],
+        }
     elif caminho.endswith("/transitions"):
         dados = [{
             "id_incendio": str(EVENTO),
@@ -88,6 +116,10 @@ def responder_api(route):
             "area_nova_evento_km2": "1",
             "p2_incremento_ja_queimado_km2": "0.5",
             "eventos_convergencia": "1",
+            "tr_azimute_centroide_graus": "80",
+            "tr_deslocamento_centroide_km": "1",
+            "igt_azimute_ponderado_graus": "55",
+            "p2_incremento_geometrico_km2": "2",
         } for i in range(1, len(DATAS))]
     elif caminho.endswith("/geometry"):
         dia = caminho.split("/")[-2]
@@ -160,6 +192,37 @@ def testar() -> None:
             page.get_by_role(
                 "button", name="Abrir mapa do evento",
             ).wait_for()
+            assert page.locator(".sidebar").evaluate(
+                "el => getComputedStyle(el).position"
+            ) == "sticky", "A barra lateral precisa acompanhar a rolagem"
+            page.get_by_role("tab", name="Paisagem").click()
+            page.get_by_role("heading", name="Paisagem e componentes").wait_for()
+            assert page.locator(".chart-panel").count() == 4
+            page.get_by_role("tab", name="Expansão").click()
+            page.get_by_role("heading", name="Expansão e incorporação geométrica").wait_for()
+            page.evaluate("window.scrollTo(0, 530)")
+            page.wait_for_timeout(100)
+            lateral = page.locator(".sidebar").bounding_box()
+            assert lateral is not None and abs(lateral["y"] - 76) < 4, (
+                "Barra lateral não acompanhou a rolagem do desktop"
+            )
+            page.evaluate("window.scrollTo(0, 0)")
+            page.get_by_role("tab", name="Movimento").click()
+            page.get_by_role("heading", name="Cinco trajetórias representativas").wait_for()
+            page.get_by_role("tab", name="Direções").click()
+            page.get_by_role("heading", name="Direções e rosáceas").wait_for()
+            assert page.locator(".rose-card").count() == 7
+            page.get_by_role("tab", name="Forma").click()
+            page.get_by_role("heading", name="Forma e deformação").wait_for()
+            assert page.locator(".chart-panel").count() == 4
+            assert not errors, f"Falhas JavaScript nas novas abas: {errors}"
+            page.set_viewport_size({"width": 390, "height": 840})
+            assert page.locator(".sidebar").evaluate(
+                "el => getComputedStyle(el).position"
+            ) == "fixed", "No mobile o menu deve continuar sendo um drawer"
+            page.get_by_role("button", name="Abrir menu").click()
+            assert "sidebar-open" in (page.locator(".sidebar").get_attribute("class") or "")
+            page.locator(".global-header").get_by_role("button", name="Fechar menu").click()
             browser.close()
     finally:
         httpd.shutdown()

@@ -10,7 +10,9 @@ O BurnGeoFlow reúne três partes distintas:
 2. **API FastAPI:** entrega séries e GeoJSONs por data, mantém um índice
    reconstruível e gerencia execuções com status e logs em SQLite.
 3. **Frontend React:** interface responsiva com mapa MapLibre, linha do
-   tempo, gráficos e botão para processar outros IDs.
+   tempo e seis abas de análise: Visão geral, Paisagem, Expansão, Movimento,
+   Direções (rosáceas TR/IGT e dos cinco feixes) e Forma. A lateral de
+   navegação acompanha o scroll no desktop.
 
 **Estado científico:** os resultados calculados são análises geométricas
 descritivas. Uma execução computacional bem-sucedida **não** significa

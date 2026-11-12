@@ -32,6 +32,7 @@ Ouvimos em 127.0.0.1, não 0.0.0.0.
 - `GET /api/events/{id}/overview`
 - `GET /api/events/{id}/series`
 - `GET /api/events/{id}/transitions`
+- `GET /api/events/{id}/analysis` (Etapa 4: pontos, segmentos e indicadores da região)
 - `GET /api/events/{id}/dates/{YYYY-MM-DD}`
 - `GET /api/events/{id}/dates/{YYYY-MM-DD}/geometry?layer=p1|p2`
 - `GET /api/events/{id}/downloads/series.csv`
@@ -46,6 +47,27 @@ O índice é invalidado se tamanho ou modificação da fonte mudar. Caso
 a Etapa 5 esteja disponível, seu SHA-256 é conferido antes da indexação;
 os próprios resumos e métricas também são conferidos. Índices derivados
 são descartáveis; P1/P2 e brutos GEE não sofrem nenhuma alteração.
+
+### Análise científica da Etapa 4
+
+O endpoint de leitura `/api/events/{id}/analysis` devolve:
+
+- `disponivel`: sinaliza se os quatro arquivos necessários existem;
+- `pontos`: 5 descritores por data (centroide, N/S/L/O), com coordenadas em LAEA local;
+- `segmentos`: distâncias e azimutes de cada feixe por transição;
+- `indicadores`: avanços cardeais, deslocamento do centroide, perímetro, índice de forma e Jaccard.
+
+As saídas vêm dos CSVs originais em `resultados/etapa4`. A API verifica
+o ID, os conjuntos completos de pontos/transições, as contagens do resumo
+da Etapa 4 e os hashes SHA-256 dos GeoJSON P1/P2. Um conjunto incoerente
+resulta em HTTP `409`; uma etapa ausente retorna listas vazias e
+`disponivel: false`, nunca números inventados.
+
+A interface agrupa os gráficos em seis abas (Visão geral, Paisagem,
+Expansão, Movimento, Direções, Forma) e só busca os dados adicionais
+quando abre uma das três últimas. As rosáceas TR e IGT têm ponderações
+distintas, especificadas nos títulos. A visualização das cinco trajetórias
+é geométrica, sem interpretação como frentes ativas de incêndio.
 
 **Restrição inicial:** servidor local com um único worker Uvicorn.
 A indexação usa lock por processo e ainda não implementa lock entre

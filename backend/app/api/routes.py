@@ -43,6 +43,12 @@ def serie(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.series(incendio)
 
 
+@router.get("/events/{incendio}/analysis")
+def analise_regiao(incendio: int, r: RepositorioEventos = Depends(repo)):
+    """Trajetórias e forma da Etapa 4, sem reprocessar os dados."""
+    return r.analise_regiao(incendio)
+
+
 @router.get("/events/{incendio}/transitions")
 def transicoes(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.transicoes(incendio)

@@ -1,20 +1,28 @@
 import { type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, AlertCircle, ArrowDownToLine, BarChart3, CheckCircle2,
+  Activity, AlertCircle, ArrowDownToLine, CheckCircle2,
   ChevronLeft, ChevronRight, Database, Flame, Layers, LoaderCircle,
   Menu, Pause, Play, RefreshCw, Search, X,
 } from "lucide-react";
-import { LineChart, type SerieGrafico } from "./components/LineChart";
+import { ScientificPanels, type AbaCientifica } from "./components/ScientificPanels";
 // Só importa MapLibre e WebGL quando o usuário solicita o mapa.
 const MapPanel = lazy(() => import("./components/MapPanel").then(m => ({default: m.MapPanel})));
 import { JobsPanel } from "./components/JobsPanel";
 import {
-  carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
+  carregarAnalise, carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
   formatarNumero, listarEventos, nomeDia, numero, urlSerieCSV,
 } from "./services/api";
-import type { Camada, Colecao, EventoListado, Linha, VisaoEvento } from "./types";
+import type { AnaliseEtapa4, Camada, Colecao, EventoListado, Linha, VisaoEvento } from "./types";
 
-const CORES = { p1: "#db8750", p2: "#168f86", suporte: "#5276a8" };
+const ABAS = [
+  { id: "geral", label: "Visão geral" },
+  { id: "paisagem", label: "Paisagem" },
+  { id: "expansao", label: "Expansão" },
+  { id: "movimento", label: "Movimento" },
+  { id: "direcoes", label: "Direções" },
+  { id: "forma", label: "Forma" },
+] as const;
+type Aba = "geral" | AbaCientifica;
 
 function textoErro(erro: unknown): string {
   return erro instanceof Error ? erro.message : "Falha inesperada";
@@ -41,6 +49,10 @@ export default function App() {
   const [buscaId, setBuscaId] = useState("");
   const [buscando, setBuscando] = useState(true);
   const [painelAberto, setPainelAberto] = useState(false);
+  const [aba, setAba] = useState<Aba>("geral");
+  const [analise, setAnalise] = useState<AnaliseEtapa4 | null>(null);
+  const [carregandoAnalise, setCarregandoAnalise] = useState(false);
+  const [erroAnalise, setErroAnalise] = useState<string | null>(null);
   const [resumo, setResumo] = useState<VisaoEvento | null>(null);
   const [serie, setSerie] = useState<Linha[]>([]);
   const [transicoes, setTransicoes] = useState<Linha[]>([]);
@@ -88,6 +100,9 @@ export default function App() {
     setResumo(null);
     setSerie([]);
     setTransicoes([]);
+    setAnalise(null);
+    setErroAnalise(null);
+    setAba("geral");
     setP1(null);
     setP2(null);
     setData("");
@@ -114,6 +129,21 @@ export default function App() {
       });
     return () => abort.abort();
   }, [id, revisao]);
+
+  useEffect(() => {
+    if (id === null || (aba !== "movimento" && aba !== "direcoes" && aba !== "forma")
+        || analise !== null) return;
+    const ctrl = new AbortController();
+    setCarregandoAnalise(true);
+    setErroAnalise(null);
+    carregarAnalise(id, ctrl.signal)
+      .then(dados => { if (!ctrl.signal.aborted) setAnalise(dados); })
+      .catch(erro => {
+        if (!ctrl.signal.aborted) setErroAnalise(textoErro(erro));
+      })
+      .finally(() => { if (!ctrl.signal.aborted) setCarregandoAnalise(false); });
+    return () => ctrl.abort();
+  }, [id, aba, analise]);
 
   const obterCamada = useCallback(async (
     identificador: number, dia: string, camada: Camada,
@@ -184,20 +214,10 @@ export default function App() {
   );
   const areaP1 = numero(linha, "area_total_laea_km2");
   const areaP2 = numero(linha, "p2_area_laea_km2");
-  const dominancia = numero(linha, "dominancia_cobertura_p2_pct");
+  const dominancia = areaP1 !== null && areaP2 !== null && areaP1 > 0
+    ? 100 * areaP2 / areaP1 : null;
   const patches = numero(linha, "numero_patches");
 
-  const linhasArea: SerieGrafico[] = useMemo(() => [
-    { label: "Cobertura P1", cor: CORES.p1, valores: serie.map(r => numero(r, "area_total_laea_km2")) },
-    { label: "Região P2", cor: CORES.p2, valores: serie.map(r => numero(r, "p2_area_laea_km2")) },
-  ], [serie]);
-  const linhasPatches: SerieGrafico[] = useMemo(() => [
-    { label: "Nº de patches", cor: CORES.suporte, valores: serie.map(r => numero(r, "numero_patches")) },
-  ], [serie]);
-  const linhasIncrementos: SerieGrafico[] = useMemo(() => [
-    { label: "Área nova no evento", cor: CORES.p1, valores: transicoes.map(r => numero(r, "area_nova_evento_km2")) },
-    { label: "Já queimada incorporada ao P2", cor: CORES.p2, valores: transicoes.map(r => numero(r, "p2_incremento_ja_queimado_km2")) },
-  ], [transicoes]);
 
   function escolherId(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -446,6 +466,27 @@ export default function App() {
                   detalhe="Patches desta observação"/>
               </div>
 
+              <nav className="analysis-tab-list" role="tablist" aria-label="Seções do estudo">
+                {ABAS.map(item => <button key={item.id} type="button" role="tab"
+                  id={"aba-" + item.id} aria-controls={"painel-" + item.id}
+                  aria-selected={aba === item.id}
+                  className={"analysis-tab " + (aba === item.id ? "analysis-tab-active" : "")}
+                  onClick={() => {
+                    setAba(item.id);
+                    if (item.id !== "geral") {
+                      setMapaAtivo(false);
+                      setP1(null);
+                      setP2(null);
+                    }
+                  }}>{item.label}</button>)}
+                {resumo.tem_series && <a className="analysis-tab-export"
+                  href={urlSerieCSV(id)} download>
+                  <ArrowDownToLine size={15}/> CSV temporal
+                </a>}
+              </nav>
+              <div role="tabpanel" className="analysis-tab-panel"
+                id={"painel-" + aba} aria-labelledby={"aba-" + aba}>
+              {aba === "geral" && <>
               <section className="panel map-panel">
                 <div className="panel-heading">
                   <div>
@@ -510,28 +551,6 @@ export default function App() {
                   <div className="transition-alert">Intervalo entre observações maior que um dia.</div>}
               </div>}
 
-              <div className="charts-title">
-                <div><BarChart3 size={20}/><h2>Indicadores temporais</h2></div>
-                {resumo.tem_series && <a className="download-link" href={urlSerieCSV(id)}
-                  download><ArrowDownToLine size={16}/> Série CSV</a>}
-              </div>
-              {!resumo.tem_series && <div className="empty-chart">
-                O evento possui geometria, mas a análise integrada ainda não foi realizada.
-              </div>}
-              {resumo.tem_series && <div className="charts-grid">
-                <LineChart titulo="Evolução da área" datas={serie.map(s=>s.data ?? "")}
-                  series={linhasArea} dataAtual={data} onSelect={setData}/>
-                <LineChart titulo="Fragmentação do evento" datas={serie.map(s=>s.data ?? "")}
-                  series={linhasPatches} unidade="patches" dataAtual={data}
-                  onSelect={setData}/>
-                <div className="full-chart">
-                  <LineChart titulo="Área nova × incorporação do P2"
-                    datas={transicoes.map(t=>t.data_atual ?? "")}
-                    series={linhasIncrementos} dataAtual={data}
-                    onSelect={setData}/>
-                </div>
-              </div>}
-
               <section className="panel details-panel">
                 <div className="panel-heading">
                   <div>
@@ -573,6 +592,13 @@ export default function App() {
                         resumo.dias_sobreposicao_p1_pendentes.join(", ") + "."}
                   </p>
                 </div>
+              </div>
+              </>}
+              {aba !== "geral" && <ScientificPanels
+                aba={aba} serie={serie} transicoes={transicoes}
+                dia={data} selecionarData={setData}
+                analise={analise} carregando={carregandoAnalise}
+                erro={erroAnalise}/>}
               </div>
             </>
           )}

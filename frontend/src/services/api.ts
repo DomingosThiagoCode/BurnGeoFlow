@@ -1,5 +1,5 @@
 import type {
-  Camada, Colecao, DadosDia, EventoListado, Linha, VisaoEvento,
+  AnaliseEtapa4, Camada, Colecao, DadosDia, EventoListado, Linha, VisaoEvento,
 } from "../types";
 
 export const BASE_API = (
@@ -46,6 +46,9 @@ export const carregarSerie = (id: number, sinal?: AbortSignal) =>
 
 export const carregarTransicoes = (id: number, sinal?: AbortSignal) =>
   buscarJSON<Linha[]>("/api/events/" + id + "/transitions", sinal);
+
+export const carregarAnalise = (id: number, sinal?: AbortSignal) =>
+  buscarJSON<AnaliseEtapa4>("/api/events/" + id + "/analysis", sinal);
 
 export const carregarDia = (id: number, dia: string, sinal?: AbortSignal) =>
   buscarJSON<DadosDia>(
