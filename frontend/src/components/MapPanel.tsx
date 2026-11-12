@@ -68,7 +68,7 @@ export function MapPanel({
         layers: [{
           id: "fundo",
           type: "background",
-          paint: { "background-color": "#dfe9e5" },
+          paint: { "background-color": "#e3e1d5" },
         }],
       },
       center: [-56.3, -17.0],
@@ -93,7 +93,7 @@ export function MapPanel({
       });
       instancia.addLayer({
         id: "osm-raster", type: "raster", source: "osm",
-        paint: { "raster-opacity": 0.85 },
+        paint: { "raster-opacity": 0.76 },
       });
       instancia.addSource("p1", {
         type: "geojson", data: VAZIO as unknown as Parameters<GeoJSONSource["setData"]>[0],
@@ -103,19 +103,19 @@ export function MapPanel({
       });
       instancia.addLayer({
         id: "p1-fill", type: "fill", source: "p1",
-        paint: { "fill-color": "#ef9354", "fill-opacity": 0.32 },
+        paint: { "fill-color": "#b86040", "fill-opacity": 0.32 },
       });
       instancia.addLayer({
         id: "p1-line", type: "line", source: "p1",
-        paint: { "line-color": "#bc632d", "line-width": 1.5 },
+        paint: { "line-color": "#9a432f", "line-width": 1.5 },
       });
       instancia.addLayer({
         id: "p2-fill", type: "fill", source: "p2",
-        paint: { "fill-color": "#109a8b", "fill-opacity": 0.28 },
+        paint: { "fill-color": "#397e76", "fill-opacity": 0.28 },
       });
       instancia.addLayer({
         id: "p2-line", type: "line", source: "p2",
-        paint: { "line-color": "#087469", "line-width": 2.7 },
+        paint: { "line-color": "#2a5f5b", "line-width": 2.7 },
       });
       atualizarFonte(instancia, "p1", dadosMaisRecentes.current.p1);
       atualizarFonte(instancia, "p2", dadosMaisRecentes.current.p2);
