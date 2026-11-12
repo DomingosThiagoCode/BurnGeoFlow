@@ -98,7 +98,7 @@ jobs:
               pagina = client.get("/")
               assert pagina.status_code == 200
               assert "BurnGeoFlow" in pagina.text
-              js = search(r'/assets/[^" ]+\\.js', pagina.text)
+              js = search(r'/assets/[^" ]+[.]js', pagina.text)
               assert js is not None, pagina.text
               asset = client.get(js.group(0))
               assert asset.status_code == 200
