@@ -81,6 +81,9 @@ jobs:
       - name: TypeScript e build Vite
         working-directory: frontend
         run: npm run build
+      - name: Garantia de carregamento inicial leve
+        working-directory: frontend
+        run: npm run check:bundle
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
