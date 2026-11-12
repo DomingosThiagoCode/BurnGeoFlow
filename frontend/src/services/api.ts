@@ -1,7 +1,6 @@
 import type {
-  Camada, Colecao, DadosDia, EventoListado, Linha, VisaoEvento,
+  AnaliseEtapa4, Camada, Colecao, DadosDia, EventoListado, Linha, VisaoEvento,
 } from "../types";
-import type { AnaliseEtapa4 } from "../components/ScientificPanels";
 
 export const BASE_API = (
   import.meta.env.VITE_API_BASE_URL ??
