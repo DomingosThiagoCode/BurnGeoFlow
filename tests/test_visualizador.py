@@ -88,6 +88,11 @@ def criar_caso(base: Path, *, metrico: bool = True):
 
 
 class TesteLeituraVisualizador(unittest.TestCase):
+    def test_interface_e_compilavel_sem_dependencias_opcionais(self):
+        caminho = Path(__file__).resolve().parents[1] / "visualizador.py"
+        codigo = caminho.read_text(encoding="utf-8")
+        compile(codigo, str(caminho), "exec")
+
     def test_discovery_e_timeline(self):
         with TemporaryDirectory() as temp:
             base = Path(temp)
