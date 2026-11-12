@@ -1,16 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { LineChart, type SerieGrafico } from "./LineChart";
 import { formatarNumero, numero } from "../services/api";
-import type { Linha } from "../types";
+import type { AnaliseEtapa4, Linha } from "../types";
 
 export type AbaCientifica = "paisagem" | "expansao" | "movimento" | "direcoes" | "forma";
-
-export interface AnaliseEtapa4 {
-  disponivel: boolean;
-  pontos: Linha[];
-  segmentos: Linha[];
-  indicadores: Linha[];
-}
 
 interface Props {
   aba: AbaCientifica;
@@ -39,7 +32,7 @@ function Introducao({ titulo, texto }: { titulo: string; texto: string }) {
   </div>;
 }
 
-function Aviso({ children }: { children: React.ReactNode }) {
+function Aviso({ children }: { children: ReactNode }) {
   return <p className="analysis-caution">{children}</p>;
 }
 
