@@ -522,3 +522,7 @@ tbody tr:hover { background:#f8fbf9; }
   .analysis-intro { align-items:flex-start; }
   .analysis-intro h2 { font-size:19px; }
 }
+
+/* Âncora do painel, com margem para cabeçalho fixo. */
+.jobs-anchor { scroll-margin-top: 100px; }
+@media (max-width: 840px) { .jobs-anchor { scroll-margin-top: 88px; } }
