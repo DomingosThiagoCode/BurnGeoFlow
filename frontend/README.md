@@ -60,6 +60,14 @@ Configuração: copie .env.example para .env.local se precisar alterar a
 origem da API; a variável `VITE_API_BASE_URL` é pública e contém somente
 o endereço local, nunca credenciais.
 
+## Modo leve e falhas de memória
+
+O mapa e o motor WebGL são carregados apenas quando clicar em
+**Abrir mapa do evento**. A abertura inicial do painel consulta primeiro
+os indicadores e séries. É possível fechar o mapa para liberar memória.
+Consulte [Diagnóstico Windows](../docs/DIAGNOSTICO_WINDOWS.md)
+antes de repetir aquisições GEE.
+
 ## Recursos
 
 - Seleção de evento e ID manual.
