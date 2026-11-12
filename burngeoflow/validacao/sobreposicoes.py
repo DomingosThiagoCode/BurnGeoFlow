@@ -116,23 +116,46 @@ def diagnosticar_arquivo(p1: Path, *, data: str | None = None,
 
 
 def _intersecao_valida(a, b, *, conversor=None) -> dict:
-    """Area de intersecao, somente para geometrias topologicamente validas.
+    """Audita o contato no CRS de entrada antes de qualquer transformação.
 
-    A comparacao WGS84 é reprojetada ao LAEA da analise, em vez de usar
-    valores de area em graus quadrados. Overlay de geometrias invalidas
-    nao oferece evidencia confiavel, por isso retorna 'indeterminada'.
+    Em WGS84, área positiva em graus² prova sobreposição areal (não mede
+    área métrica). O resultado da projeção só serve para a medida em m²;
+    sua eventual invalidade não apaga a evidência topológica original.
+    Não realizamos overlay sobre geometrias de entrada inválidas.
     """
     if not a.is_valid or not b.is_valid:
         return {"area_m2": None, "situacao": "geometria_invalida"}
     try:
         inter = a.intersection(b)
+        if not inter.is_valid:
+            return {
+                "area_m2": None, "situacao": "intersecao_original_invalida",
+            }
+        # Evidências em CRS geográfico só existem quando esse é o CRS
+        # da entrada. Não interpretar graus² como área métrica.
+        evidencia = (
+            {
+                "area_intersecao_original_graus2": float(inter.area),
+                "sobreposicao_areal_no_original": bool(inter.area > 0),
+                "intersecao_original_valida": True,
+            }
+            if conversor is not None else {}
+        )
         if conversor is not None and not inter.is_empty:
             inter = shapely.transform(
                 inter, conversor.transform, interleaved=False,
             )
         if not inter.is_valid:
-            return {"area_m2": None, "situacao": "intersecao_projetada_invalida"}
-        return {"area_m2": float(inter.area), "situacao": "calculada"}
+            return {
+                **evidencia,
+                "area_m2": None,
+                "situacao": "intersecao_projetada_invalida",
+            }
+        return {
+            **evidencia,
+            "area_m2": float(inter.area),
+            "situacao": "calculada",
+        }
     except (shapely.GEOSException, ValueError, pyproj.exceptions.ProjError) as exc:
         return {
             "area_m2": None,
@@ -142,9 +165,15 @@ def _intersecao_valida(a, b, *, conversor=None) -> dict:
 
 
 def _classificar_origem(original, projetada, corrigida) -> str:
-    if original["area_m2"] is None:
+    # Prova topológica independente da área métrica projetada.
+    # Um interseção em WGS84 com área positiva já estava no GeoJSON.
+    if original.get("sobreposicao_areal_no_original") is True:
+        return "JA_EXISTIA_NO_GEOJSON_ORIGINAL"
+    if original["area_m2"] is None and original.get(
+        "sobreposicao_areal_no_original"
+    ) is not False:
         return "INDETERMINADO_ORIGINAL_INVALIDO_OU_OVERLAY_IMPOSSIVEL"
-    if original["area_m2"] > 0:
+    if original["area_m2"] is not None and original["area_m2"] > 0:
         return "JA_EXISTIA_NO_GEOJSON_ORIGINAL"
     if corrigida["area_m2"] is None:
         return "INDETERMINADO_APOS_REPARO"

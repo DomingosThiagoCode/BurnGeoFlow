@@ -198,6 +198,14 @@ Para o evento 24340828 e a data 18/09/2020, compare os ranks 1/10,
 python -m burngeoflow.validacao.sobreposicoes --id 24340828 --data 2020-09-18 --verificar-origem
 ```
 
+Se a interseção entre duas geometrias originais for válida em
+WGS84, o relatório registra sua **área em graus²** e a presença de
+sobreposição areal antes da projeção. Área em graus² serve apenas para
+detectar existência, **não** deve ser interpretada como m². Assim,
+mesmo se a reprojeção da geometria de interseção produzir um polígono
+inválido, a classificação pode confirmar que a sobreposição já estava
+na fonte sem inventar uma medida métrica.
+
 Esse modo registra para cada par a interseção (em m²) nos estados
 **P1 original WGS84**, **LAEA antes de `make_valid`** e
 **LAEA após `make_valid`**. O resultado vai para
