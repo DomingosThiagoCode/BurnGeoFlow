@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Database, Flame, Layers, LoaderCircle,
   Menu, Pause, Play, RefreshCw, Search, X,
 } from "lucide-react";
-import { ScientificPanels, type AbaCientifica, type AnaliseEtapa4 } from "./components/ScientificPanels";
+import { ScientificPanels, type AbaCientifica } from "./components/ScientificPanels";
 // Só importa MapLibre e WebGL quando o usuário solicita o mapa.
 const MapPanel = lazy(() => import("./components/MapPanel").then(m => ({default: m.MapPanel})));
 import { JobsPanel } from "./components/JobsPanel";
@@ -12,7 +12,7 @@ import {
   carregarAnalise, carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
   formatarNumero, listarEventos, nomeDia, numero, urlSerieCSV,
 } from "./services/api";
-import type { Camada, Colecao, EventoListado, Linha, VisaoEvento } from "./types";
+import type { AnaliseEtapa4, Camada, Colecao, EventoListado, Linha, VisaoEvento } from "./types";
 
 const ABAS = [
   { id: "geral", label: "Visão geral" },
