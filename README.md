@@ -168,6 +168,21 @@ já registrado nos resumos. A análise P2 pode receber polígonos cuja
 projeção revela auto-interseções, mesmo após a validação estrutural.
 
 TR e IGT verificam agora o P2 com a mesma projeção do P1.
+
+### Etapa 5 com geometrias P1/P2 regularizadas
+
+A integração da Etapa 5 não deve rejeitar automaticamente um P1 que
+precisou de `make_valid` após projeção. Ela reconstrói a geometria LAEA
+pelo **mesmo procedimento de TR/IGT**, verifica a correspondência P1/P2
+por data e rank, e confere os relatórios de TR, IGT e consolidação da
+Etapa 4 quando houver reparos. As verificações exigem hashes SHA-256
+de ambos os GeoJSONs, contagens de reparos e identidade dos registros
+reparados (data/rank); falhas continuam bloqueadas.
+
+Uma auditoria detalhada é incluída no `resumo_etapa5_<ID>.json`,
+mantendo os GeoJSONs originais intocados. Trata-se de **consistência
+computacional interna**, não de validação geométrica independente
+das imagens GlobFire/MODIS.
 **Definição geométrica comum TR/IGT:** a área nova é `área(R(t+1) \\ R(t))`
 e a área reduzida é `área(R(t) \\ R(t+1))`, ambas calculadas por
 diferença espacial explícita em LAEA (não como subtração de áreas
