@@ -79,6 +79,32 @@ def responder_api(route):
             "numero_patches": "1",
             "dominancia_cobertura_p2_pct": "80",
         } for i, d in enumerate(DATAS)]
+    elif caminho.endswith("/analysis"):
+        nomes = ("centroide", "norte", "sul", "leste", "oeste")
+        dados = {
+            "disponivel": True,
+            "pontos": [{
+                "id_incendio": str(EVENTO), "data": d, "ponto": nome,
+                "x_laea_m": str(1000 + i * 200 + j * 40),
+                "y_laea_m": str(2000 + i * 100 + j * 70),
+            } for i, d in enumerate(DATAS) for j, nome in enumerate(nomes)],
+            "segmentos": [{
+                "id_incendio": str(EVENTO),
+                "data_anterior": DATAS[i-1], "data_atual": DATAS[i],
+                "ponto": nome, "azimute_geodesico_graus": str(50+j*25),
+                "distancia_geodesica_km": "1.5",
+            } for i in range(1, len(DATAS)) for j, nome in enumerate(nomes)],
+            "indicadores": [{
+                "id_incendio": str(EVENTO),
+                "data_anterior": DATAS[i-1], "data_atual": DATAS[i],
+                "deslocamento_centroide_km": "1.5",
+                "avanco_norte_km": "0.5", "avanco_sul_km": "0.1",
+                "avanco_leste_km": "0.7", "avanco_oeste_km": "0.2",
+                "delta_amplitude_ns_km": "0.4", "delta_amplitude_lo_km": "0.5",
+                "indice_forma_atual": "1.7", "delta_indice_forma": "0.1",
+                "perimetro_atual_km": "10.0", "jaccard_geometrico": "0.7",
+            } for i in range(1, len(DATAS))],
+        }
     elif caminho.endswith("/transitions"):
         dados = [{
             "id_incendio": str(EVENTO),
@@ -160,6 +186,23 @@ def testar() -> None:
             page.get_by_role(
                 "button", name="Abrir mapa do evento",
             ).wait_for()
+            assert page.locator(".sidebar").evaluate(
+                "el => getComputedStyle(el).position"
+            ) == "sticky", "A barra lateral precisa acompanhar a rolagem"
+            page.get_by_role("tab", name="Paisagem").click()
+            page.get_by_role("heading", name="Paisagem e componentes").wait_for()
+            assert page.locator(".chart-panel").count() == 4
+            page.get_by_role("tab", name="Expansão").click()
+            page.get_by_role("heading", name="Expansão e incorporação geométrica").wait_for()
+            page.get_by_role("tab", name="Movimento").click()
+            page.get_by_role("heading", name="Cinco trajetórias representativas").wait_for()
+            page.get_by_role("tab", name="Direções").click()
+            page.get_by_role("heading", name="Direções e rosáceas").wait_for()
+            assert page.locator(".rose-card").count() == 7
+            page.get_by_role("tab", name="Forma").click()
+            page.get_by_role("heading", name="Forma e deformação").wait_for()
+            assert page.locator(".chart-panel").count() == 4
+            assert not errors, f"Falhas JavaScript nas novas abas: {errors}"
             browser.close()
     finally:
         httpd.shutdown()
