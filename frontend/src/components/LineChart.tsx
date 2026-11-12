@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatarNumero, nomeDia } from "../services/api";
 
 export type SerieGrafico = {
@@ -20,7 +20,22 @@ export function LineChart({
   titulo, datas, series, unidade = "km²", onSelect, dataAtual,
 }: Props) {
   const uid = useId().replace(/:/g, "_");
-  const largura = 740, altura = 210;
+  const recipiente = useRef<HTMLDivElement>(null);
+  const [largura, setLargura] = useState(740);
+  // Renderiza eixos e rótulos em pixels legíveis no tamanho real do cartão.
+  // O viewBox fixo anterior reduzia também a tipografia em telas pequenas.
+  useEffect(() => {
+    const el = recipiente.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const w = Math.round(entry.contentRect.width);
+      if (w > 0) setLargura(Math.max(320, w));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const altura = 210;
   const margem = { topo: 15, direita: 22, inferior: 35, esquerda: 54 };
   const xMin = margem.esquerda, xMax = largura - margem.direita;
   const yMin = margem.topo, yMax = altura - margem.inferior;
@@ -41,8 +56,7 @@ export function LineChart({
       aberto = true;
     }
     return desenho.trim();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [series, datas]);
+  }), [series, datas, largura]);
   if (!datas.length || !valores.length) {
     return <div className="empty-chart">Sem valores para o gráfico {titulo}.</div>;
   }
@@ -52,7 +66,7 @@ export function LineChart({
         <h3>{titulo}</h3>
         <span>{unidade}</span>
       </div>
-      <div className="chart-scroll">
+      <div className="chart-scroll" ref={recipiente}>
         <svg viewBox={"0 0 " + largura + " " + altura} role="img"
           aria-label={titulo + ". Consulte a legenda para séries."}
           className="chart-svg">
