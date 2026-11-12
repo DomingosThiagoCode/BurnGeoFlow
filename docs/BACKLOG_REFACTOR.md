@@ -9,8 +9,8 @@ Abordagem Kanban, PRs pequenos e reversíveis; ordenação por dependências.
 | BG-03 | P0 | Cache geográfico por data | Índice derivado sem modificar P1/P2, validade por hash e assinatura; benchmark | Concluído (PR #21) |
 | BG-04 | P1 | Frontend React/TS | Mapas P1/P2, timeline, indicadores, loading/erro, exportação | Integrado (PR #22), homologação visual pendente |
 | BG-05 | P1 | QA e UX | Mobile/Desktop, teste de navegação, p50/p95, contraste e feedback | Pendente |
-| BG-06 | P1 | Tarefas operacionais | Processar ID, status/progresso com logs, sem duplicar CLI | Em implementação (PR #23) |
-| BG-07 | P2 | SQLite de jobs | Migração aditiva e backup, estados robustos, recuperação | Em implementação (PR #23); banco novo, sem migração destrutiva |
+| BG-06 | P1 | Tarefas operacionais | Processar ID, status/progresso com logs, sem duplicar CLI | Backend integrado (PR #23), painel PR #24 |
+| BG-07 | P2 | SQLite de jobs | Migração aditiva e backup, estados robustos, recuperação | Integrado (PR #23); banco novo, sem migração destrutiva |
 | BG-08 | P2 | Empacotamento e release | pyproject/README/ADR, builds verificáveis e versão estável | Pendente |
 | BG-09 | P3 | Revisão científica interna | Decompor módulos grandes sem mudar fórmulas e com contratos | Pendente |
 

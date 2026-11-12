@@ -45,8 +45,9 @@ não a este pacote.
 
 ## Nova API REST local (migração gradual)
 
-Foi criado um backend desacoplado em `backend/app/` para servir
-eventos já processados, sem executar GEE ou alterar as fórmulas científicas.
+Foi criado um backend desacoplado em `backend/app/` para consultar
+eventos processados e iniciar a CLI em um worker local separado.
+As fórmulas científicas não foram alteradas.
 
 Para instalar e iniciar:
 
@@ -59,9 +60,10 @@ Teste <http://127.0.0.1:8000/docs>. Endpoints para catálogo, séries,
 indicadores, geometria P1/P2 por data e download CSV. O índice por data é
 reconstruível e preserva todos os GeoJSONs originais.
 
-**Importante:** esta API é apenas a camada de dados da nova interface.
-O painel Streamlit original continua funcional enquanto o frontend React
-não estiver implementado e testado. Os comandos científicos permanecem iguais.
+**Importante:** a API é a camada de consulta e execução local do novo painel,
+não uma reimplementação do GEE. O Streamlit continua disponível até que
+a interface React seja homologada com os dados reais. Os comandos
+científicos permanecem iguais.
 
 Veja [docs/API.md](docs/API.md) e
 [docs/AUDITORIA_ARQUITETURAL_2026-11-12.md](docs/AUDITORIA_ARQUITETURAL_2026-11-12.md).
@@ -77,7 +79,9 @@ MapLibre). O processamento GEE e as análises permanecem em Python.
 
 O novo painel mantém a seleção de ID, timeline, polígonos P1/P2,
 gráficos, métricas, alertas e downloads, mas consulta **apenas a data
-selecionada**, sem recalcular o pipeline. O Streamlit original permanece
+selecionada**, sem recalcular o pipeline durante a navegação.
+A seção **Processar e acompanhar eventos** inicia a CLI por meio do
+worker FastAPI, registra estado em SQLite e exibe as mensagens reais. O Streamlit original permanece
 instalável durante a homologação funcional; não será removido sem
 paridade e teste real no Windows.
 

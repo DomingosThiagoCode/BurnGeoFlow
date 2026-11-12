@@ -27,14 +27,22 @@ npm ci
 npm run dev
 ```
 
-Abra <http://127.0.0.1:5173>. O frontend não consulta o GEE.
-Para processar um ID ausente, execute no terminal do projeto:
+Abra <http://127.0.0.1:5173>. O frontend não faz cálculos GEE
+diretamente: a API inicia a CLI existente em um processo separado.
+
+Para processar outro ID, expanda **Processar e acompanhar eventos**, informe
+ID, origem e, quando útil, ano. Clique em **Executar**. Acompanhe o estado
+em SQLite e as mensagens no painel de logs. Quando terminar com sucesso, a
+interface atualiza a lista e reabre os resultados. A autenticação GEE deve
+estar previamente configurada no computador.
+
+A CLI manual permanece disponível:
 
 ```powershell
 python executar_pipeline.py --id 24340828 --origem gee --ano 2020
 ```
 
-Depois, recarregue a lista de eventos na interface.
+Uma única execução ativa por vez evita concorrência excessiva no sistema.
 
 Configuração: copie .env.example para .env.local se precisar alterar a
 origem da API; a variável `VITE_API_BASE_URL` é pública e contém somente
@@ -43,6 +51,7 @@ o endereço local, nunca credenciais.
 ## Recursos
 
 - Seleção de evento e ID manual.
+- Processamento por ID/origem com estado e logs via API, sem duplicar CLI.
 - Slider temporal com anterior/próxima data e reprodução.
 - Mapa com P1/P2, camadas independentes e opção de mapa-base OSM.
 - Indicadores da observação e da transição, gráficos sem re-renderização
