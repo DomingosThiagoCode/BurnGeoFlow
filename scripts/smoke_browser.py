@@ -192,6 +192,8 @@ def testar() -> None:
             assert not errors, f"Falhas JavaScript após abrir mapa: {errors}"
             evidencias = ROOT / "artifacts" / "atlas"
             evidencias.mkdir(parents=True, exist_ok=True)
+            page.evaluate("window.scrollTo(0, 0)")
+            page.wait_for_timeout(150)
             page.screenshot(path=str(evidencias / "01-mapa-desktop.png"), full_page=True)
             page.get_by_role(
                 "button", name="Fechar mapa e liberar memória",
@@ -220,6 +222,8 @@ def testar() -> None:
             page.get_by_role("tab", name="Direções").click()
             page.get_by_role("heading", name="Direções e rosáceas").wait_for()
             assert page.locator(".rose-card").count() == 7
+            page.evaluate("window.scrollTo(0, 0)")
+            page.wait_for_timeout(150)
             page.screenshot(path=str(evidencias / "02-rosaceas-desktop.png"), full_page=True)
             page.get_by_role("tab", name="Forma").click()
             page.get_by_role("heading", name="Forma e deformação").wait_for()
@@ -232,6 +236,9 @@ def testar() -> None:
             page.get_by_role("button", name="Abrir menu").click()
             assert "sidebar-open" in (page.locator(".sidebar").get_attribute("class") or "")
             page.locator(".global-header").get_by_role("button", name="Fechar menu").click()
+            page.wait_for_timeout(350)
+            page.evaluate("window.scrollTo(0, 0)")
+            assert "sidebar-open" not in (page.locator(".sidebar").get_attribute("class") or "")
             page.screenshot(path=str(evidencias / "03-forma-mobile.png"), full_page=True)
             browser.close()
     finally:
