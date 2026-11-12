@@ -99,7 +99,10 @@ def conferir_proximo(a, b, etiqueta, *, tolerancia_km2=1e-5):
 
 
 
-def calcular_cobertura_componentes(grupos: dict[str, list]) -> tuple[dict, dict]:
+def calcular_cobertura_componentes(
+    grupos: dict[str, list],
+    ranks_por_data: dict[str, list[int]] | None = None,
+) -> tuple[dict, dict]:
     """Area coberta pela uniao P1, com auditoria de sobreposicoes.
 
     A soma de areas dos patches e preservada para conferencia com as
@@ -137,8 +140,12 @@ def calcular_cobertura_componentes(grupos: dict[str, list]) -> tuple[dict, dict]
                     continue
                 area = g1.intersection(g2).area
                 if area > 0.0001:
+                    ranks = ranks_por_data[dia] if ranks_por_data else list(
+                        range(1, len(geometrias)+1)
+                    )
                     pares.append({
                         "indice_p1_a": i, "indice_p1_b": j,
+                        "rank_p1_a": ranks[i], "rank_p1_b": ranks[j],
                         "intersecao_m2": area,
                     })
         pares.sort(key=lambda x: -x["intersecao_m2"])
@@ -205,10 +212,12 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
     if len(reparados_p1) != reparos:
         raise ValueError("Inconsistencia na contagem de reparos P1 em LAEA")
     grupos = defaultdict(list)
+    ranks_por_data = defaultdict(list)
     chaves = {}
     indice = {}
     for p in patches:
         grupos[p.data].append(p.geometria)
+        ranks_por_data[p.data].append(p.rank)
         if (p.data,p.rank) in chaves:
             raise ValueError("P1 tem rank/data duplicado")
         chaves[(p.data,p.rank)] = p.geometria
@@ -267,7 +276,9 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
         })
     if set(selecionados) != set(grupos):
         raise ValueError("Datas distintas entre P1 e P2")
-    totais, relatorio_cobertura = calcular_cobertura_componentes(grupos)
+    totais, relatorio_cobertura = calcular_cobertura_componentes(
+        grupos, ranks_por_data,
+    )
     if diagnostico is not None:
         diagnostico["cobertura_p1"] = relatorio_cobertura
     return totais, selecionados, grupos, crs
