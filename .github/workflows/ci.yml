@@ -21,6 +21,8 @@ jobs:
         run: python -m unittest discover -s tests -p "test_pipeline.py" -v
       - name: Executar caso base
         run: python executar_pipeline.py --id 24340828 --baixar-exemplo --saida .
+      - name: Perfil legado de leitura e serializacao (baseline)
+        run: python scripts/perfil_visualizador_legado.py --base . --id 24340828 --repeticoes 3
       - name: Testes cientificos originais
         run: python -m unittest discover -s tests -v
       - name: Conferir retomada
