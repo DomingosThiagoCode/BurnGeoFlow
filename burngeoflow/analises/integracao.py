@@ -28,6 +28,7 @@ from shapely.geometry import shape, Polygon, MultiPolygon
 from shapely.ops import unary_union
 
 from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
+from burngeoflow.validacao.topologia_p2 import reconciliar_p2
 
 
 CAMPOS_TRANSICOES = [
@@ -92,21 +93,33 @@ def conferir_proximo(a, b, etiqueta, *, tolerancia_km2=1e-5):
         raise ValueError(f"Inconsistencia em {etiqueta}: {a} != {b}")
 
 
-def ler_geometrias(p1: Path, p2: Path, incendio: int):
-    """Mesmo CRS LAEA/operacao da Etapa 2; nao altera arquivos originais."""
+def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
+                   diagnostico: dict | None = None):
+    """Reprojeta P1 e reconcilia P2 pelo mesmo critério TR/IGT.
+
+    Reparos são condicionais e em memória; as entradas são preservadas.
+    Quando fornecido, diagnostico recebe evidências de data/rank e tolerâncias.
+    """
     patches = carregar_p1(p1)
     if {p.incendio for p in patches} != {incendio}:
         raise ValueError("P1 contem IDs inesperados")
     crs, reparos = projetar_patches(patches)
-    if reparos:
-        raise ValueError("Etapa 5 exige auditoria de reparos antes de integrar")
+    reparados_p1 = [
+        {"data": p.data, "rank": p.rank,
+         "area_projetada_m2": p.area_m2}
+        for p in patches if p.reparado_apos_projecao
+    ]
+    if len(reparados_p1) != reparos:
+        raise ValueError("Inconsistencia na contagem de reparos P1 em LAEA")
     grupos = defaultdict(list)
     chaves = {}
+    indice = {}
     for p in patches:
         grupos[p.data].append(p.geometria)
         if (p.data,p.rank) in chaves:
             raise ValueError("P1 tem rank/data duplicado")
         chaves[(p.data,p.rank)] = p.geometria
+        indice[(p.data,p.rank)] = p
     proj = pyproj.Transformer.from_crs(
         "EPSG:4326", pyproj.CRS.from_proj4(crs["definicao_laea_proj4"]),
         always_xy=True,
@@ -114,19 +127,51 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int):
     with p2.open(encoding="utf-8") as arq:
         produto = json.load(arq)
     selecionados = {}
-    for feat in produto.get("features", []):
-        prop = feat["properties"]
-        if int(prop["id_incendio"]) != incendio:
-            raise ValueError("P2 contem outro ID")
-        dia, rank = prop["data"], int(prop["rank_global"])
+    auditorias_p2 = []
+    for numero_registro, feat in enumerate(produto.get("features", [])):
+        try:
+            prop = feat["properties"]
+            dia, rank = prop["data"], int(prop["rank_global"])
+            id_lido = int(prop["id_incendio"])
+            original = shape(feat["geometry"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"P2 registro {numero_registro} invalido: {exc}"
+            ) from exc
+        if id_lido != incendio or prop["id_incendio"] != id_lido or prop["rank_global"] != rank:
+            raise ValueError(f"P2 registro {numero_registro}: ID/rank incoerente")
         if dia in selecionados or (dia,rank) not in chaves:
-            raise ValueError("P2 nao corresponde a um rank exclusivo no P1")
-        gp2 = shapely.transform(shape(feat["geometry"]), proj.transform,
-                               interleaved=False)
-        gp1 = chaves[(dia,rank)]
-        if not gp2.is_valid or gp2.symmetric_difference(gp1).area > max(1, gp1.area*1e-8):
-            raise ValueError(f"Geometria P2 difere de P1 em {dia}")
-        selecionados[dia] = gp1
+            raise ValueError(
+                f"P2 registro {numero_registro} ({dia}, rank {rank}): "
+                "rank ou data duplicado/inexistente no P1"
+            )
+        if original.geom_type not in ("Polygon", "MultiPolygon") or original.is_empty:
+            raise ValueError(
+                f"P2 registro {numero_registro}: geometria nao poligonal"
+            )
+        _geom, evidencia = reconciliar_p2(
+            original, indice[(dia, rank)], proj, registro=numero_registro,
+            data=dia, rank=rank,
+        )
+        auditorias_p2.append(evidencia)
+        selecionados[dia] = chaves[(dia,rank)]
+    if diagnostico is not None:
+        diagnostico.update({
+            "crs_laea": crs["definicao_laea_proj4"],
+            "geometrias_p1_reparadas_apos_projecao": reparos,
+            "reparos_p1": reparados_p1,
+            "numero_reparos_p2_para_comparacao": sum(
+                a["reparo_p2_necessario"] for a in auditorias_p2
+            ),
+            "reparos_p2": [
+                a for a in auditorias_p2 if a["reparo_p2_necessario"]
+            ],
+            "maior_diferenca_simetrica_p1_p2_m2": max(
+                (a["diferenca_simetrica_m2"] for a in auditorias_p2), default=0,
+            ),
+            "politica": "reconciliar P2 com P1 LAEA, make_valid condicionado "
+                       "a max(1 m2, 1e-8 x area P1)",
+        })
     if set(selecionados) != set(grupos):
         raise ValueError("Datas distintas entre P1 e P2")
     totais = {}
@@ -136,6 +181,89 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int):
             raise ValueError(f"Patches P1 sobrepoem em area: {d}")
         totais[d] = total
     return totais, selecionados, grupos, crs
+
+
+
+def conferir_auditoria_previa(
+    raiz: Path, incendio: int, p1: Path, p2: Path, diagnostico: dict,
+) -> None:
+    """Confere proveniência e reparos de P1/P2 nas Etapas 1 e 4.
+
+    Os relatórios de TR, IGT e consolidação são evidências de processamento,
+    não de validade científica independente. Nunca basta sua existência:
+    SHA, contagens e datas/ranks dos reparos têm de coincidir.
+    """
+    e4 = raiz / "resultados" / "etapa4"
+    caminhos = {
+        "tr": e4 / f"resumo_regiao_movel_{incendio}.json",
+        "igt": e4 / f"resumo_incrementos_{incendio}.json",
+        "consolidado": e4 / f"resumo_consolidado_tr_igt_{incendio}.json",
+    }
+    reparos = (
+        diagnostico["geometrias_p1_reparadas_apos_projecao"] > 0
+        or diagnostico["numero_reparos_p2_para_comparacao"] > 0
+    )
+    if not reparos:
+        diagnostico["auditoria_etapa4_conferida"] = "sem_reparos"
+        return
+    hashes = {
+        "p1": sha256(p1.read_bytes()).hexdigest(),
+        "p2": sha256(p2.read_bytes()).hexdigest(),
+    }
+    esperados_p2 = {
+        (item["data"], int(item["rank"]))
+        for item in diagnostico["reparos_p2"]
+    }
+    for origem, caminho in caminhos.items():
+        if not caminho.is_file():
+            raise ValueError(
+                f"Etapa 5 exige auditoria previa dos reparos: "
+                f"relatorio da Etapa 4 ausente ({caminho}). "
+                "Nao use --refazer nem edite P1/P2."
+            )
+        with caminho.open(encoding="utf-8") as arquivo:
+            dados = json.load(arquivo)
+        for produto, atual in hashes.items():
+            chave = (
+                f"hash_sha256_{produto}" if origem == "consolidado"
+                else f"sha256_{produto}"
+            )
+            if dados.get(chave) != atual:
+                raise ValueError(
+                    f"Auditoria Etapa 4 ({origem}): hash de {produto} "
+                    "diverge da entrada; reparos nao podem ser reutilizados."
+                )
+        auditado = (
+            dados.get("auditoria_geometrica_consolidacao", {})
+            if origem == "consolidado" else dados
+        )
+        chave_p1 = (
+            "geometrias_reparadas_apos_projecao" if origem == "tr"
+            else "geometrias_p1_reparadas_apos_projecao"
+        )
+        if auditado.get(chave_p1) != diagnostico[
+            "geometrias_p1_reparadas_apos_projecao"
+        ]:
+            raise ValueError(f"Auditoria Etapa 4 ({origem}): reparos P1 divergentes")
+        if auditado.get("numero_reparos_p2_para_comparacao") != diagnostico[
+            "numero_reparos_p2_para_comparacao"
+        ]:
+            raise ValueError(f"Auditoria Etapa 4 ({origem}): reparos P2 divergentes")
+        encontrados_p2 = {
+            (item["data"], int(item["rank"]))
+            for item in (
+                auditado.get("reparos_p2_para_comparacao", [])
+            )
+        }
+        if encontrados_p2 != esperados_p2:
+            raise ValueError(
+                f"Auditoria Etapa 4 ({origem}): datas/ranks dos reparos "
+                "P2 nao conferem"
+            )
+    diagnostico["auditoria_etapa4_conferida"] = "hashes_contagens_e_ranks"
+    diagnostico["relatorios_conferidos"] = [
+        str(caminho) for caminho in caminhos.values()
+    ]
 
 
 def decompor_transicao(total0, total1, p20, p21):
@@ -326,7 +454,10 @@ def executar(raiz:Path,incendio:int,saida:Path):
                    campos_chave=("data_anterior","data_atual"))
     tr=ler_tabela(raiz/"resultados/etapa4"/f"indicadores_regiao_{incendio}.csv",
                   campos_chave=("data_anterior","data_atual"))
-    totais,selecionados,grupos,crs=ler_geometrias(p1,p2,incendio)
+    auditoria_reparos = {}
+    totais,selecionados,grupos,crs=ler_geometrias(
+        p1,p2,incendio,diagnostico=auditoria_reparos)
+    conferir_auditoria_previa(raiz,incendio,p1,p2,auditoria_reparos)
     dias=sorted(totais)
     if set(temporais)!={(d,) for d in dias}:
         raise ValueError("Tabela temporal nao corresponde as datas de P1")
@@ -439,6 +570,8 @@ def executar(raiz:Path,incendio:int,saida:Path):
         "maximo_erro_fechamento_m2":max(max(r["desvio_fechamento_evento_m2"],
                                             r["desvio_fechamento_p2_m2"]) for r in transicoes),
         "crs":crs,
+        "auditoria_reparos_geometricos":auditoria_reparos,
+        "validacao_independente":False,
         "sha256_p1":sha256(p1.read_bytes()).hexdigest(),
         "sha256_p2":sha256(p2.read_bytes()).hexdigest(),
         "premissas":[
