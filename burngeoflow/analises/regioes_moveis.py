@@ -27,6 +27,7 @@ from shapely.geometry import Point, LineString, shape, mapping
 from burngeoflow.analises.paisagem import (
     Patch, carregar_p1, indice_forma_vetorial, projetar_patches, salvar_csv,
 )
+from burngeoflow.validacao.topologia_p2 import reconciliar_p2
 
 PONTOS = ("centroide", "norte", "sul", "leste", "oeste")
 CAMPOS_PONTOS = ["id_incendio", "data", "rank_p2", "ponto", "longitude",
@@ -302,6 +303,10 @@ def executar(p1: Path, p2: Path, pasta_saida: Path) -> dict:
         raise ValueError("P2 deve ser FeatureCollection nao vazia")
     ranks, geoms = {}, {}
     maior_diferenca_p1_p2_m2 = 0.0
+    auditorias_p2 = []
+    inv = pyproj.Transformer.from_crs(
+        pyproj.CRS.from_proj4(projecao["definicao_laea_proj4"]),
+        "EPSG:4326", always_xy=True)
     ids = {p.incendio for p in patches}
     for i, feat in enumerate(produto["features"]):
         prop = feat.get("properties") or {}
@@ -321,14 +326,28 @@ def executar(p1: Path, p2: Path, pasta_saida: Path) -> dict:
             raise ValueError(f"P2 registro {i}: geometria nao poligonal")
         # Exportacoes GEE da mesma geometria podem diferir em coordenadas
         # flutuantes; usar equivalencia por area simetrica em metros quadrados.
-        gm = shapely.transform(geom, proj.transform, interleaved=False)
-        if not gm.is_valid:
-            raise ValueError(f"P2 registro {i}: geometria projetada invalida")
-        area_diferente = gm.symmetric_difference(indice[(dia, rank)].geometria).area
-        maior_diferenca_p1_p2_m2 = max(maior_diferenca_p1_p2_m2, area_diferente)
-        if area_diferente > max(1., indice[(dia, rank)].area_m2*1e-8):
-            raise ValueError(f"P2 registro {i}: geometria diverge do P1 rank {rank}")
-        ranks[dia], geoms[dia] = rank, geom
+        gm, auditoria = reconciliar_p2(
+            geom, indice[(dia, rank)], proj, registro=i, data=dia, rank=rank,
+        )
+        auditorias_p2.append(auditoria)
+        maior_diferenca_p1_p2_m2 = max(
+            maior_diferenca_p1_p2_m2, auditoria["diferenca_simetrica_m2"],
+        )
+        ranks[dia] = rank
+        # Os extremos do TR usam a fonte original enquanto estiver íntegra.
+        # Caso o P2 precise reparo, usam a mesma geometria P1 auditada,
+        # reprojetada para WGS84: não misturar bases topológicas distintas.
+        if auditoria["reparo_p2_necessario"]:
+            canonica = shapely.transform(
+                indice[(dia, rank)].geometria, inv.transform, interleaved=False,
+            )
+            if not canonica.is_valid:
+                raise ValueError(
+                    f"P2 registro {i}: P1 reparado voltou inválido ao WGS84"
+                )
+            geoms[dia] = canonica
+        else:
+            geoms[dia] = geom
     por_data = defaultdict(list)
     for patch in patches:
         por_data[patch.data].append(patch)
@@ -341,6 +360,14 @@ def executar(p1: Path, p2: Path, pasta_saida: Path) -> dict:
     resumo.update({
         "projecao": projecao, "geometrias_reparadas_apos_projecao": reparados,
         "maior_diferenca_simetrica_p1_p2_m2": maior_diferenca_p1_p2_m2,
+        "reparos_p2_para_comparacao": [
+            d for d in auditorias_p2 if d["reparo_p2_necessario"]
+        ],
+        "numero_reparos_p2_para_comparacao": sum(
+            d["reparo_p2_necessario"] for d in auditorias_p2
+        ),
+        "criterio_p2": "make_valid condicionado a equivalencia topologica com P1; "
+                       "tolerancia max(1m2, 1e-8*area_p1)",
         "sha256_p1": sha256(p1.read_bytes()).hexdigest(),
         "sha256_p2": sha256(p2.read_bytes()).hexdigest(),
         "origem_p1": str(p1), "origem_p2": str(p2),

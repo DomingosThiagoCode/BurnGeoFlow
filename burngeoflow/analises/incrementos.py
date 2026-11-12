@@ -22,6 +22,7 @@ import shapely
 from shapely.geometry import mapping, shape
 
 from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
+from burngeoflow.validacao.topologia_p2 import reconciliar_p2
 
 
 CAMPOS_INTERVALOS = [
@@ -108,8 +109,8 @@ def calcular_incremento(anterior, atual, inv, geod, *, evento, dia0, dia1):
 def executar(p1: Path, p2: Path, saida: Path) -> dict:
     patches = carregar_p1(p1)
     projecao, reparados = projetar_patches(patches)
-    if reparados:
-        raise ValueError("IGT exige P1 valido sem reparos implicitos")
+    # Mesma geometria P1 validada, projetada e auditada que a rotina TR usa.
+    # Reparos condicionais em P1 são registrados, não ignorados.
     indice = {(p.data, p.rank): p for p in patches}
     ids = {p.incendio for p in patches}
     if len(ids) != 1:
@@ -123,6 +124,7 @@ def executar(p1: Path, p2: Path, saida: Path) -> dict:
     if produto.get("type") != "FeatureCollection" or not produto.get("features"):
         raise ValueError("P2 vazio ou fora do padrao FeatureCollection")
     selecionados = {}
+    auditorias_p2 = []
     for i, feat in enumerate(produto["features"]):
         prop = feat.get("properties") or {}
         try:
@@ -135,14 +137,12 @@ def executar(p1: Path, p2: Path, saida: Path) -> dict:
             raise ValueError(f"P2 registro {i}: ID, rank ou data incoerente")
         if prop["rank_global"] != rank or prop["id_incendio"] != id_lido:
             raise ValueError(f"P2 registro {i}: rank ou ID fracionario")
-        geom_laea = shapely.transform(original, proj.transform, interleaved=False)
-        if not geom_laea.is_valid or geom_laea.is_empty:
-            raise ValueError(f"P2 registro {i}: geometria invalida")
-        geometria_p1 = indice[(dia, rank)].geometria
-        diferenca = geom_laea.symmetric_difference(geometria_p1).area
-        if diferenca > max(1., geometria_p1.area*1e-8):
-            raise ValueError(f"P2 registro {i}: diverge de P1")
-        selecionados[dia] = geometria_p1  # mesmo referencial dos resultados anteriores
+        _geom_laea, auditoria = reconciliar_p2(
+            original, indice[(dia, rank)], proj,
+            registro=i, data=dia, rank=rank,
+        )
+        auditorias_p2.append(auditoria)
+        selecionados[dia] = indice[(dia, rank)].geometria  # P1 canônico
     if set(selecionados) != {p.data for p in patches}:
         raise ValueError("Datas P1 e P2 nao coincidem")
     dias = sorted(selecionados)
@@ -174,7 +174,20 @@ def executar(p1: Path, p2: Path, saida: Path) -> dict:
         "max_erro_fechamento_area_m2": max((r["erro_fechamento_area_m2"] for r in intervalos), default=0),
         "max_erro_soma_componentes_m2": max((r["erro_soma_componentes_m2"] for r in intervalos), default=0),
         "lacunas_temporais": [r["data_atual"] for r in intervalos if r["lacuna_temporal"]],
-        "projecao": projecao, "sha256_p1": sha256(p1.read_bytes()).hexdigest(),
+        "projecao": projecao,
+        "geometrias_p1_reparadas_apos_projecao": reparados,
+        "numero_reparos_p2_para_comparacao": sum(
+            d["reparo_p2_necessario"] for d in auditorias_p2
+        ),
+        "reparos_p2_para_comparacao": [
+            d for d in auditorias_p2 if d["reparo_p2_necessario"]
+        ],
+        "maior_diferenca_simetrica_p1_p2_m2": max(
+            (d["diferenca_simetrica_m2"] for d in auditorias_p2), default=0,
+        ),
+        "criterio_p2": "make_valid condicionado a equivalencia topologica com P1; "
+                       "tolerancia max(1m2, 1e-8*area_p1)",
+        "sha256_p1": sha256(p1.read_bytes()).hexdigest(),
         "sha256_p2": sha256(p2.read_bytes()).hexdigest(),
         "sql_postgis_executado": False,
         "comparabilidade_sql": "equivalencia logica; diferenca planar WGS84 no SQL vs LAEA no Python",

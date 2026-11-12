@@ -40,3 +40,12 @@ da construção. Dados brutos são preservados antes da validação, e
 `--origem brutos` pode recuperar os produtos sem nova requisição ao GEE.
 Nenhuma geometria não poligonal com área positiva é descartada:
 a execução é interrompida e um diagnóstico persistente é gerado.
+
+## Topologia nas análises TR/IGT
+
+`burngeoflow/validacao/topologia_p2.py` é o módulo compartilhado para
+reconciliação entre P2 e P1 após reprojeção LAEA. O `make_valid` é
+permitido apenas em memória e se o resultado for equivalente ao P1
+projetado e validado dentro de tolerância explícita de área simétrica.
+As análises registram o número de reparos, as datas/ranks envolvidos
+e a diferença residual. Falhas acima da tolerância não são disfarçadas.

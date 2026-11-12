@@ -159,6 +159,32 @@ Documentação oficial: [API Python](https://developers.google.com/earth-engine/
 [computeFeatures](https://developers.google.com/earth-engine/apidocs/ee-data-computefeatures)
 e [GlobFire v2](https://developers.google.com/earth-engine/datasets/catalog/JRC_GWIS_GlobFire_v2_DailyPerimeters).
 
+
+### Reconciliação geométrica P2 para TR/IGT
+
+Os produtos P1/P2 finais não são editados pelas análises. A análise espacial
+de P1 utiliza geometria em projeção LAEA, com `make_valid` condicional
+já registrado nos resumos. A análise P2 pode receber polígonos cuja
+projeção revela auto-interseções, mesmo após a validação estrutural.
+
+TR e IGT verificam agora o P2 com a mesma projeção do P1. Se o P2 ficar
+inválido, a sua geometria para comparação é reparada apenas em memória.
+Esse reparo **só é aceito se a diferença simétrica de área em relação ao
+componente P1 correspondente não ultrapassar `max(1 m², 10⁻⁸ × área_P1)`**.
+Se houver divergência maior, a análise é interrompida e registra
+número da feição, data, rank, motivo topológico e magnitude da divergência.
+Os reparos aceitos são contabilizados nos resumos de TR e IGT; não
+constituem validação independente da fonte GlobFire.
+
+Para retomar a execução local após atualizar o código:
+
+```powershell
+git pull origin main
+python executar_pipeline.py --id 24340828 --origem local
+```
+
+Os arquivos do GEE continuam no cache e as etapas anteriores concluídas
+são reutilizadas quando os hashes P1/P2 permanecem inalterados.
 ## Escopo e qualidade
 
 Os indicadores medem evolução geométrica de áreas queimadas acumuladas,

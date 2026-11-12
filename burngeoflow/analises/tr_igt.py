@@ -82,7 +82,7 @@ def salvar_csv(caminho, campos, linhas):
 
 
 def direcoes_reducao(g0, g1, inverso, geod, *, evento, dia0, dia1):
-    """Barbosa & Oliveira (2022), Fig. 3: R0\R1 e vetores perda -> centroide R0.
+    """Barbosa & Oliveira (2022), Fig. 3: R0\\R1 e vetores perda -> centroide R0.
 
     Nao atribuir movimento fisico a fragmentos subpixel.
     """
