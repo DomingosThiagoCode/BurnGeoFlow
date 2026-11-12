@@ -123,6 +123,36 @@ Os avisos significam apenas que o **Python ainda está esperando o servidor**;
 não comprovam que o processamento remoto está avançando. Se o GEE retornar
 uma falha, ela será informada. O programa não cria GeoJSONs incompletos.
 Uma execução iniciada antes dessa atualização não passa a emitir os avisos.
+### Preservação dos dados e tratamento geométrico
+
+Cada página P1/P2 recebida fica em
+`execucoes/<ID>/dados/estudo_caso_<ID>/brutos_gee/paginas_P1/`
+ou `paginas_P2/`. Uma execução interrompida pode recuperar as páginas
+já recebidas, com checagem de identidade da consulta e token de paginação.
+Após completar cada produto, uma cópia GeoJSON **bruta e imutável** é
+guardada em `brutos_gee/`, antes da validação científica.
+
+Se o servidor produzir uma `GeometryCollection` com parte poligonal,
+o pipeline extrai somente a componente areal e registra essa intervenção.
+Geometrias estritamente não poligonais **com área declarada zero** são
+excluídas do conjunto de patches e têm ranks e contagens recompostos.
+A lista completa de intervenções fica em
+`brutos_gee/diagnostico_geometrias.json`. Qualquer geometria
+não poligonal com área positiva/desconhecida bloqueia a publicação
+para revisão. Isso não deve ser interpretado como propagação física.
+
+Para reprocessar **sem chamar o Earth Engine** os GeoJSONs já recebidos:
+
+```powershell
+python executar_pipeline.py --id 24340828 --origem brutos --somente-aquisicao
+```
+
+Esse comando só funciona quando ambos os GeoJSONs brutos já estão
+presentes em disco. Se você executou uma versão anterior à correção,
+os temporários daquele processamento foram apagados automaticamente
+e precisarão ser extraídos outra vez. A nova versão não descartará
+os dados recebidos em caso de erro de validação.
+
 
 
 Documentação oficial: [API Python](https://developers.google.com/earth-engine/guides/python_install),

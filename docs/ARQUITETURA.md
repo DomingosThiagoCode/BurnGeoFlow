@@ -7,7 +7,8 @@ A pasta `resultados/` na raiz não é necessária: cada execução grava em `exe
 | --- | --- |
 | executar_pipeline.py | Entrada CLI, execução, logs, retomada |
 | burngeoflow/config.py | Configuração não sensível do acesso GEE |
-| burngeoflow/aquisicao/earth_engine.py | Consulta GlobFire, constrói P1/P2 acumulados e exporta GeoJSON por páginas |
+| burngeoflow/aquisicao/earth_engine.py | Consulta GlobFire, gera P1/P2, exporta com checkpoint por página e salva entradas brutas |
+| burngeoflow/aquisicao/geometrias.py | Diagnóstico, normalização auditada de coleções e tratamento de feições sem área |
 | burngeoflow/aquisicao/dados_referencia.py | Baixa amostra pública com hash para testes de regressão |
 | burngeoflow/processamento/componentes.py | Organização das componentes P1 por data |
 | burngeoflow/processamento/conectividade.py | Contatos geométricos, incluindo vértices |
@@ -31,3 +32,11 @@ O GitHub Actions testa a aquisição com mocks, sem credenciais Google.
 A equivalência geométrica com os resultados históricos do Pantanal 24340828
 precisa ser aferida numa execução autenticada real. Para eventos grandes,
 a exportação paginada pode exigir futura alternativa em lote.
+
+## Segurança e reprocessamento
+
+O cache de páginas usa chave vinculada ao ID, ano, parâmetros e versão
+da construção. Dados brutos são preservados antes da validação, e
+`--origem brutos` pode recuperar os produtos sem nova requisição ao GEE.
+Nenhuma geometria não poligonal com área positiva é descartada:
+a execução é interrompida e um diagnóstico persistente é gerado.
