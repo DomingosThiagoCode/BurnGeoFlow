@@ -48,3 +48,10 @@ export interface DadosDia {
   metricas: Linha | null;
   transicao: Linha | null;
 }
+
+export interface AnaliseEtapa4 {
+  disponivel: boolean;
+  pontos: Linha[];
+  segmentos: Linha[];
+  indicadores: Linha[];
+}
