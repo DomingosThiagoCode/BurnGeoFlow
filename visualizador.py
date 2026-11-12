@@ -211,8 +211,9 @@ def main():
                     latitude=(bbox[1]+bbox[3])/2,
                     zoom=zoom, pitch=0,
                 ),
-                tooltip={"html": "<b>Componente</b><br>Data: {data}<br>"
-                         "Rank: {rank}<br>Rank P2: {rank_global}",
+                tooltip={"html": "<b>Componente</b><br>Data: {properties.data}<br>"
+                         "Rank P1: {properties.rank}<br>"
+                         "Rank rastreado P2: {properties.rank_global}",
                          "style": {"backgroundColor": "#24313A",
                                    "color": "#FFFFFF"}},
                 map_style="light",
