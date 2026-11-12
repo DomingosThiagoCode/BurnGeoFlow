@@ -150,11 +150,11 @@ class TesteSinteseCientifica(unittest.TestCase):
                 (saida / f"indicadores_sintese_{EVENTO}.json").is_file()
             )
             self.assertIn(
-                "Validação externa",
+                "validação externa: não",
                 (saida / f"resumo_para_chat_{EVENTO}.txt").read_text(
                     encoding="utf-8"
-                ) if False else md,
-            ) if False else None
+                ),
+            )
             self.assertEqual(
                 antes,
                 (sha256(p1.read_bytes()).hexdigest(),
