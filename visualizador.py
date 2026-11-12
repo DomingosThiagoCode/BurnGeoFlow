@@ -100,25 +100,36 @@ def main():
         st.error(f"Não foi possível abrir o evento: {exc}")
         st.stop()
     datas = evento["datas"]
+    # O seletor e os botões compartilham a mesma chave por evento.
+    # on_click executa antes do rerun, evitando modificar widget
+    # já instanciado no mesmo ciclo Streamlit.
+    chave_data = f"data_selecionada_{evento_id}"
+    if st.session_state.get(chave_data) not in datas:
+        st.session_state[chave_data] = datas[-1]
+
+    def mover_data(deslocamento: int):
+        indice_atual = datas.index(st.session_state[chave_data])
+        novo = max(0, min(len(datas)-1, indice_atual + deslocamento))
+        st.session_state[chave_data] = datas[novo]
+
     with st.sidebar:
         st.divider()
         st.subheader("Linha do tempo")
-        dia = st.select_slider("Data de observação", options=datas, value=datas[-1])
+        dia = st.select_slider(
+            "Data de observação", options=datas, key=chave_data,
+        )
         indice = datas.index(dia)
         antes, depois = st.columns(2)
         with antes:
-            if st.button("◀ Anterior", disabled=indice == 0, use_container_width=True):
-                st.session_state["dia_forcado"] = datas[indice-1]
+            st.button(
+                "◀ Anterior", disabled=indice == 0, use_container_width=True,
+                on_click=mover_data, args=(-1,),
+            )
         with depois:
-            if st.button("Próxima ▶", disabled=indice == len(datas)-1,
-                         use_container_width=True):
-                st.session_state["dia_forcado"] = datas[indice+1]
-        if st.session_state.get("dia_forcado") in datas:
-            novo = st.session_state.pop("dia_forcado")
-            if novo != dia:
-                # O seletor é controlado por sua própria chave Streamlit.
-                st.session_state["data_selecionada"] = novo
-                st.rerun()
+            st.button(
+                "Próxima ▶", disabled=indice == len(datas)-1,
+                use_container_width=True, on_click=mover_data, args=(1,),
+            )
         st.divider()
         mostrar_p1 = st.checkbox("P1: todos os componentes", value=True)
         mostrar_p2 = st.checkbox("P2: região rastreada", value=True)
