@@ -169,6 +169,26 @@ projeção revela auto-interseções, mesmo após a validação estrutural.
 
 TR e IGT verificam agora o P2 com a mesma projeção do P1.
 
+### Diagnosticar sobreposições em P1 sem refazer as etapas
+
+Se a integração acusar "Patches P1 sobrepoem em area", não elimine a
+verificação e não gere outros polígonos automaticamente. Audite a data:
+
+```powershell
+python -m burngeoflow.validacao.sobreposicoes --id 24340828 --data 2020-09-18
+```
+
+O diagnóstico salva
+`execucoes/24340828/resultados/etapa5/diagnostico_sobreposicoes_p1_24340828.json`
+e imprime a diferença entre soma das áreas individuais e união, os
+pares sobrepostos, os ranks, a área exata de interseção em m²,
+fração da área do menor patch e indicadores de reparo LAEA.
+
+Para auditar todas as datas, omita `--data`. A operação lê
+o cache local de P1 e **não altera os dados, não chama GEE e não prossegue
+com a integração**. A diferença soma/união não necessariamente é igual
+à soma das interseções por pares quando há sobreposição tripla.
+
 ### Etapa 5 com geometrias P1/P2 regularizadas
 
 A integração da Etapa 5 não deve rejeitar automaticamente um P1 que
