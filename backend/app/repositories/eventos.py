@@ -81,6 +81,10 @@ class RepositorioEventos:
             "transicoes": resultados / "etapa5" / f"transicoes_integradas_{incendio}.csv",
             "resumo5": resultados / "etapa5" / f"resumo_etapa5_{incendio}.json",
             "resumo6": resultados / "etapa6" / f"resumo_validacao_{incendio}.json",
+            "resumo4": resultados / "etapa4" / f"resumo_regiao_movel_{incendio}.json",
+            "pontos_tr": resultados / "etapa4" / f"pontos_representativos_{incendio}.csv",
+            "segmentos_tr": resultados / "etapa4" / f"segmentos_trajetorias_{incendio}.csv",
+            "indicadores_tr": resultados / "etapa4" / f"indicadores_regiao_{incendio}.csv",
         }
 
     def _obrigatorios(self, incendio: int) -> dict[str, Path]:
@@ -189,6 +193,60 @@ class RepositorioEventos:
                 "Análise espacial descritiva. A existência de métricas "
                 "não comprova validação científica externa."
             ),
+        }
+
+
+    def analise_regiao(self, incendio: int) -> dict:
+        """Expõe saídas originais da Etapa 4 somente com proveniência consistente.
+
+        Nunca recalcula indicadores e não combina arquivos históricos com
+        geometrias P1/P2 de outra execução.
+        """
+        arqs = self._obrigatorios(incendio)
+        chaves = ("resumo4", "pontos_tr", "segmentos_tr", "indicadores_tr")
+        if not all(arqs[k].is_file() for k in chaves):
+            return {"disponivel": False, "pontos": [],
+                    "segmentos": [], "indicadores": []}
+        meta = _json_obj(arqs["resumo4"])
+        if int(meta.get("id_incendio", -1)) != incendio:
+            raise DadosInconsistentes("Resumo da Etapa 4 pertence a outro evento")
+        if not meta.get("sha256_p1") or not meta.get("sha256_p2"):
+            raise DadosInconsistentes("Etapa 4 sem hashes de P1/P2")
+        self._proveniencia(arqs, meta)
+
+        pontos = _csv_rows(arqs["pontos_tr"])
+        segmentos = _csv_rows(arqs["segmentos_tr"])
+        indicadores = _csv_rows(arqs["indicadores_tr"])
+        datas = self.resumo(incendio)["datas"]
+        pares = list(zip(datas, datas[1:]))
+        tipos = {"centroide", "norte", "sul", "leste", "oeste"}
+
+        if not datas or len(pontos) != len(datas)*5 or len(segmentos) != len(pares)*5 or len(indicadores) != len(pares):
+            raise DadosInconsistentes("Contagens da Etapa 4 incompatíveis com P1/P2")
+        for grupo in (pontos, segmentos, indicadores):
+            if any(int(r.get("id_incendio", -1)) != incendio for r in grupo):
+                raise DadosInconsistentes("Etapa 4 contém registros de outro evento")
+        if set((r.get("data"), r.get("ponto")) for r in pontos) != {
+            (d, tipo) for d in datas for tipo in tipos
+        }:
+            raise DadosInconsistentes("Pontos da Etapa 4 não correspondem às datas do evento")
+        if set((r.get("data_anterior"), r.get("data_atual"), r.get("ponto")) for r in segmentos) != {
+            (a, b, tipo) for a, b in pares for tipo in tipos
+        }:
+            raise DadosInconsistentes("Segmentos da Etapa 4 não correspondem às transições")
+        if set((r.get("data_anterior"), r.get("data_atual")) for r in indicadores) != set(pares):
+            raise DadosInconsistentes("Indicadores da Etapa 4 não correspondem às transições")
+        if any(int(meta.get(k, -1)) != n for k, n in (
+            ("datas", len(datas)), ("pontos", len(pontos)),
+            ("segmentos", len(segmentos)), ("transicoes", len(pares)),
+        )):
+            raise DadosInconsistentes("Resumo e tabelas da Etapa 4 divergem")
+
+        return {
+            "disponivel": True,
+            "pontos": sorted(pontos, key=lambda r: (r["data"], r["ponto"])),
+            "segmentos": sorted(segmentos, key=lambda r: (r["data_anterior"], r["ponto"])),
+            "indicadores": sorted(indicadores, key=lambda r: r["data_anterior"]),
         }
 
     def camada(self, incendio: int, dia: str,
