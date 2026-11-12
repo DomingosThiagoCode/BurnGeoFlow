@@ -17,8 +17,8 @@ interface Props {
 }
 
 const cores = {
-  laranja: "#d98245", verde: "#168f86", azul: "#4e78a8",
-  roxo: "#8b6ab0", amarelo: "#c19b34", vermelho: "#c66a5c",
+  laranja: "#aa4b36", verde: "#35756d", azul: "#4d7088",
+  roxo: "#786a87", amarelo: "#a48852", vermelho: "#ad5f58",
 };
 
 function linha(rotulo: string, cor: string, registros: Linha[], campo: string): SerieGrafico {
@@ -78,16 +78,16 @@ function RosaDirecional({ titulo, dados, subtitulo }: {
         aria-label={"Rosácea: " + titulo}>
         {[0.25, 0.5, 0.75, 1].map(f =>
           <circle key={f} cx="110" cy="112" r={raio*f}
-            fill="none" stroke="#e2ebe7" strokeWidth="1"/>)}
+            fill="none" stroke="#e4e0d5" strokeWidth="1"/>)}
         {[0, 45, 90, 135].map(a => {
           const p = ponto(a, raio), q = ponto(a+180, raio);
           return <line key={a} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]}
-            stroke="#dce6e2" strokeWidth="1"/>;
+            stroke="#d9d6c9" strokeWidth="1"/>;
         })}
         {bins.map((valor, i) => {
           if (valor <= 0) return null;
           const rad = Math.max(2, raio * valor/maior);
-          return <path key={i} d={setor(i, rad)} fill="#168f86"
+          return <path key={i} d={setor(i, rad)} fill="#35756d"
             fillOpacity=".72" stroke="#fff" strokeWidth=".7">
             <title>{DIRECOES[i]}: {formatarNumero(valor / total * 100, 1)}% do peso</title>
           </path>;
@@ -95,9 +95,9 @@ function RosaDirecional({ titulo, dados, subtitulo }: {
         {media !== null && (() => {
           const p = ponto(media, raio + 5);
           return <line x1="110" y1="112" x2={p[0]} y2={p[1]}
-            stroke="#d77b42" strokeWidth="2.6" strokeLinecap="round"/>;
+            stroke="#aa4b36" strokeWidth="2.6" strokeLinecap="round"/>;
         })()}
-        <circle cx="110" cy="112" r="2.5" fill="#324d45"/>
+        <circle cx="110" cy="112" r="2.5" fill="#26483d"/>
         <text x="110" y="22" textAnchor="middle">N</text>
         <text x="203" y="116" textAnchor="middle">L</text>
         <text x="110" y="207" textAnchor="middle">S</text>
@@ -150,8 +150,8 @@ function CincoTrajetorias({ pontos, dia }: { pontos: Linha[]; dia: string }) {
             fill={t.cor} stroke="#fff" strokeWidth="2"/>}
         </g>;
       })}
-      <text x="749" y="43" fill="#58766d" fontSize="12" textAnchor="end">N ↑</text>
-      <text x="52" y="427" fill="#8aa299" fontSize="10">Extremos descritivos, não trajetórias de partículas ou frentes ativas.</text>
+      <text x="749" y="43" fill="#657468" fontSize="12" textAnchor="end">N ↑</text>
+      <text x="52" y="427" fill="#777e70" fontSize="10">Extremos descritivos, não trajetórias de partículas ou frentes ativas.</text>
     </svg>
     <div className="chart-legend">
       {TRAJETORIAS.map(t => <span key={t.id}><i style={{backgroundColor:t.cor}}/>{t.rotulo}</span>)}

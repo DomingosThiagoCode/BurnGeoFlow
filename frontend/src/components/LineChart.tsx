@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatarNumero, nomeDia } from "../services/api";
 
 export type SerieGrafico = {
@@ -20,14 +20,38 @@ export function LineChart({
   titulo, datas, series, unidade = "km²", onSelect, dataAtual,
 }: Props) {
   const uid = useId().replace(/:/g, "_");
-  const largura = 740, altura = 210;
+  const recipiente = useRef<HTMLDivElement>(null);
+  const [largura, setLargura] = useState(740);
+  // Renderiza eixos e rótulos em pixels legíveis no tamanho real do cartão.
+  // O viewBox fixo anterior reduzia também a tipografia em telas pequenas.
+  useEffect(() => {
+    const el = recipiente.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const w = Math.round(entry.contentRect.width);
+      if (w > 0) setLargura(Math.max(320, w));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const altura = 210;
   const margem = { topo: 15, direita: 22, inferior: 35, esquerda: 54 };
   const xMin = margem.esquerda, xMax = largura - margem.direita;
   const yMin = margem.topo, yMax = altura - margem.inferior;
   const valores = series.flatMap((s) => s.valores)
     .filter((n): n is number => n !== null && Number.isFinite(n));
-  const max = Math.max(1, ...valores), min = Math.min(0, ...valores);
-  const dominio = max === min ? 1 : max - min;
+  const maxDado = valores.length ? Math.max(...valores) : 0;
+  const min = Math.min(0, ...valores);
+  // Escala numérica contextual: não achata índices inferiores a 1
+  // e mantém a origem zero para facilitar comparações científicas.
+  const max = maxDado > 0 ? maxDado * 1.08 : (Math.abs(min) || 1) * 0.08;
+  const dominio = max - min || 1;
+  const intervaloEixo = dominio / 4;
+  const casasEixo = intervaloEixo < 0.01 ? 4
+    : intervaloEixo < 0.1 ? 3
+    : intervaloEixo < 1 ? 2
+    : intervaloEixo < 10 ? 1 : 0;
   const X = (i: number) => xMin + (datas.length < 2 ? 0 : i/(datas.length-1)) * (xMax-xMin);
   const Y = (v: number) => yMax - ((v-min)/dominio)*(yMax-yMin);
   const selected = Math.max(0, datas.indexOf(dataAtual ?? ""));
@@ -41,8 +65,7 @@ export function LineChart({
       aberto = true;
     }
     return desenho.trim();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [series, datas]);
+  }), [series, datas, largura]);
   if (!datas.length || !valores.length) {
     return <div className="empty-chart">Sem valores para o gráfico {titulo}.</div>;
   }
@@ -52,7 +75,7 @@ export function LineChart({
         <h3>{titulo}</h3>
         <span>{unidade}</span>
       </div>
-      <div className="chart-scroll">
+      <div className="chart-scroll" ref={recipiente}>
         <svg viewBox={"0 0 " + largura + " " + altura} role="img"
           aria-label={titulo + ". Consulte a legenda para séries."}
           className="chart-svg">
@@ -65,19 +88,19 @@ export function LineChart({
             const yy = yMax - fra*(yMax-yMin), val = min + fra*dominio;
             return <g key={i}>
               <line x1={xMin} x2={xMax} y1={yy} y2={yy}
-                stroke="#e4ebe9" strokeWidth="1"/>
+                stroke="#e3e0d5" strokeWidth="1"/>
               <text x={xMin-10} y={yy+4} textAnchor="end"
-                fill="#71827e" fontSize="11">{formatarNumero(val, 0)}</text>
+                fill="#818477" fontSize="11">{formatarNumero(val, casasEixo)}</text>
             </g>;
           })}
           <line x1={xMin} y1={yMax} x2={xMax} y2={yMax}
-            stroke="#b3c5c0"/>
+            stroke="#bcbdb1"/>
           {datas.filter((_,i) => i===0 || i===datas.length-1 ||
             i===Math.floor((datas.length-1)/2)).map((iso) => {
             const i = datas.indexOf(iso);
             return <text key={iso} x={X(i)} y={altura-11}
               textAnchor={i===0?"start":i===datas.length-1?"end":"middle"}
-              fill="#71827e" fontSize="11">{nomeDia(iso).slice(0,5)}</text>;
+              fill="#818477" fontSize="11">{nomeDia(iso).slice(0,5)}</text>;
           })}
           <g clipPath={"url(#" + uid + ")"}>
             {series.map((serie, i) =>
@@ -86,7 +109,7 @@ export function LineChart({
                 strokeLinecap="round" strokeLinejoin="round"/> )}
             {datas.includes(dataAtual ?? "") && <line
               x1={X(selected)} x2={X(selected)} y1={yMin} y2={yMax}
-              stroke="#425955" strokeDasharray="4 4" strokeWidth="1.4" />}
+              stroke="#aa4b36" strokeDasharray="4 4" strokeWidth="1.4" />}
             {series.map((s) => {
               const v = s.valores[selected];
               return v !== null && v !== undefined ? <circle

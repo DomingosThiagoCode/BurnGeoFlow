@@ -1,7 +1,7 @@
 import { type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, CheckCircle2,
-  ChevronLeft, ChevronRight, Database, Flame, Layers, LoaderCircle,
+  ChevronLeft, ChevronRight, Database, Layers, LoaderCircle,
   Menu, Pause, Play, RefreshCw, Search, X,
 } from "lucide-react";
 import { ScientificPanels, type AbaCientifica } from "./components/ScientificPanels";
@@ -275,16 +275,26 @@ export default function App() {
     <div className="application">
       <header className="global-header">
         <div className="brand">
-          <span className="brand-icon"><Flame size={21} strokeWidth={2.2}/></span>
-          <div>
-            <strong>BurnGeoFlow</strong>
-            <small>Plataforma geoespacial</small>
+          <span className="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 58 58" fill="none" focusable="false">
+              <path d="M8 31c7-15 15-2 24-14 7-9 12-4 18-12" />
+              <path d="M6 42c8-16 18-7 27-19 6-8 12-4 19-11" />
+              <path d="M6 53c9-15 20-9 28-20 6-7 11-6 18-12" />
+              <circle cx="37" cy="14" r="3" />
+            </svg>
+          </span>
+          <div className="brand-copy">
+            <strong>Burn<span>Geo</span>Flow</strong>
+            <small>ATLAS DE ÁREAS QUEIMADAS</small>
           </div>
         </div>
-        <span className="header-context">Análise espaço-temporal de áreas queimadas</span>
+        <div className="header-context">
+          <span>OBSERVATÓRIO CARTOGRÁFICO</span>
+          <strong>SÉRIES TEMPORAIS / REGIÕES MÓVEIS</strong>
+        </div>
         <div className="header-actions">
           <span className={"connection " + (existeErro ? "connection-error" : "")}>
-            <i /> {buscando ? "Conectando" : existeErro ? "API indisponível" : "API local"}
+            <i /> {buscando ? "Conectando" : existeErro ? "API indisponível" : "Servidor local"}
           </span>
           <button className="mobile-menu icon-btn" type="button"
             aria-label={painelAberto ? "Fechar menu" : "Abrir menu"}
@@ -296,6 +306,11 @@ export default function App() {
 
       <div className="page-layout">
         <aside className={"sidebar " + (painelAberto ? "sidebar-open" : "")}>
+          <div className="sidebar-intro">
+            <span>CADERNO DE CAMPO · CONTROLES</span>
+            <strong>Navegue pelo<br/>território.</strong>
+            <p>Selecione o evento e percorra suas observações no tempo.</p>
+          </div>
           <div className="sidebar-group">
             <div className="section-heading">
               <span>GERENCIAMENTO</span>
@@ -397,12 +412,17 @@ export default function App() {
 
         <main className="main-content">
           <div className="workspace-heading">
-            <div>
-              <span className="eyebrow">PAINEL DE EXPLORAÇÃO</span>
-              <h1>Visão geral do incêndio</h1>
-              <p>Observe a evolução dos componentes e da região móvel ao longo do tempo.</p>
+            <div className="workspace-copy">
+              <div className="edition-line">
+                <span className="eyebrow">CADERNO CARTOGRÁFICO / Nº 01</span>
+                <span className="edition-line-rule" aria-hidden="true"/>
+                <span className="edition-meta">ANÁLISE ESPAÇO-TEMPORAL</span>
+              </div>
+              <h1>O território <em>depois do fogo.</em></h1>
+              <p>Uma leitura das áreas queimadas, de seus componentes e das transformações da paisagem ao longo do tempo.</p>
             </div>
             <div className="workspace-actions">
+              <span className="workspace-stamp">GLOBFIRE V2 <b>·</b> DADOS HISTÓRICOS</span>
               <button className="secondary-button" type="button"
                 aria-label="Atualizar lista de eventos"
                 onClick={() => atualizarLista()}><RefreshCw size={16}/> Atualizar</button>
@@ -484,7 +504,7 @@ export default function App() {
               <section className="panel map-panel">
                 <div className="panel-heading">
                   <div>
-                    <span className="eyebrow">GEOMETRIA ACUMULADA</span>
+                    <span className="eyebrow">01 / GEOMETRIA ACUMULADA</span>
                     <h2>Mapa temporal do evento</h2>
                   </div>
                   <span className="panel-date">{data ? nomeDia(data) : ""}</span>
@@ -548,7 +568,7 @@ export default function App() {
               <section className="panel details-panel">
                 <div className="panel-heading">
                   <div>
-                    <span className="eyebrow">INSPEÇÃO LOCAL</span>
+                    <span className="eyebrow">02 / INVENTÁRIO DOS PATCHES</span>
                     <h2>Patches da data selecionada</h2>
                   </div>
                   <span className="subtle-pill">
@@ -597,7 +617,7 @@ export default function App() {
             </>
           )}
           <footer className="footer">
-            <span>BurnGeoFlow · Exploração de dados, não monitoramento de fogo ativo</span>
+            <span>BurnGeoFlow / Atlas cartográfico · Não representa monitoramento de fogo ativo</span>
             <span>Armazenamento local · GEE GlobFire v2</span>
           </footer>
         </main>
