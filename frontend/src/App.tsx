@@ -1,11 +1,12 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, BarChart3, CheckCircle2,
   ChevronLeft, ChevronRight, Database, Flame, Layers, LoaderCircle,
   Menu, Pause, Play, RefreshCw, Search, X,
 } from "lucide-react";
 import { LineChart, type SerieGrafico } from "./components/LineChart";
-import { MapPanel } from "./components/MapPanel";
+// Só importa MapLibre e WebGL quando o usuário solicita o mapa.
+const MapPanel = lazy(() => import("./components/MapPanel").then(m => ({default: m.MapPanel})));
 import { JobsPanel } from "./components/JobsPanel";
 import {
   carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
@@ -44,6 +45,7 @@ export default function App() {
   const [serie, setSerie] = useState<Linha[]>([]);
   const [transicoes, setTransicoes] = useState<Linha[]>([]);
   const [data, setData] = useState("");
+  const [mapaAtivo, setMapaAtivo] = useState(false);
   const [p1Ativo, setP1Ativo] = useState(true);
   const [p2Ativo, setP2Ativo] = useState(true);
   const [mapaBase, setMapaBase] = useState(true);
@@ -90,6 +92,7 @@ export default function App() {
     setP2(null);
     setData("");
     setTocando(false);
+    setMapaAtivo(false);
     Promise.all([
       carregarResumo(id, abort.signal),
       carregarSerie(id, abort.signal),
@@ -122,7 +125,7 @@ export default function App() {
     const dados = await carregarGeometria(identificador, dia, camada, signal);
     // Cache de poucas datas para não reter todas as coordenadas em RAM.
     cache.current.set(chave, dados);
-    if (cache.current.size > 12) {
+    if (cache.current.size > 4) {
       const primeira = cache.current.keys().next().value;
       if (primeira !== undefined) cache.current.delete(primeira);
     }
@@ -130,7 +133,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (id === null || !data || !resumo) return;
+    if (id === null || !data || !resumo || !mapaAtivo) return;
     const ctrl = new AbortController();
     setCarregandoMapa(true);
     setErroMapa(null);
@@ -154,7 +157,7 @@ export default function App() {
         if (!ctrl.signal.aborted) setCarregandoMapa(false);
       });
     return () => ctrl.abort();
-  }, [id, data, resumo, p1Ativo, p2Ativo, obterCamada]);
+  }, [id, data, resumo, mapaAtivo, p1Ativo, p2Ativo, obterCamada]);
 
   useEffect(() => {
     if (!tocando || !resumo || !data) return;
@@ -454,14 +457,35 @@ export default function App() {
                 {erroMapa && <div className="map-warning" role="alert">
                   <AlertCircle size={18}/>{erroMapa}
                 </div>}
-                {carregandoMapa && <div className="map-loader" aria-live="polite">
-                  <LoaderCircle className="spin" size={18}/> Atualizando geometrias...
-                </div>}
-                <MapPanel id={id} data={data} p1={p1} p2={p2}
-                  mostrarP1={p1Ativo} mostrarP2={p2Ativo}
-                  mapaBase={mapaBase}/>
+                {!mapaAtivo ? <div className="map-deferred">
+                  <Layers size={34}/>
+                  <h3>Mapa interativo sob demanda</h3>
+                  <p>Os indicadores já estão disponíveis. Abra o mapa apenas quando precisar
+                    explorar a geometria, evitando carregar WebGL e polígonos
+                    durante a inicialização.</p>
+                  <button type="button" className="map-launch"
+                    onClick={() => setMapaAtivo(true)}>
+                    <Layers size={17}/> Abrir mapa do evento
+                  </button>
+                </div> : <>
+                  {carregandoMapa && <div className="map-loader" aria-live="polite">
+                    <LoaderCircle className="spin" size={18}/> Atualizando geometrias...
+                  </div>}
+                  <Suspense fallback={<div className="map-deferred" role="status">
+                    <LoaderCircle className="spin" size={24}/>
+                    <p>Carregando módulo cartográfico...</p>
+                  </div>}>
+                    <MapPanel id={id} data={data} p1={p1} p2={p2}
+                      mostrarP1={p1Ativo} mostrarP2={p2Ativo}
+                      mapaBase={mapaBase}/>
+                  </Suspense>
+                </>}
                 <div className="map-footer">
                   <p>Geometrias originais em EPSG:4326. Contatos e incrementos não representam frentes ativas do fogo.</p>
+                  {mapaAtivo && <button type="button"
+                    className="secondary-button compact"
+                    onClick={() => { setMapaAtivo(false); setP1(null); setP2(null); }}
+                  >Fechar mapa e liberar memória</button>}
                   <button type="button" onClick={exportarGeoJSON}
                     disabled={!data} className="secondary-button compact">
                     <ArrowDownToLine size={15}/> Exportar GeoJSON

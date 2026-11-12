@@ -3,6 +3,9 @@ import * as maplibregl from "maplibre-gl";
 import type { GeoJSONSource, Map as MapaGL } from "maplibre-gl";
 import type { Colecao } from "../types";
 import "maplibre-gl/dist/maplibre-gl.css";
+// MapLibre GL JS v6 exige URL explícita do worker no build Vite.
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+maplibregl.setWorkerUrl(workerUrl);
 
 type Props = {
   id: number;

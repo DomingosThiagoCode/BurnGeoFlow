@@ -426,3 +426,20 @@ tbody tr:hover { background:#f8fbf9; }
   .jobs-history { flex-direction:column; }
   .job-history-item { justify-content:space-between; }
 }
+
+/* O mapa não carrega WebGL nem geometria até uma ação explícita. */
+.map-deferred {
+  min-height: 260px; display: flex; flex-direction: column;
+  justify-content: center; align-items: center; text-align: center;
+  gap: 10px; padding: 36px 24px; background: #f3f7f5;
+  color: #466b5e;
+}
+.map-deferred h3 { margin: 3px 0 0; color: #2e5245; font-size: 18px; }
+.map-deferred p { max-width: 520px; margin: 0; line-height: 1.6; font-size: 12px; }
+.map-launch {
+  margin-top: 10px; border: 0; border-radius: 10px;
+  background: #2e7867; color: white; font-weight: 750; padding: 11px 18px;
+  display: inline-flex; gap: 8px; align-items: center; cursor: pointer;
+}
+.map-launch:hover { background: #205f50; }
+.map-footer { flex-wrap: wrap; }
