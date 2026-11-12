@@ -196,6 +196,13 @@ def testar() -> None:
             assert page.locator(".chart-panel").count() == 4
             page.get_by_role("tab", name="Expansão").click()
             page.get_by_role("heading", name="Expansão e incorporação geométrica").wait_for()
+            page.evaluate("window.scrollTo(0, 530)")
+            page.wait_for_timeout(100)
+            lateral = page.locator(".sidebar").bounding_box()
+            assert lateral is not None and abs(lateral["y"] - 76) < 4, (
+                "Barra lateral não acompanhou a rolagem do desktop"
+            )
+            page.evaluate("window.scrollTo(0, 0)")
             page.get_by_role("tab", name="Movimento").click()
             page.get_by_role("heading", name="Cinco trajetórias representativas").wait_for()
             page.get_by_role("tab", name="Direções").click()
@@ -205,6 +212,13 @@ def testar() -> None:
             page.get_by_role("heading", name="Forma e deformação").wait_for()
             assert page.locator(".chart-panel").count() == 4
             assert not errors, f"Falhas JavaScript nas novas abas: {errors}"
+            page.set_viewport_size({"width": 390, "height": 840})
+            assert page.locator(".sidebar").evaluate(
+                "el => getComputedStyle(el).position"
+            ) == "fixed", "No mobile o menu deve continuar sendo um drawer"
+            page.get_by_role("button", name="Abrir menu").click()
+            assert "sidebar-open" in (page.locator(".sidebar").get_attribute("class") or "")
+            page.get_by_role("button", name="Fechar menu").click()
             browser.close()
     finally:
         httpd.shutdown()
