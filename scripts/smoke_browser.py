@@ -190,6 +190,9 @@ def testar() -> None:
                 "Código cartográfico não foi carregado sob demanda"
             )
             assert not errors, f"Falhas JavaScript após abrir mapa: {errors}"
+            evidencias = ROOT / "artifacts" / "atlas"
+            evidencias.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(evidencias / "01-mapa-desktop.png"), full_page=True)
             page.get_by_role(
                 "button", name="Fechar mapa e liberar memória",
             ).click()
@@ -217,6 +220,7 @@ def testar() -> None:
             page.get_by_role("tab", name="Direções").click()
             page.get_by_role("heading", name="Direções e rosáceas").wait_for()
             assert page.locator(".rose-card").count() == 7
+            page.screenshot(path=str(evidencias / "02-rosaceas-desktop.png"), full_page=True)
             page.get_by_role("tab", name="Forma").click()
             page.get_by_role("heading", name="Forma e deformação").wait_for()
             assert page.locator(".chart-panel").count() == 4
@@ -228,6 +232,7 @@ def testar() -> None:
             page.get_by_role("button", name="Abrir menu").click()
             assert "sidebar-open" in (page.locator(".sidebar").get_attribute("class") or "")
             page.locator(".global-header").get_by_role("button", name="Fechar menu").click()
+            page.screenshot(path=str(evidencias / "03-forma-mobile.png"), full_page=True)
             browser.close()
     finally:
         httpd.shutdown()
