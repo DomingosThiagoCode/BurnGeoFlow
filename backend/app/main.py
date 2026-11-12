@@ -11,10 +11,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import router
 from backend.app.api.jobs import router as jobs_router
-from backend.app.core.config import caminho_dados, origens_permitidas
+from backend.app.core.config import ROOT, caminho_dados, origens_permitidas
 from backend.app.core.errors import (
     DadosInconsistentes, EntradaInvalida, EventoNaoEncontrado,
 )
@@ -23,7 +24,8 @@ from backend.app.repositories.eventos import RepositorioEventos
 logger = logging.getLogger("burngeoflow.api")
 
 
-def criar_app(*, dados_dir: Path | None = None) -> FastAPI:
+def criar_app(*, dados_dir: Path | None = None,
+              frontend_dist: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="BurnGeoFlow API", version="0.1.0",
         description="Consulta local de resultados geoespaciais. "
@@ -73,6 +75,13 @@ def criar_app(*, dados_dir: Path | None = None) -> FastAPI:
 
     app.include_router(router)
     app.include_router(jobs_router)
+
+    # Interface estática compilada, opcional. Em desenvolvimento, Vite
+    # continua servindo o frontend no 127.0.0.1:5173.
+    dist = frontend_dist if frontend_dist is not None else ROOT / "frontend" / "dist"
+    if (dist / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=str(dist), html=True),
+                  name="frontend")
     return app
 
 

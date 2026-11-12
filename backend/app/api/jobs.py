@@ -28,7 +28,8 @@ def verificacao_mutacao(request: Request):
     if host not in ("127.0.0.1", "localhost", "testserver"):
         raise HTTPException(status_code=403, detail="Somente host local")
     origin = request.headers.get("Origin")
-    if origin and origin not in origens_permitidas():
+    mesma_origem = str(request.base_url).rstrip("/")
+    if origin and origin != mesma_origem and origin not in origens_permitidas():
         raise HTTPException(status_code=403, detail="Origin não permitida")
 
 

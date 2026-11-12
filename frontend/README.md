@@ -12,6 +12,18 @@ por data/camada.
 
 ## Iniciar
 
+Para uso cotidiano com a interface já compilada, execute na raiz:
+
+```powershell
+python iniciar_burngeoflow.py
+```
+
+A aplicação abre em <http://127.0.0.1:8000> com API e React
+na mesma origem. A compilação inicial exige `npm ci` e `npm run build`
+uma única vez (ou quando atualizar o frontend).
+
+Para desenvolvimento, use dois terminais:
+
 Terminal 1, raiz do repositório:
 
 ```powershell
