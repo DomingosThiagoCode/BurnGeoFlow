@@ -108,3 +108,8 @@ jobs:
               assert client.get("/api/health").json()["status"] == "ok"
           print("[OK] React compilado e API na mesma porta")
           PY
+      - name: Smoke test em Chromium real (React, WebGL e API simulada)
+        run: |
+          python -m pip install "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+          python scripts/smoke_browser.py
