@@ -83,7 +83,7 @@ class TestesEtapa5Auditada(unittest.TestCase):
                       sha256(p2.read_bytes()).hexdigest())
             audit = {}
             totais, selecionados, grupos, _ = ler_geometrias(
-                p1, p2, ID, diagnostico=audit)
+                p1, p2, ID, diagnostico=audit,
             )
             self.assertEqual(len(totais), 2)
             self.assertTrue(all(x.is_valid and x.area > 0
