@@ -158,7 +158,11 @@ def testar() -> None:
             page.route("**/api/**", responder_api)
             base = "http://127.0.0.1:" + str(httpd.server_port)
             page.goto(base, wait_until="networkidle", timeout=30000)
-            page.get_by_role("heading", name="Visão geral do incêndio").wait_for()
+            page.get_by_role("heading", name="O território depois do fogo.").wait_for()
+            assert page.locator(".brand-icon svg").count() == 1, "Marca topográfica ausente"
+            assert page.locator(".kpi-card").first.evaluate(
+                "el => getComputedStyle(el).borderRadius"
+            ) == "0px", "Os indicadores não devem manter cartões arredondados"
             page.get_by_role(
                 "button", name="Abrir mapa do evento",
             ).wait_for()
