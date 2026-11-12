@@ -65,7 +65,7 @@ def reconciliar_p2(geom_wgs84, patch_p1, transformador, *,
     limite = max(1.0, esperado.area * 1e-8)
     if divergencia > limite:
         raise ErroConciliacao(
-            f"{contexto}: geometria P2 diverge do P1 mesmo após reparo; "
+            f"{contexto}: geometria diverge do P1 mesmo após reparo; "
             f"diferenca_simetrica_m2={divergencia:.6f}, "
             f"tolerancia_m2={limite:.6f}, motivo_original={motivo}")
     return comparador, {
