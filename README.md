@@ -43,6 +43,53 @@ Os SQLs e o JavaScript antigo do GEE pertencem ao repositório histórico
 [CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio),
 não a este pacote.
 
+## Visualizador interativo local (primeira versão)
+
+O BurnGeoFlow possui um painel opcional em **Streamlit** para exploração
+rápida dos dados já adquiridos e processados. Ele não substitui o
+pipeline nem precisa de QGIS para visualizar séries e mapas.
+
+### Instalação e execução
+
+No PowerShell, a partir da raiz do repositório:
+
+```powershell
+python -m pip install -r requirements-viewer.txt
+python -m streamlit run visualizador.py
+```
+
+O navegador abrirá o painel local. A interface identifica automaticamente
+os eventos existentes em `execucoes/<ID>/dados/estudo_caso_<ID>/`.
+
+### Funcionalidades já implementadas
+
+- Selecionar um ID disponível e avançar/retroceder pelas datas.
+- Exibir **P1 (todos os patches)** e **P2 (região rastreada)** no mapa,
+  com cores distintas, sem alterar os GeoJSONs em EPSG:4326.
+- Acompanhar área acumulada P1/P2, número de patches, dominância,
+  nova área no evento e incorporação prequeimada pelo P2.
+- Consultar indicadores da transição selecionada.
+- Baixar o GeoJSON filtrado por data e a série temporal em CSV.
+- Exibir o status da auditoria e a ausência de validação externa.
+- Visualizar P1/P2 mesmo antes da integração, caso existam os GeoJSONs.
+
+O painel reutiliza os dados locais e não faz consultas ao Earth Engine,
+nem reexecuta o processamento a cada movimento do controle temporal.
+Resultados da Etapa 5 são conferidos por SHA-256 contra os GeoJSONs de
+origem; dados incompatíveis são bloqueados para não gerar gráficos
+cientificamente enganosos. A aplicação usa cache por assinatura dos
+arquivos, invalidado automaticamente quando eles mudam.
+
+**Para um novo incêndio:** processe-o usando a CLI atual (com a opção
+`--origem gee`), depois selecione seu ID no painel.
+O acionamento do pipeline **dentro da interface** ainda não faz parte
+desta primeira versão. A aquisição GEE depende de autenticação válida e
+pode levar tempo; não deve ser disparada a cada atualização da página.
+
+**Observação:** o mapa usa serviços de base cartográfica do visualizador;
+a navegação pelos GeoJSONs/CSV não depende de nova aquisição no GEE.
+O mapa pode exigir internet para carregar o fundo cartográfico.
+
 ## Instalação local (PowerShell)
 
 ```powershell
