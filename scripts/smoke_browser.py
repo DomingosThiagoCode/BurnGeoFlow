@@ -78,6 +78,8 @@ def responder_api(route):
             "p2_area_laea_km2": str(i + 8),
             "numero_patches": "1",
             "dominancia_cobertura_p2_pct": "80",
+            "dominancia_maior_patch_pct": "80",
+            "indice_forma_medio_ponderado_area": "1.5",
         } for i, d in enumerate(DATAS)]
     elif caminho.endswith("/analysis"):
         nomes = ("centroide", "norte", "sul", "leste", "oeste")
