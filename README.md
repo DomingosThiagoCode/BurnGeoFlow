@@ -43,6 +43,29 @@ Os SQLs e o JavaScript antigo do GEE pertencem ao repositório histórico
 [CDG_incendio](https://github.com/DomingosThiagoCode/CDG_incendio),
 não a este pacote.
 
+## Nova API REST local (migração gradual)
+
+Foi criado um backend desacoplado em `backend/app/` para servir
+eventos já processados, sem executar GEE ou alterar as fórmulas científicas.
+
+Para instalar e iniciar:
+
+```powershell
+python -m pip install -r requirements-api.txt
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Teste <http://127.0.0.1:8000/docs>. Endpoints para catálogo, séries,
+indicadores, geometria P1/P2 por data e download CSV. O índice por data é
+reconstruível e preserva todos os GeoJSONs originais.
+
+**Importante:** esta API é apenas a camada de dados da nova interface.
+O painel Streamlit original continua funcional enquanto o frontend React
+não estiver implementado e testado. Os comandos científicos permanecem iguais.
+
+Veja [docs/API.md](docs/API.md) e
+[docs/AUDITORIA_ARQUITETURAL_2026-11-12.md](docs/AUDITORIA_ARQUITETURAL_2026-11-12.md).
+
 ## Visualizador interativo local (primeira versão)
 
 O BurnGeoFlow possui um painel opcional em **Streamlit** para exploração
