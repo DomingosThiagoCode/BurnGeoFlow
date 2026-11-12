@@ -1,6 +1,7 @@
 import type {
   Camada, Colecao, DadosDia, EventoListado, Linha, VisaoEvento,
 } from "../types";
+import type { AnaliseEtapa4 } from "../components/ScientificPanels";
 
 export const BASE_API = (
   import.meta.env.VITE_API_BASE_URL ??
@@ -46,6 +47,9 @@ export const carregarSerie = (id: number, sinal?: AbortSignal) =>
 
 export const carregarTransicoes = (id: number, sinal?: AbortSignal) =>
   buscarJSON<Linha[]>("/api/events/" + id + "/transitions", sinal);
+
+export const carregarAnalise = (id: number, sinal?: AbortSignal) =>
+  buscarJSON<AnaliseEtapa4>("/api/events/" + id + "/analysis", sinal);
 
 export const carregarDia = (id: number, dia: string, sinal?: AbortSignal) =>
   buscarJSON<DadosDia>(
