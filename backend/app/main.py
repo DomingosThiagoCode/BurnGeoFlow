@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.app.api.routes import router
+from backend.app.api.jobs import router as jobs_router
 from backend.app.core.config import caminho_dados, origens_permitidas
 from backend.app.core.errors import (
     DadosInconsistentes, EntradaInvalida, EventoNaoEncontrado,
@@ -26,14 +27,15 @@ def criar_app(*, dados_dir: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="BurnGeoFlow API", version="0.1.0",
         description="Consulta local de resultados geoespaciais. "
-        "Não realiza aquisição GEE ou validação externa.",
+        "Exibe resultados locais e pode acionar a CLI em worker isolado. "
+        "Não realiza validação científica externa.",
     )
     app.state.repositorio = RepositorioEventos(dados_dir or caminho_dados())
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origens_permitidas(),
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
 
@@ -70,6 +72,7 @@ def criar_app(*, dados_dir: Path | None = None) -> FastAPI:
         )
 
     app.include_router(router)
+    app.include_router(jobs_router)
     return app
 
 

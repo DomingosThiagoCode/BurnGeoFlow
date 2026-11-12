@@ -21,3 +21,6 @@ frontend/.vite/
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Estado operacional local (SQLite e logs)
+.burngeoflow/

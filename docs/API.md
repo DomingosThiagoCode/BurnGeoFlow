@@ -84,3 +84,48 @@ A medição do leitor legado inclui serialização separada (20,613 ms nessa
 mesma execução), enquanto a consulta da API inclui a serialização
 pré-materializada no cache. Por isso, não interpretar a razão dos dois
 tempos como aceleração total de todo o produto.
+
+
+## Execução assíncrona a partir do painel (jobs)
+
+A API pode iniciar a CLI já existente em um **processo Python separado**.
+O servidor HTTP retorna imediatamente um identificador de tarefa e permite
+consultar estado e logs. Nenhuma fórmula ou aquisição GEE foi copiada
+para o backend.
+
+Endpoints:
+
+- `POST /api/jobs` com corpo JSON
+  `{"id_incendio":24340828,"origem":"auto","ano":2020}`.
+  A origem aceita auto, local, gee ou brutos; ano é opcional quando aplicável.
+- `GET /api/jobs` lista as execuções recentes.
+- `GET /api/jobs/{id}` mostra estado queued/running/completed/failed/interrupted.
+- `GET /api/jobs/{id}/logs` retorna até 100 últimas linhas,
+  com limite de leitura por solicitação.
+
+O banco de estado é `execucoes/.burngeoflow/jobs.sqlite3`
+(SQLite padrão, schema versão 1). Logs ficam em
+`execucoes/.burngeoflow/logs/<id>.log`. Esses arquivos são
+ignorados pelo Git. **A implementação não migra nem edita P1/P2/GeoJSONs**.
+O CLI grava resultados onde sempre gravou: `execucoes/<ID>`.
+Não há backup dos dados geoespaciais porque nenhuma migração deles é feita.
+
+Uma tarefa ativa por vez evita duas operações pesadas concorrentes,
+inclusive se duas requisições chegarem ao mesmo tempo. Somente a própria
+CLI decide se pode reutilizar resultados existentes; o servidor não marca
+etapas como científicamente validadas.
+
+O worker atualiza uma marca de atividade de 5 em 5 segundos. Caso seja
+interrompido, após 120 s sem atividade o serviço tenta classificá-lo como
+interrupted, sem presumir sucesso. Processos GEE podem ser longos e não
+possuem percentual confiável. O painel mostra logs, **não estimativas
+inventadas de progresso**.
+
+**Segurança:** o endpoint de escrita só aceita Host local e origem
+permitida. CORS não substitui autenticação; a aplicação foi projetada para
+uso em loopback e não pode ser exposta a redes públicas. OAuth GEE deve ser
+previamente configurado no computador; processos iniciados pela interface
+não solicitam login interativo.
+
+Para verificar, use:
+`python -m unittest discover -s backend/tests -v`.
