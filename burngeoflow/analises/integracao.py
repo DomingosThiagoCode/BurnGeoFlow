@@ -29,6 +29,7 @@ from shapely.ops import unary_union
 
 from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
 from burngeoflow.validacao.topologia_p2 import reconciliar_p2
+from burngeoflow.validacao.sobreposicoes import diagnosticar_grupo
 
 
 CAMPOS_TRANSICOES = [
@@ -279,6 +280,15 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
     totais, relatorio_cobertura = calcular_cobertura_componentes(
         grupos, ranks_por_data,
     )
+    # Preserva o diagnóstico já integrado à main: ranks, proporção da
+    # intersecção frente ao menor patch e flag de reparo em LAEA.
+    for linha in relatorio_cobertura["datas"]:
+        if linha["revisao_cientifica_necessaria"]:
+            dia = linha["data"]
+            candidatos = [
+                indice[(dia, rank)] for rank in ranks_por_data[dia]
+            ]
+            linha["diagnostico_detalhado"] = diagnosticar_grupo(candidatos)
     if diagnostico is not None:
         diagnostico["cobertura_p1"] = relatorio_cobertura
     return totais, selecionados, grupos, crs
