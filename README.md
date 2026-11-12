@@ -246,6 +246,15 @@ GlobFire nem autoriza conclusões físicas sobre o incêndio.
 Reuso de dados: continue executando com `--origem local`. Não é
 necessário refazer aquisição pelo Earth Engine.
 
+O orquestrador agora só reutiliza uma etapa concluída quando seus
+artefatos obrigatórios existem. As Etapas 4/5 exigem também seus
+resumos e auditorias JSON, não apenas tabelas CSV. Em novas execuções,
+o manifesto registra a assinatura SHA-256 do código relevante de cada
+etapa. Se uma etapa for executada novamente, as suas sucessoras serão
+recalculadas para evitar resultados misturados. Manifests anteriores
+ao controle de versão do código mantêm o reuso legado até o primeiro
+recálculo, e não devem ser tratados como comprovação de versão.
+
 ## Escopo e qualidade
 
 Os indicadores medem evolução geométrica de áreas queimadas acumuladas,
