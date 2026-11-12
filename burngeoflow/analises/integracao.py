@@ -33,7 +33,9 @@ from burngeoflow.validacao.topologia_p2 import reconciliar_p2
 
 CAMPOS_TRANSICOES = [
     "id_incendio", "data_anterior", "data_atual", "dias_intervalo",
-    "area_total_anterior_km2", "area_total_atual_km2", "area_nova_evento_km2",
+    "area_total_anterior_km2", "area_total_atual_km2",
+    "excesso_sobreposicao_anterior_km2", "excesso_sobreposicao_atual_km2",
+    "delta_excesso_sobreposicao_km2", "area_nova_evento_km2",
     "taxa_nova_evento_km2_dia", "area_perdida_evento_km2",
     "p2_area_anterior_km2", "p2_area_atual_km2",
     "p2_incremento_geometrico_km2", "p2_incremento_ja_queimado_km2",
@@ -48,9 +50,12 @@ CAMPOS_TRANSICOES = [
 ]
 CAMPOS_DIARIOS = [
     "id_incendio", "data", "fase_descritiva", "dias_desde_inicio",
-    "area_total_laea_km2", "area_principal_laea_km2", "area_secundaria_laea_km2",
+    "area_total_laea_km2", "area_soma_patches_laea_km2",
+    "excesso_sobreposicao_p1_km2", "dominancia_cobertura_p2_pct",
+    "area_principal_laea_km2", "area_secundaria_laea_km2",
     "dominancia_maior_patch_pct", "numero_patches", "indice_forma_medio_ponderado_area",
-    "delta_area_total_km2", "taxa_media_intervalo_km2_dia",
+    "delta_area_total_km2", "delta_area_cobertura_km2",
+    "delta_excesso_sobreposicao_p1_km2", "taxa_media_intervalo_km2_dia",
     "eventos_convergencia_intervalo", "p2_area_laea_km2",
 ]
 CAMPOS_FASE = [
@@ -542,7 +547,21 @@ def executar(raiz:Path,incendio:int,saida:Path):
     auditoria_reparos = {}
     totais,selecionados,grupos,crs=ler_geometrias(
         p1,p2,incendio,diagnostico=auditoria_reparos)
+    saida.mkdir(parents=True, exist_ok=True)
+    caminho_auditoria = saida / f"auditoria_p1_sobreposicoes_{incendio}.json"
+    def salvar_auditoria():
+        caminho_auditoria.write_text(
+            json.dumps(auditoria_reparos, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    # Persiste antes de validar os demais resultados para facilitar diagnósticos.
+    salvar_auditoria()
     conferir_auditoria_previa(raiz,incendio,p1,p2,auditoria_reparos)
+    salvar_auditoria()
+    sobreposicoes_por_dia = {
+        row["data"]: row
+        for row in auditoria_reparos["cobertura_p1"]["datas"]
+    }
     dias=sorted(totais)
     if set(temporais)!={(d,) for d in dias}:
         raise ValueError("Tabela temporal nao corresponde as datas de P1")
@@ -556,19 +575,34 @@ def executar(raiz:Path,incendio:int,saida:Path):
             raise ValueError("Outro ID na tabela temporal")
         total_km2=totais[d].area/1e6
         p2_km2=selecionados[d].area/1e6
-        conferir_proximo(total_km2,valor(r,"area_total_laea_km2"),f"total P1 {d}")
+        soma_km2 = sobreposicoes_por_dia[d]["soma_patches_m2"]/1e6
+        excesso_km2 = sobreposicoes_por_dia[d]["excesso_sobreposicao_m2"]/1e6
+        conferir_proximo(soma_km2,valor(r,"area_total_laea_km2"),
+                         f"soma patches P1 (Etapa 2) {d}")
         if p2_km2>total_km2+1e-6:raise ValueError("P2 excede area P1")
         if int(r["numero_patches"])!=len(grupos[d]):
             raise ValueError(f"Contagem P1 nao confere em {d}")
         diarias.append({
             "id_incendio":incendio, "data":d,"fase_descritiva":None,
             "dias_desde_inicio":(date.fromisoformat(d)-date.fromisoformat(dias[0])).days,
-            "area_total_laea_km2":total_km2,"area_principal_laea_km2":valor(r,"area_maior_patch_laea_km2"),
+            "area_total_laea_km2":total_km2,
+            "area_soma_patches_laea_km2":soma_km2,
+            "excesso_sobreposicao_p1_km2":excesso_km2,
+            "dominancia_cobertura_p2_pct":100*p2_km2/total_km2,
+            "area_principal_laea_km2":valor(r,"area_maior_patch_laea_km2"),
             "area_secundaria_laea_km2":valor(r,"area_patches_secundarios_laea_km2"),
             "dominancia_maior_patch_pct":valor(r,"dominancia_maior_patch_pct"),
             "numero_patches":len(grupos[d]),
             "indice_forma_medio_ponderado_area":valor(r,"indice_forma_medio_ponderado_area"),
             "delta_area_total_km2":valor(r,"area_nova_intervalo_laea_km2"),
+            "delta_area_cobertura_km2": (
+                total_km2 - diarias[-1]["area_total_laea_km2"]
+                if diarias else None
+            ),
+            "delta_excesso_sobreposicao_p1_km2": (
+                excesso_km2 - diarias[-1]["excesso_sobreposicao_p1_km2"]
+                if diarias else None
+            ),
             "taxa_media_intervalo_km2_dia":valor(r,"taxa_media_intervalo_km2_dia"),
             "eventos_convergencia_intervalo":0,"p2_area_laea_km2":p2_km2,
         })
@@ -582,13 +616,25 @@ def executar(raiz:Path,incendio:int,saida:Path):
         if any(int(r["dias_intervalo"])!=intervalo for r in (lt,li,lr)):
             raise ValueError(f"Intervalo inconsistente em {key}")
         decomp=decompor_transicao(totais[d0],totais[d1],selecionados[d0],selecionados[d1])
-        conferir_proximo(decomp["area_nova_evento_km2"]-
-                         decomp["area_perdida_evento_km2"],
-                         valor(temporais[(d1,)],"area_nova_intervalo_laea_km2"),
-                         f"delta evento {key}")
-        conferir_proximo(decomp["area_nova_evento_km2"]-
-                         decomp["area_perdida_evento_km2"],
-                         valor(lt,"crescimento_liquido_km2"),f"etapa3 {key}")
+        delta_cobertura = (
+            decomp["area_nova_evento_km2"]-decomp["area_perdida_evento_km2"]
+        )
+        excesso0 = sobreposicoes_por_dia[d0]["excesso_sobreposicao_m2"]/1e6
+        excesso1 = sobreposicoes_por_dia[d1]["excesso_sobreposicao_m2"]/1e6
+        conferir_balanco_componentes(
+            totais[d1].area/1e6, totais[d0].area/1e6, excesso1, excesso0,
+            valor(temporais[(d1,)],"area_nova_intervalo_laea_km2"),
+            f"delta soma patches P1 (Etapa 2) {key}",
+        )
+        conferir_balanco_componentes(
+            totais[d1].area/1e6, totais[d0].area/1e6, excesso1, excesso0,
+            valor(lt,"crescimento_liquido_km2"),
+            f"delta soma patches P1 (Etapa 3) {key}",
+        )
+        conferir_proximo(
+            delta_cobertura, totais[d1].area/1e6-totais[d0].area/1e6,
+            f"delta cobertura geometrica {key}",
+        )
         conferir_proximo(decomp["p2_incremento_geometrico_km2"],
                          valor(li,"area_nova_km2"),f"IGT {key}")
         conferir_proximo(decomp["p2_incremento_geometrico_km2"],
@@ -602,6 +648,9 @@ def executar(raiz:Path,incendio:int,saida:Path):
             "dias_intervalo":intervalo,
             "area_total_anterior_km2":totais[d0].area/1e6,
             "area_total_atual_km2":totais[d1].area/1e6,
+            "excesso_sobreposicao_anterior_km2":excesso0,
+            "excesso_sobreposicao_atual_km2":excesso1,
+            "delta_excesso_sobreposicao_km2":excesso1-excesso0,
             **decomp,
             "taxa_nova_evento_km2_dia":decomp["area_nova_evento_km2"]/intervalo,
             "p2_area_anterior_km2":selecionados[d0].area/1e6,
@@ -656,6 +705,14 @@ def executar(raiz:Path,incendio:int,saida:Path):
                                             r["desvio_fechamento_p2_m2"]) for r in transicoes),
         "crs":crs,
         "auditoria_reparos_geometricos":auditoria_reparos,
+        "dias_p1_sobreposicao_pendente": auditoria_reparos[
+            "cobertura_p1"]["datas_com_sobreposicao_acima_1m2"
+        ],
+        "status_topologia_p1": (
+            "revisao_cientifica_pendente"
+            if auditoria_reparos["cobertura_p1"]["datas_com_sobreposicao_acima_1m2"]
+            else "sem_sobreposicoes_significativas"
+        ),
         "validacao_independente":False,
         "sha256_p1":sha256(p1.read_bytes()).hexdigest(),
         "sha256_p2":sha256(p2.read_bytes()).hexdigest(),
@@ -707,7 +764,8 @@ As observações são acumuladas e não representam frente ativa de fogo.
 ## Indicadores do estudo de caso
 
 - Período: {r["periodo_inicio"]} a {r["periodo_fim"]}; {r["observacoes"]} observações e {r["transicoes"]} transições.
-- Área final P1 em LAEA: {r["area_total_final_laea_km2"]:.3f} km².
+- Área final P1 em LAEA (união espacial, sem dupla contagem): {r["area_total_final_laea_km2"]:.3f} km².
+- Diagnóstico de P1: {len(r["dias_p1_sobreposicao_pendente"])} datas com sobreposição acima de 1 m² entre patches. Consultar a auditoria espacial da Etapa 5.
 - Área final P2 em LAEA: {r["area_p2_final_laea_km2"]:.3f} km²; participação {r["dominancia_p2_final_pct"]:.2f}%.
 - Convergências geométricas ao longo das transições: {r["total_convergencias_geometricas"]}.
 - Maior taxa média de área nova entre observações: {topo["taxa_nova_evento_km2_dia"]:.3f} km²/dia no intervalo encerrado em {topo["data_atual"]}.
