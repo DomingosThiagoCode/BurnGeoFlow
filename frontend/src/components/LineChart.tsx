@@ -41,8 +41,17 @@ export function LineChart({
   const yMin = margem.topo, yMax = altura - margem.inferior;
   const valores = series.flatMap((s) => s.valores)
     .filter((n): n is number => n !== null && Number.isFinite(n));
-  const max = Math.max(1, ...valores), min = Math.min(0, ...valores);
-  const dominio = max === min ? 1 : max - min;
+  const maxDado = valores.length ? Math.max(...valores) : 0;
+  const min = Math.min(0, ...valores);
+  // Escala numérica contextual: não achata índices inferiores a 1
+  // e mantém a origem zero para facilitar comparações científicas.
+  const max = maxDado > 0 ? maxDado * 1.08 : (Math.abs(min) || 1) * 0.08;
+  const dominio = max - min || 1;
+  const intervaloEixo = dominio / 4;
+  const casasEixo = intervaloEixo < 0.01 ? 4
+    : intervaloEixo < 0.1 ? 3
+    : intervaloEixo < 1 ? 2
+    : intervaloEixo < 10 ? 1 : 0;
   const X = (i: number) => xMin + (datas.length < 2 ? 0 : i/(datas.length-1)) * (xMax-xMin);
   const Y = (v: number) => yMax - ((v-min)/dominio)*(yMax-yMin);
   const selected = Math.max(0, datas.indexOf(dataAtual ?? ""));
@@ -81,7 +90,7 @@ export function LineChart({
               <line x1={xMin} x2={xMax} y1={yy} y2={yy}
                 stroke="#e3e0d5" strokeWidth="1"/>
               <text x={xMin-10} y={yy+4} textAnchor="end"
-                fill="#818477" fontSize="11">{formatarNumero(val, 0)}</text>
+                fill="#818477" fontSize="11">{formatarNumero(val, casasEixo)}</text>
             </g>;
           })}
           <line x1={xMin} y1={yMax} x2={xMax} y2={yMax}
