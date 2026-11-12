@@ -93,6 +93,94 @@ def conferir_proximo(a, b, etiqueta, *, tolerancia_km2=1e-5):
         raise ValueError(f"Inconsistencia em {etiqueta}: {a} != {b}")
 
 
+
+def calcular_cobertura_componentes(grupos: dict[str, list]) -> tuple[dict, dict]:
+    """Area coberta pela uniao P1, com auditoria de sobreposicoes.
+
+    A soma de areas dos patches e preservada para conferencia com as
+    Etapas 2/3. A area espacial do evento NAO pode contar duas vezes uma
+    mesma superficie. Sobreposicoes acima de 1m2 sao pendencias cientificas.
+    Nao alteramos qualquer GeoJSON de origem nem eliminamos patches.
+    """
+    totais, linhas = {}, []
+    for dia, geometrias in sorted(grupos.items()):
+        if not geometrias:
+            raise ValueError(f"P1 {dia}: nenhuma geometria")
+        if any(g.is_empty or not g.is_valid or g.area <= 0 for g in geometrias):
+            raise ValueError(f"P1 {dia}: poligono invalido antes da uniao")
+        try:
+            uniao = unary_union(geometrias)
+            area_soma = sum(g.area for g in geometrias)
+            excesso = area_soma - uniao.area
+        except shapely.GEOSException as exc:
+            raise ValueError(
+                f"P1 {dia}: falha na uniao de componentes: {exc}"
+            ) from exc
+        if uniao.is_empty or not uniao.is_valid or uniao.area <= 0:
+            raise ValueError(f"P1 {dia}: uniao de componentes invalida")
+        if excesso < -0.001:
+            raise ValueError(
+                f"P1 {dia}: area da uniao supera soma individual "
+                f"em {-excesso:.6f} m2"
+            )
+        excesso = max(0.0, excesso)
+        pares = []
+        for i, g1 in enumerate(geometrias):
+            for j in range(i + 1, len(geometrias)):
+                g2 = geometrias[j]
+                if not g1.intersects(g2):
+                    continue
+                area = g1.intersection(g2).area
+                if area > 0.0001:
+                    pares.append({
+                        "indice_p1_a": i, "indice_p1_b": j,
+                        "intersecao_m2": area,
+                    })
+        pares.sort(key=lambda x: -x["intersecao_m2"])
+        totais[dia] = uniao
+        linhas.append({
+            "data": dia, "numero_componentes": len(geometrias),
+            "soma_patches_m2": area_soma,
+            "cobertura_uniao_m2": uniao.area,
+            "excesso_sobreposicao_m2": excesso,
+            "pares_com_intersecao_area": len(pares),
+            "maior_intersecao_entre_pares_m2": (
+                pares[0]["intersecao_m2"] if pares else 0.0
+            ),
+            "pares_exemplos": pares[:30],
+            "revisao_cientifica_necessaria": excesso > 1.0,
+        })
+    revisao = [r for r in linhas if r["revisao_cientifica_necessaria"]]
+    relatorio = {
+        "criterio": "Area coberta = area da uniao; soma de patches "
+                    "mantida para comparacao com etapas anteriores",
+        "limite_alerta_sobreposicao_m2": 1.0,
+        "datas": linhas,
+        "datas_com_sobreposicao_acima_1m2": [r["data"] for r in revisao],
+        "max_excesso_sobreposicao_m2": max(
+            (r["excesso_sobreposicao_m2"] for r in linhas), default=0
+        ),
+        "interpretacao": "Sobreposicao P1 nao prova encontros de frentes "
+                         "fisicas. Revisar conectividade das datas sinalizadas.",
+        "validacao_geoespacial_externa": False,
+    }
+    return totais, relatorio
+
+
+def conferir_balanco_componentes(
+    cobertura_atual_km2: float, cobertura_anterior_km2: float,
+    excesso_atual_km2: float, excesso_anterior_km2: float,
+    reportado_km2: float, descricao: str,
+) -> float:
+    """Delta soma = delta cobertura + delta excesso por dupla contagem."""
+    delta_cobertura = cobertura_atual_km2 - cobertura_anterior_km2
+    delta_excesso = excesso_atual_km2 - excesso_anterior_km2
+    conferir_proximo(
+        delta_cobertura + delta_excesso, reportado_km2, descricao
+    )
+    return delta_cobertura
+
+
 def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
                    diagnostico: dict | None = None):
     """Reprojeta P1 e reconcilia P2 pelo mesmo critério TR/IGT.
@@ -174,12 +262,9 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
         })
     if set(selecionados) != set(grupos):
         raise ValueError("Datas distintas entre P1 e P2")
-    totais = {}
-    for d,g in grupos.items():
-        total = unary_union(g)
-        if abs(total.area-sum(x.area for x in g)) > 1:
-            raise ValueError(f"Patches P1 sobrepoem em area: {d}")
-        totais[d] = total
+    totais, relatorio_cobertura = calcular_cobertura_componentes(grupos)
+    if diagnostico is not None:
+        diagnostico["cobertura_p1"] = relatorio_cobertura
     return totais, selecionados, grupos, crs
 
 
