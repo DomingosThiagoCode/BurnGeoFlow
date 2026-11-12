@@ -22,7 +22,11 @@ jobs:
       - name: Executar caso base
         run: python executar_pipeline.py --id 24340828 --baixar-exemplo --saida .
       - name: Perfil legado de leitura e serializacao (baseline)
-        run: python scripts/perfil_visualizador_legado.py --base . --id 24340828 --repeticoes 3
+        run: |
+          mkdir -p .benchmark-execucoes/24340828
+          ln -s "$PWD/dados" .benchmark-execucoes/24340828/dados
+          ln -s "$PWD/resultados" .benchmark-execucoes/24340828/resultados
+          python scripts/perfil_visualizador_legado.py --base .benchmark-execucoes --id 24340828 --repeticoes 3
       - name: Testes cientificos originais
         run: python -m unittest discover -s tests -v
       - name: Conferir retomada
