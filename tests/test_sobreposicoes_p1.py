@@ -7,11 +7,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from shapely.geometry import box, mapping
+from shapely.geometry import Polygon, box, mapping
 
 from burngeoflow.analises.paisagem import Patch
 from burngeoflow.validacao.sobreposicoes import (
-    diagnosticar_grupo, diagnosticar_arquivo,
+    diagnosticar_grupo, diagnosticar_arquivo, verificar_origem, _classificar_origem,
 )
 
 
@@ -25,6 +25,112 @@ def patch(rank: int, geometria, *, reparado: bool = False):
 
 
 class DiagnosticoGeometrico(unittest.TestCase):
+
+    def test_sobreposicao_original_ou_ausente_preserva_arquivo(self):
+        with TemporaryDirectory() as temp:
+            p1 = Path(temp) / "P1.geojson"
+            geoms = [
+                box(-56, -17, -55.98, -16.98),
+                box(-55.99, -17, -55.97, -16.98),
+                box(-55.90, -17, -55.88, -16.98),
+            ]
+            feats = []
+            for rank, geom in enumerate(geoms, 1):
+                feats.append({
+                    "type": "Feature", "geometry": mapping(geom),
+                    "properties": {
+                        "id_incendio": 24340828, "data": "2020-09-18",
+                        "rank": rank, "area_km2": float(rank),
+                        "numero_componentes": 3, "area_total_km2": 6.0,
+                    },
+                })
+            p1.write_text(json.dumps({
+                "type": "FeatureCollection", "features": feats,
+            }), encoding="utf-8")
+            h = sha256(p1.read_bytes()).hexdigest()
+            res = verificar_origem(
+                p1, data="2020-09-18", principal=1, outros=(2, 3),
+            )
+            sobreposto, separado = res["pares"]
+            self.assertEqual(
+                sobreposto["classificacao"], "JA_EXISTIA_NO_GEOJSON_ORIGINAL"
+            )
+            self.assertGreater(
+                sobreposto["original_wgs84_intersecao_convertida_laea"]["area_m2"],
+                0,
+            )
+            self.assertGreater(
+                sobreposto["projetada_laea_apos_reparo"]["area_m2"], 0,
+            )
+            self.assertEqual(
+                separado["classificacao"], "SEM_SOBREPOSICAO_DE_AREA"
+            )
+            self.assertEqual(
+                separado["original_wgs84_intersecao_convertida_laea"]["area_m2"],
+                0,
+            )
+            self.assertEqual(h, sha256(p1.read_bytes()).hexdigest())
+
+    def test_original_invalido_nao_e_atribuido_automaticamente_ao_reparo(self):
+        with TemporaryDirectory() as temp:
+            p1 = Path(temp) / "P1.geojson"
+            cruzado = Polygon([
+                (-56, -17), (-55.98, -16.98), (-56, -16.98),
+                (-55.98, -17), (-56, -17),
+            ])
+            outro = box(-55.995, -17.002, -55.985, -16.998)
+            feats = []
+            for rank, geom in enumerate([cruzado, outro], 1):
+                feats.append({
+                    "type": "Feature", "geometry": mapping(geom),
+                    "properties": {
+                        "id_incendio": 24340828, "data": "2020-09-18",
+                        "rank": rank, "area_km2": float(rank),
+                        "numero_componentes": 2, "area_total_km2": 3.0,
+                    },
+                })
+            p1.write_text(json.dumps({
+                "type": "FeatureCollection", "features": feats,
+            }), encoding="utf-8")
+            res = verificar_origem(
+                p1, data="2020-09-18", principal=1, outros=(2,),
+            )
+            self.assertFalse(res["ranks"]["1"]["original_valida_wgs84"])
+            self.assertTrue(res["ranks"]["1"]["reparo_aplicado"])
+            self.assertIsNone(
+                res["pares"][0]["original_wgs84_intersecao_convertida_laea"]["area_m2"]
+            )
+            self.assertEqual(
+                res["pares"][0]["classificacao"],
+                "INDETERMINADO_ORIGINAL_INVALIDO_OU_OVERLAY_IMPOSSIVEL",
+            )
+
+    def test_projetado_invalido_preserva_incerteza_causal(self):
+        s0 = {"area_m2": 0.0}
+        s1 = {"area_m2": None}
+        s2 = {"area_m2": 0.5}
+        self.assertEqual(
+            _classificar_origem(s0, s1, s2),
+            "SURGIU_NA_PROJECAO_OU_REPARO_SEM_SEPARACAO_CONFIAVEL",
+        )
+
+    def test_ranks_exigidos_precisam_existir(self):
+        with TemporaryDirectory() as temp:
+            p1 = Path(temp) / "P1.geojson"
+            g = box(-56, -17, -55.99, -16.99)
+            p1.write_text(json.dumps({
+                "type": "FeatureCollection", "features": [{
+                    "type": "Feature", "geometry": mapping(g),
+                    "properties": {
+                        "id_incendio": 24340828, "data": "2020-09-18",
+                        "rank": 1, "area_km2": 1.0,
+                        "numero_componentes": 1, "area_total_km2": 1.0,
+                    },
+                }],
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "ranks inexistentes"):
+                verificar_origem(p1, data="2020-09-18", outros=(18,))
+
     def test_intersecao_identifica_ranks_area_e_reparos(self):
         patches = [
             patch(1, box(0, 0, 10, 10)),
