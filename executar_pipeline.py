@@ -185,8 +185,17 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
                 "faltantes": faltantes, "erro_json": erro_json,
             }
             salvar_json(manifesto_path, manifesto)
+            # Não esconder a causa real atrás de uma mensagem genérica.
+            # O log integral continua disponível para investigar o histórico.
+            mensagens = [linha.strip() for linha in resultado.stderr.splitlines()
+                         if linha.strip()]
+            detalhe = (mensagens[-1] if mensagens
+                       else erro_json or
+                       (f"artefatos ausentes: {', '.join(faltantes)}"
+                        if faltantes else f"código de saída {resultado.returncode}"))
             raise ErroPipeline(
-                f"Falha em '{etapa.nome}'; consulte {logs / (etapa.nome + '.log')}"
+                f"Falha em '{etapa.nome}': {detalhe}. "
+                f"Log: {logs / (etapa.nome + '.log')}"
             )
         manifesto["etapas"][etapa.nome] = {
             "status": "concluido",

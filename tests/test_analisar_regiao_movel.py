@@ -68,6 +68,35 @@ class MetodologiaTests(unittest.TestCase):
         self.assertAlmostEqual(r["jaccard_geometrico"], 1e6/b.geometria.area)
         self.assertFalse(r["lacuna_temporal"])
 
+    def test_area_tr_e_definida_por_diferenca_geometrica_igual_igt(self):
+        from burngeoflow.analises.incrementos import calcular_incremento
+        import pyproj
+        from shapely.geometry import Polygon
+        # Poligonos de borda irregular e escala ampla: transicao observavel
+        # tanto por TR quanto por IGT, inclusive áreas de ganho e perda.
+        a = Polygon([
+            (0, 0), (50000, 0), (50000, 17000),
+            (24999.1, 17000), (24999.1, 31000), (0, 31000),
+        ])
+        b = Polygon([
+            (0, 0), (50000, 0), (50000, 22000),
+            (24999.6, 22000), (24999.6, 31000), (500, 31000),
+            (500, 1000), (0, 1000),
+        ])
+        pa = patch("2020-01-01", 1, a)
+        pb = patch("2020-01-02", 1, b)
+        r_tr = indicadores_poligono(pa, pb, 1)
+        inv = pyproj.Transformer.from_crs("EPSG:3857", "EPSG:4326",
+                                          always_xy=True)
+        r_igt, _, _ = calcular_incremento(
+            a, b, inv, pyproj.Geod(ellps="WGS84"),
+            evento=123, dia0="2020-01-01", dia1="2020-01-02",
+        )
+        self.assertEqual(r_tr["area_nova_p2_km2"], r_igt["area_nova_km2"])
+        self.assertEqual(r_tr["area_perdida_p2_km2"], r_igt["area_perdida_km2"])
+        self.assertGreater(r_tr["area_nova_p2_km2"], 0)
+        self.assertGreater(r_tr["area_perdida_p2_km2"], 0)
+
     def test_contracao_e_perda_area_nao_sao_confundidas(self):
         a = patch("2020-01-01", 1, box(0, 0, 1000, 1000))
         b = patch("2020-01-03", 1, box(0, 0, 500, 500))

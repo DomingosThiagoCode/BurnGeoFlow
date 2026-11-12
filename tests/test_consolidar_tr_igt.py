@@ -44,6 +44,27 @@ class ConsolidacaoTestes(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Area nova'):
             fecho.comparar_linhas(tr,igt,n_reducao=0,soma_reducao_erro_m2=0)
 
+    def test_erro_area_indica_data_e_divergencia_em_m2(self):
+        tr, igt = dados("2020-08-09", "2020-08-10")
+        igt["area_nova_km2"] = "1.000002"
+        with self.assertRaisesRegex(
+            ValueError,
+            r"2020-08-09 -> 2020-08-10: TR=.*IGT=.*divergencia=2.000000 m2",
+        ):
+            fecho.comparar_linhas(
+                tr, igt, n_reducao=0, soma_reducao_erro_m2=0
+            )
+
+    def test_erro_area_reduzida_indica_transicao(self):
+        tr, igt = dados("2020-08-09", "2020-08-10")
+        igt["area_perdida_km2"] = "0.0001"
+        with self.assertRaisesRegex(
+            ValueError, "Area reduzida TR/IGT nao confere em 2020-08-09",
+        ):
+            fecho.comparar_linhas(
+                tr, igt, n_reducao=0, soma_reducao_erro_m2=0
+            )
+
     def test_chave_incompativel_rejeitada(self):
         tr,igt=dados()
         igt['id_incendio']='99'
