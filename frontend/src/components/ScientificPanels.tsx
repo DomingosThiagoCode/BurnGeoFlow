@@ -266,14 +266,14 @@ export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, 
     })).filter((v): v is AnguloPonderado => v.angulo !== null && v.peso !== null && v.peso > 0);
     const igt = transicoes.map(r => ({
       angulo: numero(r, "igt_azimute_ponderado_graus"),
-      peso: numero(r, "p2_incremento_nova_area_evento_km2"),
+      peso: numero(r, "p2_incremento_geometrico_km2"),
     })).filter((v): v is AnguloPonderado => v.angulo !== null && v.peso !== null && v.peso > 0);
     return <>
       <Introducao titulo="Direções e rosáceas"
         texto="Distribuições dos azimutes calculados. As rosáceas TR e IGT usam ponderações distintas, explicitadas em cada gráfico. As cinco rosáceas inferiores representam os feixes geométricos da Etapa 4."/>
       <div className="rose-grid">
         <RosaDirecional titulo="TR · Centroide" dados={tr} subtitulo="Ponderação: distância do centroide (km)"/>
-        <RosaDirecional titulo="IGT · Área nova" dados={igt} subtitulo="Ponderação: incremento de área nova (km²)"/>
+        <RosaDirecional titulo="IGT · Incremento P2" dados={igt} subtitulo="Ponderação: incremento geométrico do P2 (km²)"/>
       </div>
       {analise?.disponivel ? <>
         <h3 className="analysis-subtitle">Cinco feixes representativos</h3>
