@@ -207,9 +207,10 @@ def testar() -> None:
             page.evaluate("window.scrollTo(0, 530)")
             page.wait_for_timeout(100)
             lateral = page.locator(".sidebar").bounding_box()
-            assert lateral is not None and abs(lateral["y"] - 76) < 4, (
-                "Barra lateral não acompanhou a rolagem do desktop"
-            )
+            cabecalho = page.locator(".global-header").bounding_box()
+            assert lateral is not None and cabecalho is not None and abs(
+                lateral["y"] - (cabecalho["y"] + cabecalho["height"])
+            ) < 4, "Barra lateral não acompanhou a rolagem do desktop"
             page.evaluate("window.scrollTo(0, 0)")
             page.get_by_role("tab", name="Movimento").click()
             page.get_by_role("heading", name="Cinco trajetórias representativas").wait_for()
