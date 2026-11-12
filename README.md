@@ -233,6 +233,48 @@ python executar_pipeline.py --id 24340828 --origem local
 
 Os arquivos do GEE continuam no cache e as etapas anteriores concluídas
 são reutilizadas quando os hashes P1/P2 permanecem inalterados.
+
+### Auditoria de sobreposição P1 e integração (Etapas 5 e 6)
+
+Patches P1 distintos podem apresentar sobreposições de área após as
+operações de reprojeção e reparo geométrico. A antiga Etapa 5 interrompia
+a execução em qualquer dia com sobreposição acima de 1 m². Agora
+**os componentes e seus ranks são preservados**, sem apagamento ou
+dissolução nos GeoJSON de entrada.
+
+A análise mantém **duas grandezas diferentes**:
+
+- **Soma das áreas dos patches**: parâmetro usado nas métricas de P1
+  e linhagens das Etapas 2 e 3, mesmo quando há dupla contagem.
+- **Área espacial coberta pelo evento**: união dos patches em LAEA,
+  sem contar duas vezes regiões de sobreposição.
+
+A identidade de controle entre datas é:
+**Δ(soma) = Δ(cobertura da união) + Δ(excesso por sobreposição)**.
+A Etapa 5 confere essa identidade com as saídas das Etapas 2 e 3,
+e registra por data a área excedente, os ranks dos pares sobrepostos
+e a magnitude da maior interseção. Relatório:
+`execucoes/<ID>/resultados/etapa5/auditoria_p1_sobreposicoes_<ID>.json`.
+
+**Importante:** sobreposição acima de 1 m² continua marcada como
+**pendência de revisão científica**, não como resultado validado.
+A Etapa 6 propaga essas pendências e também sinaliza eventuais perdas
+de área acumulada. A execução computacional pode ser concluída com
+status de revisão pendente; isso não atesta qualidade espacial do
+GlobFire nem autoriza conclusões físicas sobre o incêndio.
+
+Reuso de dados: continue executando com `--origem local`. Não é
+necessário refazer aquisição pelo Earth Engine.
+
+O orquestrador agora só reutiliza uma etapa concluída quando seus
+artefatos obrigatórios existem. As Etapas 4/5 exigem também seus
+resumos e auditorias JSON, não apenas tabelas CSV. Em novas execuções,
+o manifesto registra a assinatura SHA-256 do código relevante de cada
+etapa. Se uma etapa for executada novamente, as suas sucessoras serão
+recalculadas para evitar resultados misturados. Manifests anteriores
+ao controle de versão do código mantêm o reuso legado até o primeiro
+recálculo, e não devem ser tratados como comprovação de versão.
+
 ## Escopo e qualidade
 
 Os indicadores medem evolução geométrica de áreas queimadas acumuladas,

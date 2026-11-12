@@ -34,7 +34,9 @@ from burngeoflow.validacao.sobreposicoes import diagnosticar_grupo
 
 CAMPOS_TRANSICOES = [
     "id_incendio", "data_anterior", "data_atual", "dias_intervalo",
-    "area_total_anterior_km2", "area_total_atual_km2", "area_nova_evento_km2",
+    "area_total_anterior_km2", "area_total_atual_km2",
+    "excesso_sobreposicao_anterior_km2", "excesso_sobreposicao_atual_km2",
+    "delta_excesso_sobreposicao_km2", "area_nova_evento_km2",
     "taxa_nova_evento_km2_dia", "area_perdida_evento_km2",
     "p2_area_anterior_km2", "p2_area_atual_km2",
     "p2_incremento_geometrico_km2", "p2_incremento_ja_queimado_km2",
@@ -49,9 +51,12 @@ CAMPOS_TRANSICOES = [
 ]
 CAMPOS_DIARIOS = [
     "id_incendio", "data", "fase_descritiva", "dias_desde_inicio",
-    "area_total_laea_km2", "area_principal_laea_km2", "area_secundaria_laea_km2",
+    "area_total_laea_km2", "area_soma_patches_laea_km2",
+    "excesso_sobreposicao_p1_km2", "dominancia_cobertura_p2_pct",
+    "area_principal_laea_km2", "area_secundaria_laea_km2",
     "dominancia_maior_patch_pct", "numero_patches", "indice_forma_medio_ponderado_area",
-    "delta_area_total_km2", "taxa_media_intervalo_km2_dia",
+    "delta_area_total_km2", "delta_area_cobertura_km2",
+    "delta_excesso_sobreposicao_p1_km2", "taxa_media_intervalo_km2_dia",
     "eventos_convergencia_intervalo", "p2_area_laea_km2",
 ]
 CAMPOS_FASE = [
@@ -94,6 +99,101 @@ def conferir_proximo(a, b, etiqueta, *, tolerancia_km2=1e-5):
         raise ValueError(f"Inconsistencia em {etiqueta}: {a} != {b}")
 
 
+
+def calcular_cobertura_componentes(
+    grupos: dict[str, list],
+    ranks_por_data: dict[str, list[int]] | None = None,
+) -> tuple[dict, dict]:
+    """Area coberta pela uniao P1, com auditoria de sobreposicoes.
+
+    A soma de areas dos patches e preservada para conferencia com as
+    Etapas 2/3. A area espacial do evento NAO pode contar duas vezes uma
+    mesma superficie. Sobreposicoes acima de 1m2 sao pendencias cientificas.
+    Nao alteramos qualquer GeoJSON de origem nem eliminamos patches.
+    """
+    totais, linhas = {}, []
+    for dia, geometrias in sorted(grupos.items()):
+        if not geometrias:
+            raise ValueError(f"P1 {dia}: nenhuma geometria")
+        if any(g.is_empty or not g.is_valid or g.area <= 0 for g in geometrias):
+            raise ValueError(f"P1 {dia}: poligono invalido antes da uniao")
+        try:
+            uniao = unary_union(geometrias)
+            area_soma = sum(g.area for g in geometrias)
+            excesso = area_soma - uniao.area
+        except shapely.GEOSException as exc:
+            raise ValueError(
+                f"P1 {dia}: falha na uniao de componentes: {exc}"
+            ) from exc
+        if uniao.is_empty or not uniao.is_valid or uniao.area <= 0:
+            raise ValueError(f"P1 {dia}: uniao de componentes invalida")
+        if excesso < -0.001:
+            raise ValueError(
+                f"P1 {dia}: area da uniao supera soma individual "
+                f"em {-excesso:.6f} m2"
+            )
+        excesso = max(0.0, excesso)
+        pares = []
+        for i, g1 in enumerate(geometrias):
+            for j in range(i + 1, len(geometrias)):
+                g2 = geometrias[j]
+                if not g1.intersects(g2):
+                    continue
+                area = g1.intersection(g2).area
+                if area > 0.0001:
+                    ranks = ranks_por_data[dia] if ranks_por_data else list(
+                        range(1, len(geometrias)+1)
+                    )
+                    pares.append({
+                        "indice_p1_a": i, "indice_p1_b": j,
+                        "rank_p1_a": ranks[i], "rank_p1_b": ranks[j],
+                        "intersecao_m2": area,
+                    })
+        pares.sort(key=lambda x: -x["intersecao_m2"])
+        totais[dia] = uniao
+        linhas.append({
+            "data": dia, "numero_componentes": len(geometrias),
+            "soma_patches_m2": area_soma,
+            "cobertura_uniao_m2": uniao.area,
+            "excesso_sobreposicao_m2": excesso,
+            "pares_com_intersecao_area": len(pares),
+            "maior_intersecao_entre_pares_m2": (
+                pares[0]["intersecao_m2"] if pares else 0.0
+            ),
+            "pares_exemplos": pares[:30],
+            "revisao_cientifica_necessaria": excesso > 1.0,
+        })
+    revisao = [r for r in linhas if r["revisao_cientifica_necessaria"]]
+    relatorio = {
+        "criterio": "Area coberta = area da uniao; soma de patches "
+                    "mantida para comparacao com etapas anteriores",
+        "limite_alerta_sobreposicao_m2": 1.0,
+        "datas": linhas,
+        "datas_com_sobreposicao_acima_1m2": [r["data"] for r in revisao],
+        "max_excesso_sobreposicao_m2": max(
+            (r["excesso_sobreposicao_m2"] for r in linhas), default=0
+        ),
+        "interpretacao": "Sobreposicao P1 nao prova encontros de frentes "
+                         "fisicas. Revisar conectividade das datas sinalizadas.",
+        "validacao_geoespacial_externa": False,
+    }
+    return totais, relatorio
+
+
+def conferir_balanco_componentes(
+    cobertura_atual_km2: float, cobertura_anterior_km2: float,
+    excesso_atual_km2: float, excesso_anterior_km2: float,
+    reportado_km2: float, descricao: str,
+) -> float:
+    """Delta soma = delta cobertura + delta excesso por dupla contagem."""
+    delta_cobertura = cobertura_atual_km2 - cobertura_anterior_km2
+    delta_excesso = excesso_atual_km2 - excesso_anterior_km2
+    conferir_proximo(
+        delta_cobertura + delta_excesso, reportado_km2, descricao
+    )
+    return delta_cobertura
+
+
 def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
                    diagnostico: dict | None = None):
     """Reprojeta P1 e reconcilia P2 pelo mesmo critério TR/IGT.
@@ -113,12 +213,12 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
     if len(reparados_p1) != reparos:
         raise ValueError("Inconsistencia na contagem de reparos P1 em LAEA")
     grupos = defaultdict(list)
-    patches_por_dia = defaultdict(list)
+    ranks_por_data = defaultdict(list)
     chaves = {}
     indice = {}
     for p in patches:
         grupos[p.data].append(p.geometria)
-        patches_por_dia[p.data].append(p)
+        ranks_por_data[p.data].append(p.rank)
         if (p.data,p.rank) in chaves:
             raise ValueError("P1 tem rank/data duplicado")
         chaves[(p.data,p.rank)] = p.geometria
@@ -177,30 +277,20 @@ def ler_geometrias(p1: Path, p2: Path, incendio: int, *,
         })
     if set(selecionados) != set(grupos):
         raise ValueError("Datas distintas entre P1 e P2")
-    totais = {}
-    for d,g in grupos.items():
-        total = unary_union(g)
-        excesso = max(0.0, sum(x.area for x in g) - total.area)
-        if excesso > 1:
-            detalhamento = diagnosticar_grupo(patches_por_dia[d])
-            if diagnostico is not None:
-                diagnostico["sobreposicao_p1"] = detalhamento
-            principal = detalhamento["pares_mais_relevantes"]
-            referencia = (
-                f"ranks {principal[0]['rank_a']}/{principal[0]['rank_b']}, "
-                f"intersecao {principal[0]['intersecao_m2']:.4f} m2"
-                if principal else "sem par identificado"
-            )
-            raise ValueError(
-                f"Patches P1 sobrepoem em area: {d}; "
-                f"excesso_soma_uniao={excesso:.4f} m2; "
-                f"pares={detalhamento['numero_pares_sobrepostos']}; "
-                f"maior par: {referencia}. "
-                "Audite sem alterar os dados: "
-                f"python -m burngeoflow.validacao.sobreposicoes --id {incendio} "
-                f"--data {d}"
-            )
-        totais[d] = total
+    totais, relatorio_cobertura = calcular_cobertura_componentes(
+        grupos, ranks_por_data,
+    )
+    # Preserva o diagnóstico já integrado à main: ranks, proporção da
+    # intersecção frente ao menor patch e flag de reparo em LAEA.
+    for linha in relatorio_cobertura["datas"]:
+        if linha["revisao_cientifica_necessaria"]:
+            dia = linha["data"]
+            candidatos = [
+                indice[(dia, rank)] for rank in ranks_por_data[dia]
+            ]
+            linha["diagnostico_detalhado"] = diagnosticar_grupo(candidatos)
+    if diagnostico is not None:
+        diagnostico["cobertura_p1"] = relatorio_cobertura
     return totais, selecionados, grupos, crs
 
 
@@ -478,7 +568,21 @@ def executar(raiz:Path,incendio:int,saida:Path):
     auditoria_reparos = {}
     totais,selecionados,grupos,crs=ler_geometrias(
         p1,p2,incendio,diagnostico=auditoria_reparos)
+    saida.mkdir(parents=True, exist_ok=True)
+    caminho_auditoria = saida / f"auditoria_p1_sobreposicoes_{incendio}.json"
+    def salvar_auditoria():
+        caminho_auditoria.write_text(
+            json.dumps(auditoria_reparos, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    # Persiste antes de validar os demais resultados para facilitar diagnósticos.
+    salvar_auditoria()
     conferir_auditoria_previa(raiz,incendio,p1,p2,auditoria_reparos)
+    salvar_auditoria()
+    sobreposicoes_por_dia = {
+        row["data"]: row
+        for row in auditoria_reparos["cobertura_p1"]["datas"]
+    }
     dias=sorted(totais)
     if set(temporais)!={(d,) for d in dias}:
         raise ValueError("Tabela temporal nao corresponde as datas de P1")
@@ -492,19 +596,34 @@ def executar(raiz:Path,incendio:int,saida:Path):
             raise ValueError("Outro ID na tabela temporal")
         total_km2=totais[d].area/1e6
         p2_km2=selecionados[d].area/1e6
-        conferir_proximo(total_km2,valor(r,"area_total_laea_km2"),f"total P1 {d}")
+        soma_km2 = sobreposicoes_por_dia[d]["soma_patches_m2"]/1e6
+        excesso_km2 = sobreposicoes_por_dia[d]["excesso_sobreposicao_m2"]/1e6
+        conferir_proximo(soma_km2,valor(r,"area_total_laea_km2"),
+                         f"soma patches P1 (Etapa 2) {d}")
         if p2_km2>total_km2+1e-6:raise ValueError("P2 excede area P1")
         if int(r["numero_patches"])!=len(grupos[d]):
             raise ValueError(f"Contagem P1 nao confere em {d}")
         diarias.append({
             "id_incendio":incendio, "data":d,"fase_descritiva":None,
             "dias_desde_inicio":(date.fromisoformat(d)-date.fromisoformat(dias[0])).days,
-            "area_total_laea_km2":total_km2,"area_principal_laea_km2":valor(r,"area_maior_patch_laea_km2"),
+            "area_total_laea_km2":total_km2,
+            "area_soma_patches_laea_km2":soma_km2,
+            "excesso_sobreposicao_p1_km2":excesso_km2,
+            "dominancia_cobertura_p2_pct":100*p2_km2/total_km2,
+            "area_principal_laea_km2":valor(r,"area_maior_patch_laea_km2"),
             "area_secundaria_laea_km2":valor(r,"area_patches_secundarios_laea_km2"),
             "dominancia_maior_patch_pct":valor(r,"dominancia_maior_patch_pct"),
             "numero_patches":len(grupos[d]),
             "indice_forma_medio_ponderado_area":valor(r,"indice_forma_medio_ponderado_area"),
             "delta_area_total_km2":valor(r,"area_nova_intervalo_laea_km2"),
+            "delta_area_cobertura_km2": (
+                total_km2 - diarias[-1]["area_total_laea_km2"]
+                if diarias else None
+            ),
+            "delta_excesso_sobreposicao_p1_km2": (
+                excesso_km2 - diarias[-1]["excesso_sobreposicao_p1_km2"]
+                if diarias else None
+            ),
             "taxa_media_intervalo_km2_dia":valor(r,"taxa_media_intervalo_km2_dia"),
             "eventos_convergencia_intervalo":0,"p2_area_laea_km2":p2_km2,
         })
@@ -518,13 +637,25 @@ def executar(raiz:Path,incendio:int,saida:Path):
         if any(int(r["dias_intervalo"])!=intervalo for r in (lt,li,lr)):
             raise ValueError(f"Intervalo inconsistente em {key}")
         decomp=decompor_transicao(totais[d0],totais[d1],selecionados[d0],selecionados[d1])
-        conferir_proximo(decomp["area_nova_evento_km2"]-
-                         decomp["area_perdida_evento_km2"],
-                         valor(temporais[(d1,)],"area_nova_intervalo_laea_km2"),
-                         f"delta evento {key}")
-        conferir_proximo(decomp["area_nova_evento_km2"]-
-                         decomp["area_perdida_evento_km2"],
-                         valor(lt,"crescimento_liquido_km2"),f"etapa3 {key}")
+        delta_cobertura = (
+            decomp["area_nova_evento_km2"]-decomp["area_perdida_evento_km2"]
+        )
+        excesso0 = sobreposicoes_por_dia[d0]["excesso_sobreposicao_m2"]/1e6
+        excesso1 = sobreposicoes_por_dia[d1]["excesso_sobreposicao_m2"]/1e6
+        conferir_balanco_componentes(
+            totais[d1].area/1e6, totais[d0].area/1e6, excesso1, excesso0,
+            valor(temporais[(d1,)],"area_nova_intervalo_laea_km2"),
+            f"delta soma patches P1 (Etapa 2) {key}",
+        )
+        conferir_balanco_componentes(
+            totais[d1].area/1e6, totais[d0].area/1e6, excesso1, excesso0,
+            valor(lt,"crescimento_liquido_km2"),
+            f"delta soma patches P1 (Etapa 3) {key}",
+        )
+        conferir_proximo(
+            delta_cobertura, totais[d1].area/1e6-totais[d0].area/1e6,
+            f"delta cobertura geometrica {key}",
+        )
         conferir_proximo(decomp["p2_incremento_geometrico_km2"],
                          valor(li,"area_nova_km2"),f"IGT {key}")
         conferir_proximo(decomp["p2_incremento_geometrico_km2"],
@@ -538,6 +669,9 @@ def executar(raiz:Path,incendio:int,saida:Path):
             "dias_intervalo":intervalo,
             "area_total_anterior_km2":totais[d0].area/1e6,
             "area_total_atual_km2":totais[d1].area/1e6,
+            "excesso_sobreposicao_anterior_km2":excesso0,
+            "excesso_sobreposicao_atual_km2":excesso1,
+            "delta_excesso_sobreposicao_km2":excesso1-excesso0,
             **decomp,
             "taxa_nova_evento_km2_dia":decomp["area_nova_evento_km2"]/intervalo,
             "p2_area_anterior_km2":selecionados[d0].area/1e6,
@@ -592,6 +726,14 @@ def executar(raiz:Path,incendio:int,saida:Path):
                                             r["desvio_fechamento_p2_m2"]) for r in transicoes),
         "crs":crs,
         "auditoria_reparos_geometricos":auditoria_reparos,
+        "dias_p1_sobreposicao_pendente": auditoria_reparos[
+            "cobertura_p1"]["datas_com_sobreposicao_acima_1m2"
+        ],
+        "status_topologia_p1": (
+            "revisao_cientifica_pendente"
+            if auditoria_reparos["cobertura_p1"]["datas_com_sobreposicao_acima_1m2"]
+            else "sem_sobreposicoes_significativas"
+        ),
         "validacao_independente":False,
         "sha256_p1":sha256(p1.read_bytes()).hexdigest(),
         "sha256_p2":sha256(p2.read_bytes()).hexdigest(),
@@ -643,7 +785,8 @@ As observações são acumuladas e não representam frente ativa de fogo.
 ## Indicadores do estudo de caso
 
 - Período: {r["periodo_inicio"]} a {r["periodo_fim"]}; {r["observacoes"]} observações e {r["transicoes"]} transições.
-- Área final P1 em LAEA: {r["area_total_final_laea_km2"]:.3f} km².
+- Área final P1 em LAEA (união espacial, sem dupla contagem): {r["area_total_final_laea_km2"]:.3f} km².
+- Diagnóstico de P1: {len(r["dias_p1_sobreposicao_pendente"])} datas com sobreposição acima de 1 m² entre patches. Consultar a auditoria espacial da Etapa 5.
 - Área final P2 em LAEA: {r["area_p2_final_laea_km2"]:.3f} km²; participação {r["dominancia_p2_final_pct"]:.2f}%.
 - Convergências geométricas ao longo das transições: {r["total_convergencias_geometricas"]}.
 - Maior taxa média de área nova entre observações: {topo["taxa_nova_evento_km2_dia"]:.3f} km²/dia no intervalo encerrado em {topo["data_atual"]}.
