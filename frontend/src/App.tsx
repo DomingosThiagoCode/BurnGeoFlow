@@ -263,7 +263,6 @@ export default function App() {
     atualizarLista();
   }, [atualizarLista]);
 
-  const cmd = id ? "python executar_pipeline.py --id " + id + " --origem gee" : "";
   const existeErro = Boolean(erroEvento);
   const navegaPara = (passo: number) => {
     if (!resumo) return;
@@ -385,18 +384,11 @@ export default function App() {
           </div>
 
           <div className="sidebar-group sidebar-note">
-            <strong>Outro evento?</strong>
-            <p>O processamento por ID ainda utiliza o CLI existente.</p>
-            <code>{cmd || "python executar_pipeline.py --id ID --origem gee"}</code>
-            <button type="button" className="text-button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(cmd);
-                  setMensagem("Comando copiado.");
-                } catch {
-                  setMensagem("Copie o comando exibido acima.");
-                }
-              }}>Copiar comando</button>
+            <strong>Processar outro incêndio?</strong>
+            <p>Use o painel de processamento para consultar o Earth Engine,
+              reutilizar o cache e acompanhar as análises sem executar comandos manuais.</p>
+            <a className="text-button" href="#processamento"
+              onClick={() => setPainelAberto(false)}>Ir para processamento</a>
           </div>
         </aside>
 
@@ -417,7 +409,9 @@ export default function App() {
             </div>
           </div>
 
-          <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} />
+          <div id="processamento" className="jobs-anchor">
+            <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} />
+          </div>
 
           {mensagem && <div className="message-box" role="status">
             <span>{mensagem}</span><button aria-label="Fechar mensagem"
