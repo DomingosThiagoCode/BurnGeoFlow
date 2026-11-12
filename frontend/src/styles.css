@@ -333,3 +333,96 @@ tbody tr:hover { background:#f8fbf9; }
   *, *::before, *::after { scroll-behavior:auto!important; transition:none!important; }
   .spin { animation:none; }
 }
+
+
+/* Painel de execução incremental. Não interfere no scroll/mapa da exploração. */
+.jobs-panel {
+  background:#fff; border:1px solid #dce6df; border-radius:13px;
+  margin:0 0 18px; overflow:hidden;
+}
+.jobs-head {
+  width:100%; border:0; background:transparent; padding:16px 18px;
+  display:flex; gap:14px; align-items:center; text-align:left; color:#355449;
+}
+.jobs-head:hover { background:#f7fbf8; }
+.jobs-head-icon {
+  height:39px; width:39px; border-radius:11px; flex-shrink:0;
+  display:grid; place-items:center; background:#eaf5ee; color:#47806b;
+}
+.jobs-head-copy { display:flex; flex-direction:column; gap:4px; flex:1; }
+.jobs-head-copy strong { font-size:13px; }
+.jobs-head-copy small { color:#82978a; font-size:11px; line-height:1.5; }
+.jobs-head>svg:last-child { transition:transform .2s ease; flex-shrink:0; }
+.jobs-open-arrow { transform:rotate(180deg); }
+.jobs-active-badge {
+  display:flex; align-items:center; gap:5px;
+  color:#356d5e; background:#e2f3ea; border-radius:99px;
+  font-size:10px; padding:6px 10px; font-weight:750; white-space:nowrap;
+}
+.jobs-body { border-top:1px solid #e8efe9; padding:17px 19px 20px; }
+.jobs-form {
+  display:grid; grid-template-columns:minmax(90px,1fr) minmax(170px,2fr)
+    minmax(85px,.7fr) auto; gap:11px; align-items:end;
+}
+.jobs-form-field { min-width:0; }
+.jobs-form-field label {
+  display:block; font-size:11px; font-weight:700; color:#657f72;
+  margin:0 0 7px;
+}
+.jobs-form-field input,.jobs-form-field select {
+  width:100%; height:39px; border:1px solid #d5e2d8; border-radius:8px;
+  padding:0 10px; font-size:12px; color:#355449; background:#fff;
+}
+.jobs-form-field select { max-width:100%; }
+.jobs-form-field input:disabled { background:#f2f5f2; color:#91a499; }
+.job-start {
+  height:39px; border:0; border-radius:8px; padding:0 16px;
+  background:#287b68; color:#fff; font-weight:700; font-size:12px;
+  display:flex; gap:7px; align-items:center; justify-content:center;
+}
+.job-start:hover:not(:disabled) { background:#216653; }
+.jobs-warning {
+  display:flex; align-items:flex-start; gap:8px;
+  color:#927b53; background:#fffaf0;
+  padding:10px 12px; border-radius:8px; font-size:11px;
+  line-height:1.55; margin:14px 0;
+}
+.jobs-warning svg { flex-shrink:0; margin-top:1px; }
+.job-error,.job-success { padding:10px 12px; border-radius:8px; font-size:12px; margin-bottom:10px; }
+.job-error { background:#fceae5; color:#965544; }
+.job-success { background:#e6f4eb; color:#35735d; }
+.jobs-history-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:15px 0 10px; }
+.jobs-history-head>div { display:flex; align-items:center; gap:8px; color:#567b68; font-size:12px; }
+.jobs-refresh { display:flex; align-items:center; gap:6px; border:0; color:#4c806b; background:transparent; font-size:11px; }
+.jobs-empty { color:#8ca294; font-size:12px; padding:8px 0; }
+.jobs-history { display:flex; flex-wrap:wrap; gap:8px; }
+.job-history-item {
+  display:flex; gap:14px; align-items:center;
+  padding:9px 11px; border:1px solid #dce8df; border-radius:8px;
+  background:#fbfdfb; color:#6b8575; font-size:11px; text-align:left;
+}
+.job-selected { border-color:#70ae93; background:#eef8f1; }
+.job-status { display:inline-flex; align-items:center; gap:5px; font-size:10px; }
+.job-status-completed { color:#268369; }
+.job-status-failed,.job-status-interrupted { color:#c66a53; }
+.job-status-running { color:#477bce; }
+.job-log-area { margin:15px 0 0; }
+.job-exit { font-size:10px; color:#8b9e93; }
+.job-logs {
+  max-height:245px; overflow:auto; white-space:pre-wrap; word-break:break-word;
+  border-radius:8px; background:#172a2e; color:#d0e4da;
+  border:1px solid #39534e; padding:15px; font:11px/1.7 ui-monospace,
+  "Cascadia Code",Consolas,monospace;
+}
+@media (max-width:1040px) {
+  .jobs-form { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:600px) {
+  .jobs-head { padding:12px; gap:10px; }
+  .jobs-active-badge { display:none; }
+  .jobs-body { padding:13px; }
+  .jobs-form { grid-template-columns:1fr; }
+  .jobs-form-field,.job-start { width:100%; }
+  .jobs-history { flex-direction:column; }
+  .job-history-item { justify-content:space-between; }
+}
