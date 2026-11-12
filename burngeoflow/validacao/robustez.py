@@ -92,7 +92,7 @@ def fases_sensiveis(diarios):
             b_i_c=fases[0]["criterio_bic"],alterou_inicios=inicio!=inicio_base))
     return saida
 
-def evidencias():
+def evidencias(numero_convergencias: int, numero_fases: int):
     return [
         dict(afirmacao="Area P1/P2 internamente coerente",categoria="computacional",
              status="auditada_internamente",limite="Acuracia de sensor nao avaliada",
@@ -100,10 +100,10 @@ def evidencias():
         dict(afirmacao="Incorporacao de area ja queimada ao P2",categoria="geometrica",
              status="auditada_internamente",limite="Fusao fisica nao demonstrada",
              proxima_acao="Revisar 09-11 de setembro com cenas independentes"),
-        dict(afirmacao="72 convergencias representam encontros reais de frentes",categoria="fisica",
+        dict(afirmacao=f"{numero_convergencias} convergencias representam encontros reais de frentes",categoria="fisica",
              status="nao_validada_externamente",limite="Grafo de intersecoes apenas",
              proxima_acao="Amostragem independente de casos de convergencia"),
-        dict(afirmacao="Tres fases identificam regimes fisicos de fogo",categoria="causal",
+        dict(afirmacao=f"{numero_fases} fases identificam regimes fisicos de fogo",categoria="causal",
              status="exploratoria",limite="BIC sobre serie acumulada e dependente",
              proxima_acao="Confrontar com series independentes e orientador"),
         dict(afirmacao="TR descreve cinco pontos da regiao movel",categoria="metodologica",
@@ -167,6 +167,19 @@ def executar(raiz:Path,evento:int,saida:Path,*,sem_mapa=False):
     if len(diarios)<3 or len(transicoes)!=len(diarios)-1:raise ValueError("N datas/transicoes")
     if set(trans)!={tuple(p) for p in zip(datas,datas[1:])}:raise ValueError("Transicoes")
     if any(int(r["id_incendio"])!=evento for r in diarios+transicoes):raise ValueError("ID")
+    resumo5_path = dir5 / ("resumo_etapa5_" + str(evento) + ".json")
+    if not resumo5_path.is_file():
+        raise ValueError("Falta resumo de auditoria e integracao da Etapa 5")
+    resumo5 = json.loads(resumo5_path.read_text(encoding="utf-8"))
+    if resumo5.get("id_incendio") != evento:
+        raise ValueError("Resumo da Etapa 5 pertence a outro evento")
+    sobreposicoes = resumo5.get("auditoria_reparos_geometricos", {}).get(
+        "cobertura_p1", {}
+    )
+    datas_alerta = sobreposicoes.get("datas_com_sobreposicao_acima_1m2", [])
+    if set(datas_alerta) - set(datas):
+        raise ValueError("Auditoria P1 nao corresponde as datas integradas")
+    perdas_evento = []
     for r in transicoes:
         dias_reais=(date.fromisoformat(r["data_atual"])-date.fromisoformat(r["data_anterior"])).days
         if int(r["dias_intervalo"])!=dias_reais:raise ValueError("Intervalo")
@@ -179,11 +192,18 @@ def executar(raiz:Path,evento:int,saida:Path,*,sem_mapa=False):
                num(r,"nova_area_fora_p2_km2"))>1e-6:
             raise ValueError("Fechamento total")
         if num(r,"area_perdida_evento_km2")>1e-6:
-            raise ValueError("Area acumulada perdida acima de 1 m2")
+            perdas_evento.append({
+                "data_anterior": r["data_anterior"],
+                "data_atual": r["data_atual"],
+                "area_perdida_km2": num(r,"area_perdida_evento_km2"),
+            })
     ds,agregado=direcoes(transicoes)
     cs=contatos(c,diarios)
     fs=fases_sensiveis(diarios)
-    ev=evidencias()
+    ev=evidencias(
+        sum(int(r["eventos_convergencia"]) for r in transicoes),
+        fs[0]["n_fases"],
+    )
     saida.mkdir(parents=True,exist_ok=True)
     for prefixo,rows in (
         ("direcoes_sensibilidade",ds),("contato_sensibilidade",cs),
@@ -207,6 +227,19 @@ def executar(raiz:Path,evento:int,saida:Path,*,sem_mapa=False):
         frac_incorporada_pct=100*inc/soma if soma>0 else None,
         transicao_10_11_set=next((r for r in transicoes if r["data_atual"]=="2020-09-11"),None),
         geojson_feicoes=n_geo,
+        dias_sobreposicao_p1_acima_1m2=datas_alerta,
+        sobreposicao_p1_maxima_m2=sobreposicoes.get(
+            "max_excesso_sobreposicao_m2", 0.0
+        ),
+        transicoes_com_perda_area_acumulada_acima_1m2=perdas_evento,
+        validacao_geometrica_interna_sem_pendencias=(
+            not datas_alerta and not perdas_evento
+        ),
+        status_cientifico=(
+            "revisao_geometrica_pendente"
+            if datas_alerta or perdas_evento
+            else "auditoria_interna_sem_pendencias_geom_significativas"
+        ),
         validacao_externa_concluida=False)
     (saida/("resumo_validacao_"+str(evento)+".json")).write_text(
         json.dumps(resumo,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
@@ -221,6 +254,8 @@ def relatorio(r,path):
         for x in r["sensibilidade_direcoes"])
     exemplar=r["transicao_10_11_set"]
     d=exemplar or {}
+    fracao = r["frac_incorporada_pct"]
+    fracao_texto = f"{fracao:.1f}%" if fracao is not None else "indefinida"
     texto=f"""# Etapa 6: auditoria científica interna (evento {r["id_incendio"]})
 
 **Não é validação empírica independente**. São testes de consistência e
@@ -237,7 +272,7 @@ sensibilidade sobre produtos derivados do mesmo GlobFire/MCD64A1.
   {r["aumento_max_dominancia_por_contato_pp"]:.2f} pontos percentuais.
 - Incrementos geométricos P2 somados: {r["soma_incrementos_p2_km2"]:.3f} km²;
   incorporação de áreas anteriormente queimadas: {r["soma_incorporacao_ja_queimada_km2"]:.3f}
-  km² ({r["frac_incorporada_pct"]:.1f}% desses incrementos).
+  km² ({fracao_texto} desses incrementos).
   Não confundir com área queimada nova no evento.
 - Em 10–11/09, P2 incorporou {float(d.get("p2_incremento_ja_queimado_km2",0)):.3f}
   km² anteriormente queimados, segundo os mesmos dados de entrada.
@@ -266,6 +301,20 @@ médio ponderado é **síntese nossa**, e não equação literal do artigo.
 
 Mudanças de direções entre descritores não são erros de método. A dispersão
 pode tornar uma direção média pouco representativa.
+
+## Pendências geométricas identificadas internamente
+
+- Datas com sobreposição P1 acima de 1 m²: {len(r["dias_sobreposicao_p1_acima_1m2"])}.
+- Maior excesso de dupla contagem no P1: {r["sobreposicao_p1_maxima_m2"]:.6f} m².
+- Transições com perda da área acumulada espacial acima de 1 m²:
+  {len(r["transicoes_com_perda_area_acumulada_acima_1m2"])}.
+- Situação: {r["status_cientifico"]}.
+
+A Etapa 5 preserva a soma de patches para confrontar métricas históricas,
+mas emprega a união espacial na área coberta para não contar superfícies
+duas vezes. Os avisos são pendências de revisão, não validação externa.
+Se houver perda de área acumulada ou sobreposição, os produtos ficam
+marcados como provisórios e exigem análise cartográfica antes de publicação.
 
 ## Validação externa: pendências obrigatórias
 
