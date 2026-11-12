@@ -105,3 +105,18 @@ Decisões reconsideráveis: SQLite apenas quando jobs realmente precisarem de
 persistência; otimização geométrica (generalização/tiles) somente se
 profiling confirmar payload ou browser GPU como gargalo. Nenhuma redução
 silenciosa da precisão original.
+
+## Medição inicial CI (GitHub Actions Ubuntu Python 3.11, caso de referência)
+
+Primeira rodada instrumentada (3 repetições, antes da API):
+- Leitura fria de **todos os P1/P2** no leitor Streamlit: mediana **435,629 ms**.
+- Serialização da última data para GeoJSON: mediana **15,895 ms**.
+- Payload GeoJSON da última data: **190.062 bytes**.
+- Pico de alocações captadas por `tracemalloc`: **26,733 MiB**.
+
+Esses valores pertencem **ao caso de referência do CI**, não ao novo cache GEE
+do usuário. Não medem renderização GPU, latência de rede ou tempo total da UI.
+A primeira rodada também identificou que o teste de estrutura tratava o nome
+`scripts/` como legado, embora fosse uma pasta nova exclusivamente para
+diagnóstico; o contrato foi restringido a `sql/` e `gee/`, que são de fato
+pastas históricas removidas.

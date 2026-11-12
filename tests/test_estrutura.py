@@ -41,9 +41,11 @@ class TesteEstrutura(unittest.TestCase):
             "id_incendio": 3, "concluidas": ["a"], "com_falha": ["b"]
         })
 
-    def test_sem_diretorios_legados(self):
+    def test_sem_diretorios_de_experimentacao_legados(self):
         raiz = Path(__file__).resolve().parents[1]
-        for nome in ["sql", "scripts", "gee"]:
+        # scripts/ agora contém ferramentas de diagnóstico do produto,
+        # não os experimentos SQL/GEE legados removidos em 2026.
+        for nome in ["sql", "gee"]:
             self.assertFalse((raiz / nome).exists(), f"Legado {nome} no produto")
 
 
