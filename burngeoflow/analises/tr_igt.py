@@ -17,8 +17,10 @@ from pathlib import Path
 import sys
 
 import pyproj
-import shapely
 from shapely.geometry import shape
+
+from burngeoflow.analises.paisagem import carregar_p1, projetar_patches
+from burngeoflow.validacao.topologia_p2 import reconciliar_p2
 
 
 CAMPOS_COMPARACAO = [
@@ -145,6 +147,78 @@ def comparar_linhas(linha_tr: dict, linha_igt: dict, *, n_reducao: int,
     }
 
 
+
+def geometrias_p2_consolidadas(
+    p1: Path, p2: Path, *, id_incendio: int, definicao_laea: str,
+) -> tuple[dict[str, object], dict]:
+    """Reconstitui exatamente a base geométrica usada por TR/IGT.
+
+    O P2 original é conferido rigorosamente contra o P1 pelo mesmo critério
+    de reparo auditado, mas os cálculos usam o P1 LAEA canônico. Não altera
+    nenhum arquivo fonte e não suprime divergências topológicas.
+    """
+    patches = carregar_p1(p1)
+    projecao, reparos_p1 = projetar_patches(patches)
+    if projecao["definicao_laea_proj4"] != definicao_laea:
+        raise ValueError("CRS LAEA de TR diverge da reprojeção de P1")
+    indice = {(p.data, p.rank): p for p in patches}
+    crs = pyproj.CRS.from_proj4(definicao_laea)
+    projetor = pyproj.Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+
+    with p2.open(encoding="utf-8") as arq:
+        fonte = json.load(arq)
+    if fonte.get("type") != "FeatureCollection":
+        raise ValueError("P2 deve ser FeatureCollection")
+    geometrias = {}
+    auditorias = []
+    for numero_registro, feicao in enumerate(fonte.get("features", [])):
+        try:
+            prop = feicao["properties"]
+            dia = prop["data"]
+            date.fromisoformat(dia)
+            rank = int(prop["rank_global"])
+            id_lido = int(prop["id_incendio"])
+            original = shape(feicao["geometry"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"P2 registro {numero_registro}: campos/geometria inválidos: {exc}"
+            ) from exc
+        if (id_lido != id_incendio
+                or prop["id_incendio"] != id_lido
+                or prop["rank_global"] != rank
+                or (dia, rank) not in indice
+                or dia in geometrias):
+            raise ValueError(
+                f"P2 registro {numero_registro} ({dia}, rank {rank}): "
+                "ID, rank ou data incoerente/duplicada"
+            )
+        if original.geom_type not in ("Polygon", "MultiPolygon") or original.is_empty:
+            raise ValueError(
+                f"P2 registro {numero_registro} ({dia}): geometria não poligonal"
+            )
+        patch = indice[dia, rank]
+        _, auditoria = reconciliar_p2(
+            original, patch, projetor,
+            registro=numero_registro, data=dia, rank=rank,
+        )
+        auditorias.append(auditoria)
+        geometrias[dia] = patch.geometria
+
+    datas_p1 = {p.data for p in patches}
+    if set(geometrias) != datas_p1:
+        raise ValueError("Datas P1/P2 distintas na consolidação")
+    reparos_p2 = [a for a in auditorias if a["reparo_p2_necessario"]]
+    return geometrias, {
+        "geometrias_p1_reparadas_apos_projecao": reparos_p1,
+        "numero_reparos_p2_para_comparacao": len(reparos_p2),
+        "reparos_p2_para_comparacao": reparos_p2,
+        "maior_diferenca_simetrica_p1_p2_m2": max(
+            (a["diferenca_simetrica_m2"] for a in auditorias), default=0,
+        ),
+        "base_geometrica": "P1 projetado LAEA, reconciliado com P2 por data/rank",
+    }
+
+
 def executar(p1: Path, p2: Path, saida: Path) -> dict:
     """Executa novamente TR/IGT, cruza resultados e documenta a proveniencia."""
     from burngeoflow.analises.regioes_moveis import executar as executar_tr
@@ -161,23 +235,19 @@ def executar(p1: Path, p2: Path, saida: Path) -> dict:
 
     definicao = tr["projecao"]["definicao_laea_proj4"]
     crs = pyproj.CRS.from_proj4(definicao)
-    projetor = pyproj.Transformer.from_crs("EPSG:4326", crs, always_xy=True)
     inverso = pyproj.Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
     geod = pyproj.Geod(ellps="WGS84")
-    with p2.open(encoding="utf-8") as arq:
-        fonte = json.load(arq)
-    geoms = {}
-    for feat in fonte["features"]:
-        prop = feat["properties"]
-        if int(prop["id_incendio"]) != eid:
-            raise ValueError("ID P2 divergente")
-        dia = prop["data"]
-        if dia in geoms:
-            raise ValueError("Data repetida no P2")
-        geoms[dia] = shapely.transform(shape(feat["geometry"]), projetor.transform,
-                                      interleaved=False)
+    geoms, auditoria_consolidacao = geometrias_p2_consolidadas(
+        p1, p2, id_incendio=eid, definicao_laea=definicao,
+    )
     if set(geoms) != {d for par in indice_tr for d in par}:
-        raise ValueError("Datas P2 distintas das transicoes")
+        raise ValueError("Datas P1/P2 distintas das transicoes")
+    for rotina, resumo in (("TR", tr), ("IGT", igt)):
+        if (resumo.get("numero_reparos_p2_para_comparacao")
+                != auditoria_consolidacao["numero_reparos_p2_para_comparacao"]):
+            raise ValueError(
+                f"Contagem de reparos P2 divergente entre {rotina} e consolidação"
+            )
 
     comparacoes, perdas = [], []
     for (d0, d1), linha_tr in sorted(indice_tr.items()):
@@ -223,6 +293,7 @@ def executar(p1: Path, p2: Path, saida: Path) -> dict:
         "transicoes_direcoes_comparaveis": len(angulos),
         "transicoes_direcao_IGT_indefinida": len(comparacoes)-len(angulos),
         "diferenca_angular_tr_igt_mediana_graus": sorted(angulos)[len(angulos)//2] if angulos else None,
+        "auditoria_geometrica_consolidacao": auditoria_consolidacao,
         "hash_sha256_p1": sha256(p1.read_bytes()).hexdigest(),
         "hash_sha256_p2": sha256(p2.read_bytes()).hexdigest(),
         "sql": "arquivado_como_referencia; nao_executado; nao_e_dependencia",

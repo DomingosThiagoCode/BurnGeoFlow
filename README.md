@@ -167,7 +167,13 @@ de P1 utiliza geometria em projeção LAEA, com `make_valid` condicional
 já registrado nos resumos. A análise P2 pode receber polígonos cuja
 projeção revela auto-interseções, mesmo após a validação estrutural.
 
-TR e IGT verificam agora o P2 com a mesma projeção do P1. Se o P2 ficar
+TR e IGT verificam agora o P2 com a mesma projeção do P1.
+**A consolidação `tr_igt.py` usa a mesma geometria P1 LAEA canônica** para
+o cálculo das diferenças entre datas, depois de reconciliar cada P2 com
+seu componente correspondente. Assim, não reintroduz os P2 inválidos no
+fechamento das métricas. A auditoria consta também do resumo consolidado.
+
+ Se o P2 ficar
 inválido, a sua geometria para comparação é reparada apenas em memória.
 Esse reparo **só é aceito se a diferença simétrica de área em relação ao
 componente P1 correspondente não ultrapassar `max(1 m², 10⁻⁸ × área_P1)`**.
