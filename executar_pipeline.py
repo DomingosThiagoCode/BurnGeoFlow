@@ -205,8 +205,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--id", type=int, required=True, help="ID numérico GlobFire")
     ap.add_argument(
-        "--origem", choices=("auto", "local", "gee"), default="auto",
-        help="auto: reutiliza dados locais; senão consulta GEE (padrão)",
+        "--origem", choices=("auto", "local", "gee", "brutos"), default="auto",
+        help="auto: usa GeoJSON local ou consulta GEE; brutos: revalida cache sem GEE",
     )
     ap.add_argument("--ano", type=int,
                     help="Ano da coleção GlobFire (2001-2020); acelera busca no GEE")
@@ -233,9 +233,9 @@ def main(argv: list[str] | None = None) -> int:
             raise ErroPipeline("ID GlobFire deve ser positivo.")
         if (args.p1 is None) != (args.p2 is None):
             raise ErroPipeline("--p1 e --p2 devem ser informados juntos.")
-        if args.baixar_exemplo and args.origem == "gee":
+        if args.baixar_exemplo and args.origem in {"gee", "brutos"}:
             raise ErroPipeline("--baixar-exemplo não pode ser combinado com --origem gee.")
-        if args.origem == "gee" and args.p1 is not None:
+        if args.origem in {"gee", "brutos"} and args.p1 is not None:
             raise ErroPipeline("--p1 e --p2 são opções do modo local.")
         if args.somente_aquisicao and args.origem == "local":
             raise ErroPipeline("--somente-aquisicao exige --origem gee ou auto sem cache.")
@@ -267,21 +267,27 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        from burngeoflow.aquisicao.earth_engine import adquirir
-        p1, p2, metadata = adquirir(
-            args.id,
-            raiz / "dados" / f"estudo_caso_{args.id}",
-            ano=args.ano,
-            projeto=args.projeto,
-            autenticar=args.autenticar,
-            pagina=args.pagina_gee,
-        )
+        from burngeoflow.aquisicao.earth_engine import adquirir, reprocessar_brutos
+        if modo == "brutos":
+            p1, p2, metadata = reprocessar_brutos(
+                args.id, raiz / "dados" / f"estudo_caso_{args.id}",
+            )
+        else:
+            p1, p2, metadata = adquirir(
+                args.id,
+                raiz / "dados" / f"estudo_caso_{args.id}",
+                ano=args.ano,
+                projeto=args.projeto,
+                autenticar=args.autenticar,
+                pagina=args.pagina_gee,
+            )
         if args.somente_aquisicao:
             print(json.dumps(metadata, indent=2, ensure_ascii=False))
             return 0
         executar(
             args.id, saida=raiz, p1=p1, p2=p2,
-            refazer=args.refazer, origem="Google Earth Engine / GlobFire v2",
+            refazer=args.refazer, origem=("GeoJSON bruto GEE revalidado" if modo == "brutos"
+                                        else "Google Earth Engine / GlobFire v2"),
         )
     except KeyboardInterrupt:
         print("\n[GEE] Execução interrompida pelo usuário (Ctrl+C).", file=sys.stderr)
