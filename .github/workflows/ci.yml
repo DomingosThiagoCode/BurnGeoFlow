@@ -81,6 +81,9 @@ jobs:
       - name: TypeScript e build Vite
         working-directory: frontend
         run: npm run build
+      - name: Garantia de carregamento inicial leve
+        working-directory: frontend
+        run: npm run check:bundle
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -105,3 +108,8 @@ jobs:
               assert client.get("/api/health").json()["status"] == "ok"
           print("[OK] React compilado e API na mesma porta")
           PY
+      - name: Smoke test em Chromium real (React, WebGL e API simulada)
+        run: |
+          python -m pip install "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+          python scripts/smoke_browser.py
