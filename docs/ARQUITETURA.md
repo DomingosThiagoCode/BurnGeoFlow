@@ -54,3 +54,20 @@ A consolidação `burngeoflow/analises/tr_igt.py` também reutiliza o
 P1 LAEA projetado canônico para perdas e incrementos, conferindo todos os
 registros P2 com `reconciliar_p2`. Os arquivos originais permanecem intactos;
 o resumo consolidado registra as diferenças geométricas e intervenções.
+
+## Arquitetura de consulta desacoplada (2026)
+
+`frontend/`: interface React/TS, MapLibre e gráficos SVG.
+`backend/app/`: rotas FastAPI, contratos, configuração e repositórios.
+`burngeoflow/`: permanece como **núcleo científico do produto**, sem
+duplicar fórmulas no backend ou frontend.
+
+Persistência primária continua sendo P1/P2 GeoJSON e relatórios CSV/JSON.
+A API mantém índice JSON Lines **reconstruível** por data em
+`execucoes/<ID>/.visualizador_index/`, sem migrar geometrias para SQL.
+SQLite será adicionado apenas caso o gerenciamento de jobs exigir
+persistência transacional. Sem dependência operacional PostgreSQL.
+
+O Streamlit existente é interface legada de compatibilidade temporária,
+mantida até o frontend React estar homologado. Não executar a API em rede
+externa sem autenticação: host local 127.0.0.1.

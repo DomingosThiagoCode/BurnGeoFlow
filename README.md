@@ -66,6 +66,23 @@ não estiver implementado e testado. Os comandos científicos permanecem iguais.
 Veja [docs/API.md](docs/API.md) e
 [docs/AUDITORIA_ARQUITETURAL_2026-11-12.md](docs/AUDITORIA_ARQUITETURAL_2026-11-12.md).
 
+## Frontend moderno React e API desacoplada (migração em andamento)
+
+Uma nova interface fica em `frontend/` (React + TypeScript + Vite +
+MapLibre). O processamento GEE e as análises permanecem em Python.
+
+1. Terminal 1, na raiz: `python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000`.
+2. Terminal 2: `cd frontend`, `npm ci`, `npm run dev`.
+3. Abrir <http://127.0.0.1:5173>.
+
+O novo painel mantém a seleção de ID, timeline, polígonos P1/P2,
+gráficos, métricas, alertas e downloads, mas consulta **apenas a data
+selecionada**, sem recalcular o pipeline. O Streamlit original permanece
+instalável durante a homologação funcional; não será removido sem
+paridade e teste real no Windows.
+
+Detalhes em [frontend/README.md](frontend/README.md).
+
 ## Visualizador interativo local (primeira versão)
 
 O BurnGeoFlow possui um painel opcional em **Streamlit** para exploração

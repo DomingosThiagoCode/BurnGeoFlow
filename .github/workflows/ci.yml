@@ -63,3 +63,21 @@ jobs:
         run: python scripts/perfil_visualizador_legado.py --base execucoes --id 24340828 --repeticoes 3
       - name: Indexacao e consultas por data
         run: python -m scripts.perfil_indice_api --base execucoes --id 24340828 --repeticoes 5
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar frontend (lock versionado)
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Testes unitarios de formatacao
+        working-directory: frontend
+        run: npm run test
+      - name: TypeScript e build Vite
+        working-directory: frontend
+        run: npm run build
