@@ -5,6 +5,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import patch as mock_patch
 import unittest
 
 from shapely.geometry import Polygon, box, mapping
@@ -12,6 +14,7 @@ from shapely.geometry import Polygon, box, mapping
 from burngeoflow.analises.paisagem import Patch
 from burngeoflow.validacao.sobreposicoes import (
     diagnosticar_grupo, diagnosticar_arquivo, verificar_origem, _classificar_origem,
+    _intersecao_valida,
 )
 
 
@@ -104,6 +107,49 @@ class DiagnosticoGeometrico(unittest.TestCase):
                 res["pares"][0]["classificacao"],
                 "INDETERMINADO_ORIGINAL_INVALIDO_OU_OVERLAY_IMPOSSIVEL",
             )
+
+    def test_overlay_original_positivo_mantem_prova_quando_projecao_invalida(self):
+        # Representa a falha real de 18/09: geometria da intersecao
+        # originalmente válida, mas sua reprojeção LAEA ficou inválida.
+        a = box(-56, -17, -55.99, -16.99)
+        b = box(-55.995, -17, -55.985, -16.99)
+        auto_intersectante = Polygon([
+            (0, 0), (1, 1), (0, 1), (1, 0), (0, 0),
+        ])
+        self.assertFalse(auto_intersectante.is_valid)
+        tx = SimpleNamespace(transform=lambda x, y: (x, y))
+        with mock_patch(
+            "burngeoflow.validacao.sobreposicoes.shapely.transform",
+            return_value=auto_intersectante,
+        ):
+            original = _intersecao_valida(a, b, conversor=tx)
+        self.assertEqual(original["situacao"], "intersecao_projetada_invalida")
+        self.assertIsNone(original["area_m2"])
+        self.assertTrue(original["intersecao_original_valida"])
+        self.assertTrue(original["sobreposicao_areal_no_original"])
+        self.assertGreater(original["area_intersecao_original_graus2"], 0)
+        self.assertEqual(
+            _classificar_origem(
+                original,
+                {"area_m2": None},
+                {"area_m2": 0.191108208},
+            ),
+            "JA_EXISTIA_NO_GEOJSON_ORIGINAL",
+        )
+
+    def test_intersecao_original_ausente_nao_e_inventada(self):
+        a = box(-56, -17, -55.99, -16.99)
+        b = box(-55.98, -17, -55.97, -16.99)
+        tx = SimpleNamespace(transform=lambda x, y: (x, y))
+        original = _intersecao_valida(a, b, conversor=tx)
+        self.assertFalse(original["sobreposicao_areal_no_original"])
+        self.assertEqual(original["area_intersecao_original_graus2"], 0)
+        self.assertEqual(
+            _classificar_origem(
+                original, {"area_m2": None}, {"area_m2": 0.191108208},
+            ),
+            "SURGIU_NA_PROJECAO_OU_REPARO_SEM_SEPARACAO_CONFIAVEL",
+        )
 
     def test_projetado_invalido_preserva_incerteza_causal(self):
         s0 = {"area_m2": 0.0}
