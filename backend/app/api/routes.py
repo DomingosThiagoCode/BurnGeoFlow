@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from backend.app.core.errors import EventoNaoEncontrado
 from backend.app.repositories.eventos import RepositorioEventos
 from backend.app.repositories.geojson_index import IndiceGeoJSON
+from backend.app.schemas.events import DataEvento, EventoListado, VisaoEvento
 
 logger = logging.getLogger("burngeoflow.api")
 router = APIRouter(prefix="/api", tags=["eventos"])
@@ -26,12 +27,12 @@ def health():
     return {"status": "ok", "service": "burngeoflow-api", "read_only": True}
 
 
-@router.get("/events")
+@router.get("/events", response_model=list[EventoListado])
 def eventos(r: RepositorioEventos = Depends(repo)):
     return [{"id_incendio": n} for n in r.listar()]
 
 
-@router.get("/events/{incendio}/overview")
+@router.get("/events/{incendio}/overview", response_model=VisaoEvento)
 def resumo(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.resumo(incendio)
 
@@ -46,7 +47,7 @@ def transicoes(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.transicoes(incendio)
 
 
-@router.get("/events/{incendio}/dates/{dia}")
+@router.get("/events/{incendio}/dates/{dia}", response_model=DataEvento)
 def dados_data(incendio: int, dia: str, r: RepositorioEventos = Depends(repo)):
     return r.dia(incendio, dia)
 

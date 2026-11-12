@@ -20,10 +20,8 @@ def medir(base: Path, evento: int, repeticoes: int):
     repo = RepositorioEventos(base)
     arquivos = repo._obrigatorios(evento)
     indice = IndiceGeoJSON(arquivos["raiz"])
-    for pasta in (arquivos["raiz"] / ".visualizador_index").glob("*"):
-        # Não remover caches gerados pelo usuário; benchmark inicial limpo
-        # recomenda executar em cópia da execução para medir cold.
-        pass
+    # Não exclui caches existentes. Para medir indexação fria, use uma cópia
+    # da execução que ainda não possua a pasta .visualizador_index.
     inicio = perf_counter()
     tracemalloc.start()
     primeira = {}

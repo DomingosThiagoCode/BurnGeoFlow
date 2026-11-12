@@ -60,3 +60,27 @@ dados, `404` ausência de evento/data, `422` parâmetro inválido.
 Persistência geoespacial permanece em GeoJSON/CSV/JSON e manifesto.
 SQLite será considerado para **gerenciamento de jobs**, não para duplicar
 geometrias existentes. Não há migração destrutiva nesta entrega.
+
+## Benchmark da API (mesmo caso de referência em CI, Python 3.11)
+
+A execução instrumentada do PR #21 registrou:
+
+| Métrica | Valor |
+|---|---:|
+| Leitor antigo, abertura completa | 566,128 ms (3 repetições) |
+| Índice novo, construção inicial | 1.847,904 ms |
+| Índice novo, consulta repetida P1+P2 por data | 4,293 ms (mediana de 5) |
+| Pico Python leitor antigo | 26,733 MiB |
+| Pico Python indexação nova | 2,386 MiB |
+| GeoJSON antigo última data | 190.062 bytes |
+| GeoJSON indexado última data P1+P2 | 190.103 bytes |
+
+A primeira indexação demora mais do que uma leitura completa individual.
+O ganho mensurável de latência está nas **consultas posteriores sem reparse
+do arquivo integral**. Os bytes são equivalentes: nesta etapa ainda não
+houve simplificação cartográfica. Valores não incluem navegador ou rede.
+
+A medição do leitor legado inclui serialização separada (20,613 ms nessa
+mesma execução), enquanto a consulta da API inclui a serialização
+pré-materializada no cache. Por isso, não interpretar a razão dos dois
+tempos como aceleração total de todo o produto.

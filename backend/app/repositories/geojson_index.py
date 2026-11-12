@@ -122,8 +122,14 @@ class IndiceGeoJSON:
                                     f"{layer}: feição {i} sem geometria/propriedades"
                                 )
                             dia = validar_data(str(props.get("data", "")))
+                            try:
+                                id_feicao = int(props.get("id_incendio", -1))
+                            except (ValueError, TypeError) as exc:
+                                raise DadosInconsistentes(
+                                    f"{layer}: ID inválido na feição {i}"
+                                ) from exc
                             if (
-                                int(props.get("id_incendio", -1)) != id_incendio
+                                id_feicao != id_incendio
                                 or geom.get("type") not in ("Polygon", "MultiPolygon")
                             ):
                                 raise DadosInconsistentes(
