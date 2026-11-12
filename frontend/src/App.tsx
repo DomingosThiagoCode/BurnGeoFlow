@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { LineChart, type SerieGrafico } from "./components/LineChart";
 import { MapPanel } from "./components/MapPanel";
+import { JobsPanel } from "./components/JobsPanel";
 import {
   carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
   formatarNumero, listarEventos, nomeDia, numero, urlSerieCSV,
@@ -35,6 +36,7 @@ function Kpi({
 export default function App() {
   const [lista, setLista] = useState<EventoListado[]>([]);
   const [id, setId] = useState<number | null>(null);
+  const [revisao, setRevisao] = useState(0);
   const [buscaId, setBuscaId] = useState("");
   const [buscando, setBuscando] = useState(true);
   const [painelAberto, setPainelAberto] = useState(false);
@@ -108,7 +110,7 @@ export default function App() {
         if (!abort.signal.aborted) setCarregandoEvento(false);
       });
     return () => abort.abort();
-  }, [id]);
+  }, [id, revisao]);
 
   const obterCamada = useCallback(async (
     identificador: number, dia: string, camada: Camada,
@@ -230,6 +232,13 @@ export default function App() {
       setMensagem("Falha no download: " + textoErro(erro));
     }
   }
+
+  const aoConcluirJob = useCallback((incendio: number) => {
+    cache.current.clear();
+    setId(incendio);
+    setRevisao(n => n + 1);
+    atualizarLista();
+  }, [atualizarLista]);
 
   const cmd = id ? "python executar_pipeline.py --id " + id + " --origem gee" : "";
   const existeErro = Boolean(erroEvento);
@@ -384,6 +393,8 @@ export default function App() {
                 onClick={() => atualizarLista()}><RefreshCw size={16}/> Atualizar</button>
             </div>
           </div>
+
+          <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} />
 
           {mensagem && <div className="message-box" role="status">
             <span>{mensagem}</span><button aria-label="Fechar mensagem"
