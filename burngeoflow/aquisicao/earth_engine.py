@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,9 @@ from typing import Any, Callable
 
 from burngeoflow.config import ConfiguracaoGEE, carregar_configuracao_gee
 from burngeoflow.validacao.produtos import verificar
+from burngeoflow.aquisicao.geometrias import (
+    ErroGeometria, diagnosticar, normalizar_produtos,
+)
 
 ASSET = "JRC/GWIS/GlobFire/v2/DailyPerimeters"
 ANO_MINIMO, ANO_MAXIMO = 2001, 2020
@@ -327,11 +331,117 @@ def aviso_espera(
         fim.set()
         thread.join(timeout=1)
 
+
+def salvar_json_atomico(caminho: Path, conteudo: dict) -> None:
+    """Nunca deixa JSON parcial em disco."""
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    temporario = caminho.with_name(caminho.name + '.tmp')
+    temporario.write_text(json.dumps(conteudo, ensure_ascii=False) + '\n', encoding='utf-8')
+    os.replace(temporario, caminho)
+
+
+def pastas_brutas(pasta: Path, id_incendio: int) -> tuple[Path, Path, Path]:
+    raiz = pasta / 'brutos_gee'
+    return (
+        raiz / f'P1_componentes_{id_incendio}.geojson',
+        raiz / f'P2_regiao_movel_{id_incendio}.geojson',
+        raiz / 'diagnostico_geometrias.json',
+    )
+
+
+def salvar_bruto(pasta: Path, id_incendio: int, nome: str, fc: dict) -> Path:
+    p1, p2, _ = pastas_brutas(pasta, id_incendio)
+    destino = p1 if nome == 'P1' else p2
+    salvar_json_atomico(destino, fc)
+    return destino
+
+
+def preparar_e_publicar(
+    pasta: Path, id_incendio: int, bruto_p1: dict, bruto_p2: dict,
+    informar: Callable[[str], None] = informar_terminal,
+) -> tuple[Path, Path, dict, dict]:
+    """Registra diagnóstico e só publica produtos validados, preservando brutos."""
+    p1_bruto, p2_bruto, diagnostico_path = pastas_brutas(pasta, id_incendio)
+    if not p1_bruto.exists():
+        salvar_bruto(pasta, id_incendio, 'P1', bruto_p1)
+    if not p2_bruto.exists():
+        salvar_bruto(pasta, id_incendio, 'P2', bruto_p2)
+    diagnostico = {
+        'P1': diagnosticar(bruto_p1, 'P1'),
+        'P2': diagnosticar(bruto_p2, 'P2'),
+        'status': 'em_analise',
+    }
+    salvar_json_atomico(diagnostico_path, diagnostico)
+    informar(f'[GEE] Diagnóstico geométrico salvo em {diagnostico_path}')
+    try:
+        p1, p2, auditoria = normalizar_produtos(bruto_p1, bruto_p2)
+    except ErroGeometria as exc:
+        diagnostico['status'] = 'requer_analise'
+        diagnostico['erro'] = str(exc)
+        salvar_json_atomico(diagnostico_path, diagnostico)
+        raise ErroAquisicao(
+            f'Geometria inválida identificada; nenhum componente com área positiva foi descartado. '
+            f'{exc} Dados brutos preservados em {diagnostico_path.parent}'
+        ) from exc
+    diagnostico.update(auditoria)
+    diagnostico['status'] = 'normalizado'
+    salvar_json_atomico(diagnostico_path, diagnostico)
+    informar(
+        f'[GEE] Geometrias ajustadas: {len(auditoria["geometrias_convertidas"])} coleções '
+        f'e {len(auditoria["sem_area_excluidos"])} feições sem área (ver diagnóstico).'
+    )
+    try:
+        caminho1, caminho2, resumo = publicar_geojsons(pasta, id_incendio, p1, p2)
+    except (OSError, ValueError, ErroAquisicao) as exc:
+        diagnostico['status'] = 'falha_validacao'
+        diagnostico['erro'] = str(exc)
+        salvar_json_atomico(diagnostico_path, diagnostico)
+        raise ErroAquisicao(
+            f'Validação final rejeitou P1/P2: {exc}. '
+            f'Os GeoJSONs brutos e o relatório estão em {diagnostico_path.parent}'
+        ) from exc
+    diagnostico['status'] = 'validado'
+    diagnostico['verificacao'] = resumo
+    salvar_json_atomico(diagnostico_path, diagnostico)
+    return caminho1, caminho2, resumo, auditoria
+
+
+def reprocessar_brutos(
+    id_incendio: int, pasta: Path, *,
+    informar: Callable[[str], None] = informar_terminal,
+) -> tuple[Path, Path, dict]:
+    """Revalida GeoJSONs baixados anteriormente SEM acessar o Earth Engine."""
+    p1_path, p2_path, diag = pastas_brutas(pasta, id_incendio)
+    if not p1_path.is_file() or not p2_path.is_file():
+        raise ErroAquisicao(
+            f'Brutos ausentes em {diag.parent}; é preciso completar a aquisição GEE.'
+        )
+    informar('[GEE] Reprocessando P1/P2 brutos em disco (sem requisições GEE).')
+    p1 = json.loads(p1_path.read_text(encoding='utf-8'))
+    p2 = json.loads(p2_path.read_text(encoding='utf-8'))
+    destino1, destino2, resumo, auditoria = preparar_e_publicar(
+        pasta, id_incendio, p1, p2, informar=informar
+    )
+    return destino1, destino2, {
+        'id_incendio': id_incendio,
+        'origem': 'brutos_gee_em_disco',
+        'datas': resumo['datas'],
+        'componentes_p1': resumo['registros_p1'],
+        'regioes_p2': resumo['registros_p2'],
+        'modificacoes': {
+            'colecoes': len(auditoria['geometrias_convertidas']),
+            'sem_area': len(auditoria['sem_area_excluidos']),
+        },
+        'diagnostico': str(diag),
+    }
+
 def obter_geojson(
     ee: Any, colecao: Any, *, pagina: int = 50, limite: int = 50000,
     rotulo: str = "GeoJSON",
     informar: Callable[[str], None] = informar_terminal,
     intervalo_aviso_s: float = 30.0,
+    pasta_paginas: Path | None = None,
+    chave_cache: str | None = None,
 ) -> dict:
     """Obtém feições por páginas. O GEE retorna EPSG:4326 em GeoJSON.
 
@@ -343,23 +453,48 @@ def obter_geojson(
     token: str | None = None
     vistos: set[str] = set()
     indice_pagina = 0
+    if pasta_paginas is not None and not chave_cache:
+        raise ErroAquisicao('Informe chave_cache ao armazenar páginas do GEE.')
     while True:
         params: dict[str, Any] = {"expression": colecao, "pageSize": pagina}
         if token is not None:
             params["pageToken"] = token
         indice_pagina += 1
-        try:
-            with aviso_espera(
-                f"{rotulo}, página {indice_pagina}",
-                informar=informar,
-                intervalo_s=intervalo_aviso_s,
-            ):
-                resposta = ee.data.computeFeatures(params)
-        except Exception as exc:
-            raise ErroAquisicao(
-                f"Falha na exportação paginada, após {len(feicoes)} feições: "
-                f"{type(exc).__name__}: {exc}"
-            ) from exc
+        arquivo_pagina = (
+            pasta_paginas / f"pagina_{indice_pagina:05d}.json"
+            if pasta_paginas is not None else None
+        )
+        if arquivo_pagina is not None and arquivo_pagina.is_file():
+            recuperado = json.loads(arquivo_pagina.read_text(encoding="utf-8"))
+            if (recuperado.get("chave_cache") != chave_cache
+                    or recuperado.get("token_entrada") != token):
+                raise ErroAquisicao(
+                    f"Cache GEE incompatível: {arquivo_pagina}. "
+                    "Não será reutilizado para evitar misturar conjuntos diferentes."
+                )
+            resposta = recuperado["resposta"]
+            informar(f"[GEE] {rotulo}, página {indice_pagina}: "
+                    "reutilizada do cache local.")
+        else:
+            try:
+                with aviso_espera(
+                    f"{rotulo}, página {indice_pagina}",
+                    informar=informar,
+                    intervalo_s=intervalo_aviso_s,
+                ):
+                    resposta = ee.data.computeFeatures(params)
+            except Exception as exc:
+                raise ErroAquisicao(
+                    f"Falha na exportação paginada, após {len(feicoes)} feições: "
+                    f"{type(exc).__name__}: {exc}"
+                ) from exc
+            if (arquivo_pagina is not None and isinstance(resposta, dict)
+                    and isinstance(resposta.get("features"), list)):
+                salvar_json_atomico(arquivo_pagina, {
+                    "chave_cache": chave_cache,
+                    "token_entrada": token,
+                    "resposta": resposta,
+                })
         if (not isinstance(resposta, dict)
                 or not isinstance(resposta.get("features"), list)):
             raise ErroAquisicao("Resposta inválida de computeFeatures.")
@@ -456,18 +591,32 @@ def adquirir(
         ee_modulo, evento, id_incendio, ano_usado
     )
     informar(f"[GEE] {n_datas} datas; exportando P1 e P2")
-    p1 = obter_geojson(ee_modulo, p1_ee, pagina=pagina,
-                       rotulo="P1 (componentes)", informar=informar)
-    informar("[GEE] P1 recebido. Iniciando extração de P2 (região móvel).")
-    p2 = obter_geojson(ee_modulo, p2_ee, pagina=pagina,
-                       rotulo="P2 (região móvel)", informar=informar)
-    informar("[GEE] P2 recebido. Validando os dois GeoJSONs...")
+    bruto1, bruto2, diagnostico_path = pastas_brutas(pasta, id_incendio)
+    raiz_brutos = diagnostico_path.parent
+    assinatura_base = (
+        f"{ASSET}/{ano_usado}:id={id_incendio}:alg=acumulado_v1:"
+        f"max_erro={ERRO_GEOMETRICO_M}:pagina={pagina}"
+    )
+    p1 = obter_geojson(
+        ee_modulo, p1_ee, pagina=pagina, rotulo="P1 (componentes)",
+        informar=informar, pasta_paginas=raiz_brutos / "paginas_P1",
+        chave_cache=assinatura_base + ":P1",
+    )
+    salvar_bruto(pasta, id_incendio, "P1", p1)
+    informar("[GEE] P1 bruto salvo em disco. Iniciando P2 (região móvel).")
+    p2 = obter_geojson(
+        ee_modulo, p2_ee, pagina=pagina, rotulo="P2 (região móvel)",
+        informar=informar, pasta_paginas=raiz_brutos / "paginas_P2",
+        chave_cache=assinatura_base + ":P2",
+    )
+    salvar_bruto(pasta, id_incendio, "P2", p2)
+    informar("[GEE] P2 bruto salvo. Diagnosticando geometrias...")
     if len(p2["features"]) != n_datas:
         raise ErroAquisicao(
             f"P2 contém {len(p2['features'])} geometrias e eram esperadas {n_datas}."
         )
-    caminho_p1, caminho_p2, resumo = publicar_geojsons(
-        pasta, id_incendio, p1, p2
+    caminho_p1, caminho_p2, resumo, auditoria = preparar_e_publicar(
+        pasta, id_incendio, p1, p2, informar=informar
     )
     informar("[GEE] P1 e P2 validados e gravados no disco.")
     metadados = {
@@ -485,6 +634,11 @@ def adquirir(
         "validacao_estrutura": resumo,
         "validacao_independente": False,
         "metodo": "acumulado_union__p2_overlap_e_distancia_fallback",
+        "brutos_gee": str(raiz_brutos),
+        "modificacoes_geometricas": {
+            "colecoes_convertidas": len(auditoria["geometrias_convertidas"]),
+            "feicoes_sem_area": len(auditoria["sem_area_excluidos"]),
+        },
     }
     (pasta / f"aquisicao_{id_incendio}.json").write_text(
         json.dumps(metadados, ensure_ascii=False, indent=2) + "\n",
