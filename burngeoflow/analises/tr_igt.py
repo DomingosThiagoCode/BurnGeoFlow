@@ -120,10 +120,23 @@ def comparar_linhas(linha_tr: dict, linha_igt: dict, *, n_reducao: int,
     dias = int(linha_tr["dias_intervalo"])
     if dias <= 0 or area_nova is None or area_nova < 0 or area_perda is None or area_perda < 0:
         raise ValueError("Area ou periodo invalidos")
-    if abs(numero(linha_tr["area_nova_p2_km2"])-area_nova) > 1e-7:
-        raise ValueError("Area nova TR/IGT nao confere")
-    if abs(numero(linha_tr["area_perdida_p2_km2"])-area_perda) > 1e-7:
-        raise ValueError("Area reduzida TR/IGT nao confere")
+    # A tolerância original de 0,1 m² continua em vigor; não mascarar
+    # discrepâncias. O detalhamento permite identificar a transição sem
+    # repetir a aquisição e sem abrir grandes GeoJSONs.
+    def conferir_area(rotulo: str, chave_tr: str, valor_igt: float) -> None:
+        valor_tr = numero(linha_tr[chave_tr])
+        if valor_tr is None:
+            raise ValueError(f"{rotulo} TR/IGT sem valor em {chave_tr}: {linha_tr!r}")
+        divergencia_m2 = abs(valor_tr - valor_igt) * 1e6
+        if divergencia_m2 > 0.1:
+            raise ValueError(
+                f"{rotulo} TR/IGT nao confere em "
+                f"{linha_tr['data_anterior']} -> {linha_tr['data_atual']}: "
+                f"TR={valor_tr:.12f} km2; IGT={valor_igt:.12f} km2; "
+                f"divergencia={divergencia_m2:.6f} m2 (limite 0.1 m2)"
+            )
+    conferir_area("Area nova", "area_nova_p2_km2", area_nova)
+    conferir_area("Area reduzida", "area_perdida_p2_km2", area_perda)
     a_tr = numero(linha_tr["azimute_centroide_graus"])
     a_igt = numero(linha_igt["azimute_medio_ponderado_graus"])
     return {

@@ -111,6 +111,11 @@ def indicadores_poligono(anterior: Patch, atual: Patch, dias: int) -> dict:
         raise ValueError("Geometrias devem ser validas, metricas e nao vazias")
     area_inter = g0.intersection(g1).area
     area_uniao = g0.union(g1).area
+    # Definição comum ao IGT: áreas de diferenças espaciais explícitas.
+    # Subtrair áreas totais da interseção pode acumular cancelamento numérico
+    # em regiões extensas com inúmeros vértices e anéis pequenos.
+    area_nova = g1.difference(g0).area
+    area_perdida = g0.difference(g1).area
     if area_inter > min(g0.area, g1.area) + 1e-5:
         raise ValueError("Intersecao impossivel")
     minx0, miny0, maxx0, maxy0 = g0.bounds
@@ -120,8 +125,8 @@ def indicadores_poligono(anterior: Patch, atual: Patch, dias: int) -> dict:
     area0, area1 = g0.area/1e6, g1.area/1e6
     return {
         "area_anterior_km2": area0, "area_atual_km2": area1,
-        "area_nova_p2_km2": max(0., (g1.area-area_inter)/1e6),
-        "area_perdida_p2_km2": max(0., (g0.area-area_inter)/1e6),
+        "area_nova_p2_km2": area_nova/1e6,
+        "area_perdida_p2_km2": area_perdida/1e6,
         "incremento_liquido_km2": area1-area0,
         "retencao_area_anterior_pct": 100*area_inter/g0.area,
         "jaccard_geometrico": area_inter/area_uniao,

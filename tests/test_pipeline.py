@@ -1,11 +1,14 @@
 """Teste de contrato do orquestrador sem GEE ou dados externos."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import patch
 import json
 import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from executar_pipeline import ErroPipeline, preparar_dados, definir_etapas, salvar_json
+from executar_pipeline import (ErroPipeline, Etapa, preparar_dados,
+                               definir_etapas, salvar_json, executar)
 from burngeoflow.aquisicao.dados_referencia import git_hash
 
 
@@ -28,6 +31,33 @@ class TestePipeline(unittest.TestCase):
                 "validar", "auditar", "regularizar_diagnostico", "paisagem",
                 "linhagens", "tr_igt", "integrar", "robustez"
             ])
+
+    def test_erro_subprocesso_aparece_no_terminal_e_log_e_preservado(self):
+        with TemporaryDirectory() as d:
+            raiz = Path(d)
+            output = raiz / "saida.json"
+            etapa = Etapa(
+                nome="tr_igt", comando=["python", "modulo"],
+                artefatos=(output,),
+            )
+            resultado = SimpleNamespace(
+                returncode=1, stdout="",
+                stderr="FALHA: Area nova TR/IGT nao confere em 2020-09-01 "
+                       "-> 2020-09-02: divergencia=2.500000 m2",
+            )
+            with patch(
+                "executar_pipeline.preparar_dados",
+                return_value=(raiz/"p1.geojson", raiz/"p2.geojson",
+                              {"p1": "a", "p2": "b"}),
+            ), patch("executar_pipeline.definir_etapas", return_value=[etapa]), \
+                 patch("executar_pipeline.subprocess.run", return_value=resultado):
+                with self.assertRaisesRegex(ErroPipeline, "divergencia=2.500000 m2"):
+                    executar(1, saida=raiz)
+            log = raiz / "logs/tr_igt.log"
+            self.assertTrue(log.is_file())
+            self.assertIn("2020-09-02", log.read_text(encoding="utf-8"))
+            manifesto = json.loads((raiz/"execucao.json").read_text())
+            self.assertEqual(manifesto["etapas"]["tr_igt"]["status"], "falha")
 
     def test_json_atomico(self):
         with TemporaryDirectory() as d:
