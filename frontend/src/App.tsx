@@ -214,7 +214,8 @@ export default function App() {
   );
   const areaP1 = numero(linha, "area_total_laea_km2");
   const areaP2 = numero(linha, "p2_area_laea_km2");
-  const dominancia = numero(linha, "dominancia_cobertura_p2_pct");
+  const dominancia = areaP1 !== null && areaP2 !== null && areaP1 > 0
+    ? 100 * areaP2 / areaP1 : null;
   const patches = numero(linha, "numero_patches");
 
 
