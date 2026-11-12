@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, BarChart3, CheckCircle2,
   ChevronLeft, ChevronRight, Database, Flame, Layers, LoaderCircle,
@@ -12,7 +12,6 @@ import {
 } from "./services/api";
 import type { Camada, Colecao, EventoListado, Linha, VisaoEvento } from "./types";
 
-const VAZIO: Colecao = { type: "FeatureCollection", features: [] };
 const CORES = { p1: "#db8750", p2: "#168f86", suporte: "#5276a8" };
 
 function textoErro(erro: unknown): string {
@@ -195,7 +194,7 @@ export default function App() {
     { label: "Já queimada incorporada ao P2", cor: CORES.p2, valores: transicoes.map(r => numero(r, "p2_incremento_ja_queimado_km2")) },
   ], [transicoes]);
 
-  function escolherId(evento: React.FormEvent<HTMLFormElement>) {
+  function escolherId(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const n = Number(buscaId.trim());
     if (!Number.isSafeInteger(n) || n <= 0) {
@@ -382,10 +381,7 @@ export default function App() {
             <div className="workspace-actions">
               <button className="secondary-button" type="button"
                 aria-label="Atualizar lista de eventos"
-                onClick={() => {
-                  atualizarLista();
-                  if (id !== null) setId(null);
-                }}><RefreshCw size={16}/> Atualizar</button>
+                onClick={() => atualizarLista()}><RefreshCw size={16}/> Atualizar</button>
             </div>
           </div>
 

@@ -61,23 +61,4 @@ export const carregarGeometria = (
 export const urlSerieCSV = (id: number) =>
   BASE_API + "/api/events/" + id + "/downloads/series.csv";
 
-export function numero(r: Linha | null | undefined, campo: string): number | null {
-  const valor = r?.[campo];
-  if (valor === undefined || valor === null || valor.trim() === "") return null;
-  const n = Number(valor);
-  return Number.isFinite(n) ? n : null;
-}
-
-export function nomeDia(iso: string): string {
-  const [ano, mes, dia] = iso.split("-");
-  return dia + "/" + mes + "/" + ano;
-}
-
-export function formatarNumero(n: number | null, casas = 2): string {
-  return n === null
-    ? "N/D"
-    : n.toLocaleString("pt-BR", {
-        minimumFractionDigits: casas,
-        maximumFractionDigits: casas,
-      });
-}
+export { numero, nomeDia, formatarNumero } from "../utils/format";
