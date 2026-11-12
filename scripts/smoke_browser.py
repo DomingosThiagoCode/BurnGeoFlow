@@ -218,7 +218,7 @@ def testar() -> None:
             ) == "fixed", "No mobile o menu deve continuar sendo um drawer"
             page.get_by_role("button", name="Abrir menu").click()
             assert "sidebar-open" in (page.locator(".sidebar").get_attribute("class") or "")
-            page.get_by_role("button", name="Fechar menu").click()
+            page.locator(".global-header").get_by_role("button", name="Fechar menu").click()
             browser.close()
     finally:
         httpd.shutdown()
