@@ -303,6 +303,32 @@ recalculadas para evitar resultados misturados. Manifests anteriores
 ao controle de versão do código mantêm o reuso legado até o primeiro
 recálculo, e não devem ser tratados como comprovação de versão.
 
+
+### Síntese científica exploratória (após o pipeline)
+
+Quando as Etapas 5 e 6 estiverem concluídas, gere o dossiê interpretativo
+**sem baixar dados do GEE nem refazer o pipeline**:
+
+    python -m burngeoflow.relatorios.sintese_caso --id 24340828
+
+Os produtos são gravados em execucoes/24340828/resultados/sintese_cientifica/:
+
+- sintese_cientifica_24340828.md: leitura P1/P2, TR/IGT, conectividade,
+  convergências geométricas, picos e ressalvas metodológicas;
+- indicadores_sintese_24340828.json: dados estruturados e auditáveis;
+- resumo_para_chat_24340828.txt: indicadores e datas centrais para revisão.
+
+A rotina exige o mesmo ID, contagem de datas e transições e hashes SHA-256
+dos GeoJSONs efetivamente usados na Etapa 5. Usa apenas os produtos das
+Etapas 5/6 e os arquivos de origem disponíveis localmente. Se houver
+verificacao_origem_p1_<ID>_<data>.json com SHA válido, a origem das
+sobreposições aparece no dossiê. Não muda os dados de entrada nem
+transforma pendências científicas em aprovação.
+
+A comparação direcional exploratória considera apenas transições de 1 dia,
+concentração IGT >= 0,5, nova área P2 >= 0,25 km² e azimutes definidos.
+Esses limiares não são calibração do sensor e não validam propagação do fogo.
+
 ## Escopo e qualidade
 
 Os indicadores medem evolução geométrica de áreas queimadas acumuladas,
