@@ -29,6 +29,43 @@ class Etapa:
     stdout_json: Path | None = None
 
 
+
+# Dependências de código diretamente relevantes para cada etapa. O hash só
+# invalida as etapas afetadas; alterações nos GeoJSONs já invalidam a execução
+# por SHA-256 em preparar_dados. Relatórios de etapas subsequentes também são
+# invalidados quando uma etapa anterior é efetivamente reexecutada.
+FONTES_ETAPAS = {
+    "validar": ("validacao/produtos.py",),
+    "auditar": ("validacao/espacial.py",),
+    "regularizar_diagnostico": ("validacao/regularizacao.py",),
+    "paisagem": ("analises/paisagem.py",),
+    "linhagens": ("processamento/linhagens.py", "analises/paisagem.py"),
+    "tr_igt": (
+        "analises/tr_igt.py", "analises/regioes_moveis.py",
+        "analises/incrementos.py", "analises/paisagem.py",
+        "validacao/topologia_p2.py",
+    ),
+    "integrar": (
+        "analises/integracao.py", "analises/paisagem.py",
+        "validacao/topologia_p2.py",
+    ),
+    "robustez": (
+        "validacao/robustez.py", "analises/integracao.py",
+        "analises/paisagem.py", "validacao/topologia_p2.py",
+    ),
+}
+
+
+def assinatura_codigo(nome_etapa: str) -> str:
+    """Fingerprint das rotinas científicas determinantes para o reuso."""
+    h = sha256()
+    for caminho_relativo in FONTES_ETAPAS[nome_etapa]:
+        caminho = ROOT / "burngeoflow" / caminho_relativo
+        h.update(caminho_relativo.encode("utf-8") + b"\0")
+        h.update(caminho.read_bytes())
+    return h.hexdigest()
+
+
 def agora() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -106,12 +143,17 @@ def definir_etapas(id_: int, raiz: Path, p1: Path, p2: Path) -> tuple[Etapa, ...
               [str(p1), str(p2), "--saida", str(e4)],
               (e4 / f"indicadores_regiao_{id_}.csv",
                e4 / f"incrementos_temporais_{id_}.csv",
-               e4 / f"comparacao_tr_igt_{id_}.csv")),
+               e4 / f"comparacao_tr_igt_{id_}.csv",
+               e4 / f"resumo_regiao_movel_{id_}.json",
+               e4 / f"resumo_incrementos_{id_}.json",
+               e4 / f"resumo_consolidado_tr_igt_{id_}.json")),
         Etapa("integrar", py("analises.integracao") +
               ["--id", str(id_), "--raiz", str(raiz), "--saida", str(e5)],
               (e5 / f"serie_diaria_integrada_{id_}.csv",
                e5 / f"transicoes_integradas_{id_}.csv",
-               e5 / f"relatorio_interpretativo_{id_}.md")),
+               e5 / f"relatorio_interpretativo_{id_}.md",
+               e5 / f"resumo_etapa5_{id_}.json",
+               e5 / f"auditoria_p1_sobreposicoes_{id_}.json")),
         Etapa("robustez", py("validacao.robustez") +
               ["--id", str(id_), "--raiz", str(raiz), "--saida", str(e6)],
               (e6 / f"resumo_validacao_{id_}.json",
@@ -150,14 +192,27 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
     salvar_json(manifesto_path, manifesto)
     logs = raiz / "logs"
     logs.mkdir(parents=True, exist_ok=True)
+    predecessora_reexecutada = False
     for etapa in definir_etapas(id_, raiz, a, b):
         estado = manifesto["etapas"].get(etapa.nome, {})
-        if not refazer and estado.get("status") == "concluido" and all(
-            f.is_file() and f.stat().st_size > 0 for f in etapa.artefatos
-        ):
+        assinatura_atual = assinatura_codigo(etapa.nome)
+        assinatura_anterior = estado.get("codigo_sha256")
+        codigo_compativel = assinatura_anterior in (None, assinatura_atual)
+        # Registros antigos não tinham assinatura de código. Preservamos o
+        # reuso retrocompatível, mas novas execuções gravam a assinatura.
+        # Uma etapa posterior nunca pode reutilizar dados quando qualquer
+        # predecessora foi reexecutada na execução atual.
+        pode_reutilizar = (
+            not refazer and not predecessora_reexecutada
+            and codigo_compativel and estado.get("status") == "concluido"
+            and all(f.is_file() and f.stat().st_size > 0
+                    for f in etapa.artefatos)
+        )
+        if pode_reutilizar:
             print(f"[REUSO] {etapa.nome}", flush=True)
             continue
         print(f"[EXEC] {etapa.nome}", flush=True)
+        predecessora_reexecutada = True
         for arquivo in etapa.artefatos:
             arquivo.parent.mkdir(parents=True, exist_ok=True)
             if arquivo.is_file():
@@ -200,6 +255,7 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
         manifesto["etapas"][etapa.nome] = {
             "status": "concluido",
             "artefatos": [str(p.relative_to(raiz)) for p in etapa.artefatos],
+            "codigo_sha256": assinatura_atual,
             "fim_utc": agora(),
         }
         salvar_json(manifesto_path, manifesto)
