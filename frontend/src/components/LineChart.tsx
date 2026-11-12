@@ -65,19 +65,19 @@ export function LineChart({
             const yy = yMax - fra*(yMax-yMin), val = min + fra*dominio;
             return <g key={i}>
               <line x1={xMin} x2={xMax} y1={yy} y2={yy}
-                stroke="#e4ebe9" strokeWidth="1"/>
+                stroke="#e3e0d5" strokeWidth="1"/>
               <text x={xMin-10} y={yy+4} textAnchor="end"
-                fill="#71827e" fontSize="11">{formatarNumero(val, 0)}</text>
+                fill="#818477" fontSize="11">{formatarNumero(val, 0)}</text>
             </g>;
           })}
           <line x1={xMin} y1={yMax} x2={xMax} y2={yMax}
-            stroke="#b3c5c0"/>
+            stroke="#bcbdb1"/>
           {datas.filter((_,i) => i===0 || i===datas.length-1 ||
             i===Math.floor((datas.length-1)/2)).map((iso) => {
             const i = datas.indexOf(iso);
             return <text key={iso} x={X(i)} y={altura-11}
               textAnchor={i===0?"start":i===datas.length-1?"end":"middle"}
-              fill="#71827e" fontSize="11">{nomeDia(iso).slice(0,5)}</text>;
+              fill="#818477" fontSize="11">{nomeDia(iso).slice(0,5)}</text>;
           })}
           <g clipPath={"url(#" + uid + ")"}>
             {series.map((serie, i) =>
@@ -86,7 +86,7 @@ export function LineChart({
                 strokeLinecap="round" strokeLinejoin="round"/> )}
             {datas.includes(dataAtual ?? "") && <line
               x1={X(selected)} x2={X(selected)} y1={yMin} y2={yMax}
-              stroke="#425955" strokeDasharray="4 4" strokeWidth="1.4" />}
+              stroke="#aa4b36" strokeDasharray="4 4" strokeWidth="1.4" />}
             {series.map((s) => {
               const v = s.valores[selected];
               return v !== null && v !== undefined ? <circle
