@@ -116,6 +116,10 @@ def responder_api(route):
             "area_nova_evento_km2": "1",
             "p2_incremento_ja_queimado_km2": "0.5",
             "eventos_convergencia": "1",
+            "tr_azimute_centroide_graus": "80",
+            "tr_deslocamento_centroide_km": "1",
+            "igt_azimute_ponderado_graus": "55",
+            "p2_incremento_geometrico_km2": "2",
         } for i in range(1, len(DATAS))]
     elif caminho.endswith("/geometry"):
         dia = caminho.split("/")[-2]
