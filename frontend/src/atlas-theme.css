@@ -71,7 +71,7 @@ a:focus-visible, [role="tab"]:focus-visible {
 }
 .brand-copy strong span { color: var(--ember); }
 .brand-copy small {
-  color: #727b6d; font-size: 9px;
+  color: #59685e; font-size: 9px;
   letter-spacing: .15em; font-weight: 800;
   white-space: nowrap;
 }
@@ -83,7 +83,7 @@ a:focus-visible, [role="tab"]:focus-visible {
 }
 .header-context span {
   font-size: 9px; letter-spacing: .2em;
-  color: #8a8b7d; font-weight: 800;
+  color: #5d6b61; font-weight: 800;
 }
 .header-context strong {
   font-size: 11px; letter-spacing: .04em; font-weight: 650;
@@ -225,7 +225,7 @@ a:focus-visible, [role="tab"]:focus-visible {
 .edition-line { display:flex; gap: 16px; align-items:center; margin-bottom: 18px; }
 .eyebrow { color: var(--ember); font-size: 9px; letter-spacing: .18em; font-weight: 850; }
 .edition-line-rule { width: 36px; height: 1px; background: #b8b3a3; flex-shrink:0; }
-.edition-meta { color: #888b7e; font: 750 9px var(--type-ui); letter-spacing: .135em; }
+.edition-meta { color: #5a685e; font: 750 9px var(--type-ui); letter-spacing: .135em; }
 .workspace-heading h1 {
   color: var(--ink);
   font: 400 clamp(38px, 4.3vw, 65px)/1.02 var(--type-editorial);
@@ -240,7 +240,7 @@ a:focus-visible, [role="tab"]:focus-visible {
 }
 .workspace-actions { align-items: flex-end; flex-direction: column; gap: 14px; }
 .workspace-stamp {
-  color: #888b7c; font-size: 9px;
+  color: #5a685e; font-size: 9px;
   font-weight: 800; letter-spacing: .11em; white-space: nowrap;
 }
 .workspace-stamp b { color: var(--ember); padding: 0 3px; }
@@ -269,7 +269,7 @@ a:focus-visible, [role="tab"]:focus-visible {
 }
 .event-dot { width: 8px; height: 8px; border-radius: 0; background: var(--ember); }
 .date-label { color: #7c7f73; font-size: 12px; }
-.period-label { color: #7c8276; font: 700 10px var(--type-ui); letter-spacing: .04em; }
+.period-label { color: #5c695f; font: 700 10px var(--type-ui); letter-spacing: .04em; }
 
 .kpi-grid {
   display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
@@ -307,7 +307,7 @@ a:focus-visible, [role="tab"]:focus-visible {
   margin-top: 17px; white-space: normal;
 }
 .kpi-card:first-child .kpi-value { color: var(--ember); }
-.kpi-detail { color: #82867a; font-size: 10px; margin-top: 10px; }
+.kpi-detail { color: #5d6b61; font-size: 10px; margin-top: 10px; }
 
 .panel, .chart-panel, .rose-card, .jobs-panel {
   background: var(--paper); border: 1px solid var(--hairline);
@@ -429,7 +429,7 @@ a:focus-visible, [role="tab"]:focus-visible {
   letter-spacing:-.035em;
 }
 .chart-heading span {
-  color:#8c8e7e; font-size:10px; font-weight:700;
+  color:#5e6b60; font-size:10px; font-weight:700;
 }
 .chart-scroll { margin-top:17px; }
 .chart-legend { margin-top:12px; gap:11px 17px; }
@@ -443,7 +443,7 @@ a:focus-visible, [role="tab"]:focus-visible {
 .rose-grid { gap:15px; }
 .rose-card { border-top:2px solid #b0b9ab; padding:23px 22px; }
 .rose-card h3 { color:var(--forest); font:400 21px var(--type-editorial); }
-.rose-card p { color:#868b7e; font-size:10px; }
+.rose-card p { color:#5a6c60; font-size:10px; }
 .rose-svg text { fill:#596e60; }
 .rose-result { border-top:1px solid var(--hairline); }
 .rose-result span { color:#6c796d; }
@@ -486,7 +486,7 @@ tbody tr:hover { background:#efede5; }
   font:400 clamp(17px,1.5vw,21px) var(--type-editorial);
   letter-spacing:-.03em;
 }
-.jobs-head-copy small { color:#7a8377; font-size:11px; }
+.jobs-head-copy small { color:#5b6d60; font-size:11px; }
 .jobs-active-badge {
   color:#30624e; background:#e5eddf; border-radius:0;
   font-size:9px; letter-spacing:.05em;
