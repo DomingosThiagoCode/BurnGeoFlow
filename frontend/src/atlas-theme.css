@@ -528,7 +528,7 @@ tbody tr:hover { background:#efede5; }
   inset:14px; border:1px solid #d3d1c4; pointer-events:none;
 }
 .map-deferred::before {
-  content:"49°  /  17°";
+  content:"CAMADAS / EPSG:4326";
   position:absolute; top:31px; right:32px;
   font: 700 10px var(--type-ui);
   letter-spacing:.12em; color:#aaad9f;
