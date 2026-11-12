@@ -81,3 +81,27 @@ jobs:
       - name: TypeScript e build Vite
         working-directory: frontend
         run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Smoke test do React compilado servido pelo FastAPI
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python - <<'PY'
+          from pathlib import Path
+          from re import search
+          from fastapi.testclient import TestClient
+          from backend.app.main import criar_app
+          dist = Path("frontend/dist")
+          assert (dist / "index.html").is_file()
+          with TestClient(criar_app(frontend_dist=dist)) as client:
+              pagina = client.get("/")
+              assert pagina.status_code == 200
+              assert "BurnGeoFlow" in pagina.text
+              js = search(r'/assets/[^" ]+\\.js', pagina.text)
+              assert js is not None, pagina.text
+              asset = client.get(js.group(0))
+              assert asset.status_code == 200
+              assert client.get("/api/health").json()["status"] == "ok"
+          print("[OK] React compilado e API na mesma porta")
+          PY
