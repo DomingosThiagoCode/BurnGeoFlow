@@ -49,3 +49,8 @@ permitido apenas em memória e se o resultado for equivalente ao P1
 projetado e validado dentro de tolerância explícita de área simétrica.
 As análises registram o número de reparos, as datas/ranks envolvidos
 e a diferença residual. Falhas acima da tolerância não são disfarçadas.
+
+A consolidação `burngeoflow/analises/tr_igt.py` também reutiliza o
+P1 LAEA projetado canônico para perdas e incrementos, conferindo todos os
+registros P2 com `reconciliar_p2`. Os arquivos originais permanecem intactos;
+o resumo consolidado registra as diferenças geométricas e intervenções.
