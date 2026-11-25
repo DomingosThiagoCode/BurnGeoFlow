@@ -291,6 +291,43 @@ def construir_produtos(
     return p1, p2, qtd_datas
 
 
+
+# Esquema explicitamente escalar: Export.table.toAsset não aceita colunas
+# com objetos Feature, nem sempre infere o esquema de listas produzidas por
+# ee.List.iterate. O P2 científico original permanece intocado.
+P2_CAMPOS_NUMERICOS = (
+    "id_incendio", "ano_dataset", "data_millis", "area_km2", "rank",
+    "numero_componentes", "area_total_km2", "proporcao_area_pct",
+    "ordem_temporal", "rank_global", "overlap_prev_km2", "overlap_prev_pct",
+    "overlap_candidato_pct", "distancia_prev_m", "delta_area_km2",
+    "delta_area_pct", "delta_area_total_km2", "delta_num_componentes",
+    "proporcao_rm_pct",
+)
+P2_CAMPOS_TEXTO = ("data", "metodo_continuidade")
+P2_CAMPOS_BOOLEANOS = ("eh_maior", "rm_eh_maior")
+
+
+def preparar_p2_exportacao(ee: Any, p2: Any) -> Any:
+    """Reconstrói apenas o ESQUEMA da tabela, preservando a geometria P2.
+
+    Cada feição da lista criada por iterate recebe os 23 atributos escalares
+    esperados, explicitamente tipados. Os booleanos derivam do rank, conforme
+    as definições do próprio rastreador. Não invoca a API interativa.
+    """
+    def normalizar(linha: Any) -> Any:
+        f = ee.Feature(linha)
+        propriedades = {
+            campo: ee.Number(f.get(campo)) for campo in P2_CAMPOS_NUMERICOS
+        }
+        propriedades.update({
+            campo: ee.String(f.get(campo)) for campo in P2_CAMPOS_TEXTO
+        })
+        propriedades["eh_maior"] = ee.Number(f.get("rank")).eq(1)
+        propriedades["rm_eh_maior"] = ee.Number(f.get("rank_global")).eq(1)
+        return ee.Feature(f.geometry(), propriedades)
+
+    return p2.map(normalizar).sort("data_millis")
+
 def informar_terminal(mensagem: str) -> None:
     """Mostra mensagens imediatamente no terminal."""
     print(mensagem, flush=True)
@@ -656,7 +693,8 @@ def adquirir(
             )
         try:
             assets_batch, checkpoint_batch = materializar(
-                ee_modulo, {"P1": p1_ee, "P2": p2_ee},
+                ee_modulo, {"P1": p1_ee,
+                            "P2": preparar_p2_exportacao(ee_modulo, p2_ee)},
                 projeto=projeto_usado, incendio=id_incendio, ano=ano_usado,
                 assinatura=assinatura_base + ":batch_v1",
                 pasta=raiz_brutos, informar=informar,
