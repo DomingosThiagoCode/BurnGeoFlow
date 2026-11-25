@@ -282,6 +282,38 @@ erro remoto. A aceitação do novo esquema pelo Google Earth Engine
 **continua dependendo desse teste autenticado**; testes de CI são
 offline e não simulam o servidor de esquemas de tabelas.
 
+#### Resultado do ensaio autenticado após a correção (25/11/2026)
+
+O operador executou, no Windows e com autenticação GEE válida:
+
+```powershell
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --modo-gee lote --somente-aquisicao
+```
+
+**Resultado observado: sucesso completo de aquisição e validação estrutural**
+para o incêndio 24340828. O sistema:
+- reutilizou a tarefa P1 anterior concluída;
+- detectou a falha anterior da P2 por `Unsupported table schema: Type<Feature>`;
+- criou apenas uma segunda tentativa P2 (`_p2_r01`), que atingiu `COMPLETED`;
+- obteve 978 feições P1 em 20 páginas e 57 feições P2 em duas páginas;
+- normalizou 102 `GeometryCollection` e descartou zero feições sem área;
+- validou e gravou os GeoJSONs locais;
+- removeu os dois assets batch temporários utilizados.
+
+Resumo estrutural informado: 947 perímetros-fonte, 57 datas de
+09/08/2020 a 09/10/2020, 978 componentes P1 e 57 regiões P2.
+Área final reportada pela verificação estrutural: 984,6145 km²
+(P1) e 954,5632 km² (P2). Esses valores não devem ser comparados
+diretamente com áreas métricas LAEA de outros relatórios sem
+reconciliação explícita dos métodos de cálculo e geometrias.
+
+**Escopo da evidência:** processamento batch e validação estrutural.
+A execução usou `--somente-aquisicao`: não testou automaticamente
+todas as análises posteriores, equivalência geométrica com versões
+históricas, uso pelo painel React ou validação independente por satélites.
+O ID maior 24194371, que falhou com timeout no modo interativo,
+continua pendente de teste batch autenticado.
+
 #### Retomada e limpeza segura
 
 O checkpoint de batch fica em
