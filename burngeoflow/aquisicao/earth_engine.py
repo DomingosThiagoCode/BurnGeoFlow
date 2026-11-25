@@ -620,8 +620,9 @@ def adquirir(
         bruto = {}
         for nome in ("P1", "P2"):
             # Pastas por asset/session evitam misturar paginação de tarefas distintas.
-            assinatura = (assinatura_base + ":" + metodo + ":" + nome + ":"
-                          + (str(assets_batch[nome]) if assets_batch else "direto"))
+            assinatura = (assinatura_base + ":" + nome if metodo == "interativo"
+                          else assinatura_base + ":batch:" + nome + ":"
+                          + str(assets_batch[nome]))
             pasta_atual = (pasta_metodo / str(assets_batch[nome]).rsplit("/", 1)[-1]
                            if assets_batch else raiz_brutos / f"paginas_{nome}")
             bruto[nome] = obter_geojson(
@@ -666,7 +667,6 @@ def adquirir(
             "P1": ee_modulo.FeatureCollection(assets_batch["P1"]),
             "P2": ee_modulo.FeatureCollection(assets_batch["P2"]),
         }, metodo="lote")
-    salvar_bruto(pasta, id_incendio, "P2", p2)
     informar("[GEE] P2 bruto salvo. Diagnosticando geometrias...")
     if len(p2["features"]) != n_datas:
         raise ErroAquisicao(
