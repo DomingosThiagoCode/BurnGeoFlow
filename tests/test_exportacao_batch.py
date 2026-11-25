@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import date, timedelta
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -165,6 +166,15 @@ class TesteIntegracaoModoAuto(unittest.TestCase):
         self, localizar, construir, baixar, materializar_mock, limpar,
     ):
         p1, p2 = dados_fake()
+        def repetir_com_datas(fc):
+            modelo = fc["features"][0]
+            return {"type": "FeatureCollection", "features": [
+                {**deepcopy(modelo), "properties": {
+                    **deepcopy(modelo["properties"]),
+                    "data": (date(2020, 1, 1) + timedelta(days=i)).isoformat(),
+                }} for i in range(57)
+            ]}
+        p1, p2 = repetir_com_datas(p1), repetir_com_datas(p2)
         localizar.return_value = ("evento", 2020, 947)
         construir.return_value = ("p1_expr", "p2_expr", 57)
         baixar.side_effect = [p1, p2]
