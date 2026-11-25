@@ -253,6 +253,35 @@ A interface de acompanhamento do BurnGeoFlow continua responsiva,
 porque o worker HTTP já inicia o pipeline em processo separado;
 o aplicativo **não** executa o cálculo do Earth Engine no navegador.
 
+#### Primeiro ensaio autenticado (25/11/2026)
+
+O ID `24340828` (947 registros, 57 datas) confirmou que a exportação
+**P1 batch terminou em COMPLETED**. Na primeira versão, a tarefa P2
+terminou com `Unsupported table schema: Type<Feature>`. Portanto, a
+falha não foi o timeout interativo original nem um erro do painel.
+
+A implementação seguinte reconstrói exclusivamente a representação
+**tabular exportável do P2**, com os 23 atributos esperados e tipos
+escalares explícitos. A geometria produzida pelo rastreamento não é
+simplificada nem modificada por esse procedimento. A tarefa P2 antiga,
+cujo status remoto é `FAILED`, permite **uma única nova tentativa**
+com asset distinto (`_p2_r01`); a tarefa P1 que concluiu é preservada.
+
+Depois de atualizar essa branch, usar exatamente o mesmo comando:
+
+```powershell
+git pull --ff-only origin fix/gee-timeout-batch-assets
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --modo-gee lote --somente-aquisicao
+```
+
+**Não apague `estado_batch_24340828.json` nem o asset P1.** A retomada
+consulta o status da tarefa anterior antes de tomar alguma decisão.
+Se o segundo envio P2 também falhar, o programa interrompe sem gerar
+uma sequência ilimitada de tarefas. É necessário inspecionar o novo
+erro remoto. A aceitação do novo esquema pelo Google Earth Engine
+**continua dependendo desse teste autenticado**; testes de CI são
+offline e não simulam o servidor de esquemas de tabelas.
+
 #### Retomada e limpeza segura
 
 O checkpoint de batch fica em
