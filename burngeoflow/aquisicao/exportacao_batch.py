@@ -29,13 +29,17 @@ def salvar_estado(path: Path, estado: dict) -> None:
     os.replace(temporario, path)
 
 
-def asset_id(projeto: str, incendio: int, ano: int, sessao: str, nome: str) -> str:
+def asset_id(projeto: str, incendio: int, ano: int, sessao: str, nome: str,
+             tentativa: int = 0) -> str:
     """Destino isolado e criado EXCLUSIVAMENTE pelo BurnGeoFlow."""
     if not re.fullmatch(r"[a-z][a-z0-9-]{4,61}[a-z0-9]", projeto):
         raise ErroLote("ID de projeto Google Cloud inválido para exportação em lote.")
     if nome not in ("p1", "p2") or not re.fullmatch(r"[a-f0-9]{12}", sessao):
         raise ErroLote("Nome de tarefa ou sessão GEE inválido.")
-    return f"projects/{projeto}/assets/bgf_{incendio}_{ano}_{sessao}_{nome}"
+    if not 0 <= tentativa <= 1:
+        raise ErroLote("Número de tentativas batch excedido (máximo 1 retry).")
+    sufixo = f"_r{tentativa:02d}" if tentativa else ""
+    return f"projects/{projeto}/assets/bgf_{incendio}_{ano}_{sessao}_{nome}{sufixo}"
 
 
 def _status_remoto(ee: Any, task_id: str) -> dict:
@@ -51,24 +55,63 @@ def iniciar_ou_retomar(
     informar: Callable[[str], None],
 ) -> dict:
     tarefas = estado["tarefas"]
+    tentativa = 0
+    historico = []
     if nome in tarefas:
         registro = tarefas[nome]
-        if registro.get("asset") != asset_id(
-            projeto, incendio, ano, estado["sessao"], nome.lower()
-        ):
+        tentativa = int(registro.get("tentativa", 0))
+        esperado = asset_id(
+            projeto, incendio, ano, estado["sessao"], nome.lower(), tentativa
+        )
+        if registro.get("asset") != esperado:
             raise ErroLote("Checkpoint de tarefa GEE contém asset inconsistente.")
         if not registro.get("task_id"):
             raise ErroLote(
                 "Checkpoint indica criação interrompida, sem ID de tarefa. "
                 "Verifique tarefas/ativos no Earth Engine antes de reiniciar."
             )
-        informar(f"[GEE/batch] Retomando {nome}: tarefa {registro['task_id']}")
-        return registro
+        resposta = _status_remoto(ee, registro["task_id"])
+        situacao = resposta.get("state", "UNKNOWN")
+        if situacao in ("FAILED", "CANCELLED"):
+            if tentativa >= 1:
+                raise ErroLote(
+                    f"{nome} já falhou em duas tentativas batch. "
+                    "Revise o log da tarefa e o checkpoint; não haverá "
+                    "reenvio automático ilimitado."
+                )
+            historico = list(registro.get("historico_tentativas", []))
+            historico.append({
+                "task_id": registro["task_id"],
+                "asset": registro["asset"],
+                "estado": situacao,
+                "erro": resposta.get("error_message", ""),
+            })
+            tentativa += 1
+            informar(
+                f"[GEE/batch] {nome}: tarefa anterior {situacao}; "
+                "criando uma única nova tentativa, sem reprocessar outros produtos."
+            )
+        else:
+            if situacao == "COMPLETED":
+                registro["estado"] = "COMPLETED"
+                salvar_estado(caminho, estado)
+            elif situacao not in ("READY", "RUNNING", "SUBMITTED", "CANCEL_REQUESTED"):
+                raise ErroLote(
+                    f"Estado remoto inesperado da tarefa {registro['task_id']}: "
+                    f"{situacao}"
+                )
+            informar(f"[GEE/batch] Retomando {nome}: tarefa {registro['task_id']}")
+            return registro
 
-    destino = asset_id(projeto, incendio, ano, estado["sessao"], nome.lower())
+    destino = asset_id(
+        projeto, incendio, ano, estado["sessao"], nome.lower(), tentativa
+    )
     # Se a execução for interrompida durante o start(), não criar outra
     # tarefa automaticamente para evitar duplicação silenciosa.
-    tarefas[nome] = {"asset": destino, "task_id": None, "estado": "criando"}
+    tarefas[nome] = {
+        "asset": destino, "task_id": None, "estado": "criando",
+        "tentativa": tentativa, "historico_tentativas": historico,
+    }
     salvar_estado(caminho, estado)
     try:
         task = ee.batch.Export.table.toAsset(
