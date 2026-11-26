@@ -17,6 +17,10 @@ type StatusPipeline = {
     versao:string;estado:string;datas_p1:number|null;
     datas_p2:number|null;primeira_data_p2:string|null;
     erro:string|null;
+    progresso?:{
+      estado?:string;etapa?:string;
+      datas_concluidas?:number;datas_total?:number;ultima_data?:string;
+    };
   };
   manifesto_existe:boolean;
   entradas_compativeis_manifesto_legado:boolean;
@@ -55,6 +59,10 @@ const STATUS:Record<string,string> = {
   origem_alterada:"Fonte mudou",
   origem_ausente:"Fonte desapareceu",
   versao_incompativel:"Versão incompatível",
+  codigo_v2_alterado:"Código v2 alterado",
+  proveniencia_incompleta:"Hashes ausentes",
+  artefato_modificado:"Arquivo alterado após processamento",
+  execucao_nao_finalizada:"Execução ativa ou interrompida",
 };
 
 function Estado({ estado }: { estado:string }) {
@@ -119,6 +127,15 @@ export function PipelineStatusPanel({ incendio }: { incendio:number|null }) {
           <span>P1 conectado + P2 retrospectivo</span>
           <Estado estado={dados.preprocessamento_v2.estado}/>
         </div>
+        {dados.preprocessamento_v2.progresso?.etapa&&
+          <p className="catalog-note">
+            Última fase registrada: {dados.preprocessamento_v2.progresso.etapa}.
+            {typeof dados.preprocessamento_v2.progresso.datas_concluidas==="number"&&
+             " "+dados.preprocessamento_v2.progresso.datas_concluidas+
+             " de "+dados.preprocessamento_v2.progresso.datas_total+
+             " datas tratadas."}
+            {" "}Esse registro não comprova que o processo continua ativo.
+          </p>}
         {dados.preprocessamento_v2.erro&&
           <p className="job-error">{dados.preprocessamento_v2.erro}</p>}
         <p className="catalog-note">
