@@ -74,6 +74,13 @@ class TestePipeline(unittest.TestCase):
             self.assertIn("resumo_incrementos_24340828.json", caminhos4)
             self.assertIn("resumo_etapa5_24340828.json", caminhos5)
             self.assertIn("auditoria_p1_sobreposicoes_24340828.json", caminhos5)
+            caminhos3 = {p.name for p in etapas["linhagens"].artefatos}
+            self.assertIn("vinculos_temporais_24340828.csv", caminhos3)
+            self.assertIn("resumo_linhagens_24340828.json", caminhos3)
+            self.assertIn("convergencias_para_qgis_24340828.geojson", caminhos3)
+            self.assertIn("cinco_trajetorias_24340828.geojson", caminhos4)
+            self.assertIn("geometrias_incrementos_24340828.geojson", caminhos4)
+            self.assertIn("fases_descritivas_24340828.csv", caminhos5)
 
     def test_reuso_depende_de_codigo_e_predecessor(self):
         with TemporaryDirectory() as d:
