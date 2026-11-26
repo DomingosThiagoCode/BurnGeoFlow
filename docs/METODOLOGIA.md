@@ -126,10 +126,22 @@ Deslocamentos de centroides e extremos representam mudanças de posição de ele
 
 **Pendências:** justificar a utilidade e selecionar os indicadores, testar padrões em eventos distintos, verificar robustez e avaliar eventual relação com variáveis externas em etapa futura. Revisar nomes, unidades, legendas e textos da interface para evitar interpretação física indevida.
 
+## D-010 — Avaliação exploratória da aplicabilidade dos indicadores TR/IGT
+
+**Estado:** decisão conceitual aprovada; avaliação científica pendente.
+
+Avaliar inicialmente o conjunto de indicadores originais TR/IGT documentados nas respectivas metodologias, sem seleção prévia baseada apenas em intuição. Verificar definições, hipóteses, unidades e compatibilidade com a geometria do P2; registrar indicadores inaplicáveis ou indefinidos em vez de inventar resultados. Aplicar a eventos com características distintas e investigar utilidade, redundância, sensibilidade e limitações.
+
+**Objetivo:** determinar se, como e em quais condições os indicadores fornecem informação cientificamente relevante sobre a evolução espaço-temporal da área queimada acumulada. A análise do P1 serve de contexto e referência para avaliar a contribuição adicional do P2.
+
+**Resultados admissíveis:** a metodologia pode revelar-se pouco útil ou inadequada para áreas queimadas; pode ser parcialmente aplicável; ou pode permitir consolidar um conjunto de indicadores, requisitos de dados, condições de validade e regras de interpretação capaz de sustentar afirmações verificáveis sobre a evolução geométrica observada. Não pressupor resultado positivo, nem confundir caracterização geométrica com inferência sobre dinâmica física do fogo (D-009).
+
+**Pendências:** estabelecer critérios verificáveis de utilidade, robustez e informação adicional; distinguir análise exploratória de validação em outros eventos; documentar resultados negativos e justificar qualquer seleção final de indicadores.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Tolerância numérica e desempate residual.
 - Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
-- Utilidade científica, seleção e interpretação específica dos indicadores TR/IGT.
+- Critérios verificáveis de utilidade científica, robustez e validação dos indicadores TR/IGT.
 - Segmentação temporal/BIC, validação e generalização.
