@@ -129,9 +129,24 @@ class VinculosTests(unittest.TestCase):
     def test_sobreposicao_de_patches_na_mesma_data_e_rejeitada(self):
         ant = [sintetico("2020-01-01", 1, box(0, 0, 10, 10))]
         nov = [sintetico("2020-01-02", 1, box(0, 0, 10, 10)),
-               sintetico("2020-01-02", 2, box(0, 0, 10, 10))]
-        with self.assertRaisesRegex(ValueError, "soma das intersecoes"):
-            vincular_por_area(ant, nov)
+               sintetico("2020-01-02", 2, box(7, 0, 14, 10))]
+        for primeiro, segundo, lado in ((ant, nov, "anterior"),
+                                        (nov, ant, "atual")):
+            with self.subTest(lado=lado):
+                with self.assertRaisesRegex(
+                    ValueError, f"Patch {lado} .*soma das intersecoes"
+                ) as contexto:
+                    vincular_por_area(primeiro, segundo)
+                detalhes = json.loads(str(contexto.exception).split("; ", 1)[1])
+                self.assertEqual(detalhes["id_incendio"], 123)
+                self.assertEqual(detalhes["data_oposta"], "2020-01-02")
+                self.assertEqual(detalhes["area_patch_m2"], 100)
+                self.assertEqual(detalhes["soma_intersecoes_m2"], 130)
+                self.assertEqual(detalhes["uniao_intersecoes_m2"], 100)
+                self.assertEqual(detalhes["diferenca_soma_uniao_m2"], 30)
+                self.assertEqual(detalhes["excesso_relativo_sobre_patch"], .3)
+                self.assertEqual(detalhes["intersecoes_por_rank_m2"],
+                                 {"1": 100, "2": 30})
 
     def test_data_unica_e_linha_de_base(self):
         patches = [sintetico("2020-01-01", 1, box(0, 0, 10, 10))]

@@ -120,14 +120,39 @@ def vincular_por_area(
     for ra, rn, area in arestas:
         por_ant[ra] += area
         por_nov[rn] += area
-    for grupo, somas, lado in ((anteriores, por_ant, "anterior"),
-                              (atuais, por_nov, "atual")):
+    for grupo, opostos, vizinhos, somas, lado in (
+        (anteriores, atuais, filhos, por_ant, "anterior"),
+        (atuais, anteriores, pais, por_nov, "atual"),
+    ):
         for p in grupo:
-            if somas[p.rank] > p.area_m2 + max(1.0, p.area_m2 * 1e-8):
+            soma = somas[p.rank]
+            tolerancia = max(1.0, p.area_m2 * 1e-8)
+            if soma > p.area_m2 + tolerancia:
+                ranks = set(vizinhos[p.rank])
+                intersecoes = {
+                    q.rank: p.geometria.intersection(q.geometria)
+                    for q in opostos if q.rank in ranks
+                }
+                uniao = shapely.union_all(list(intersecoes.values())).area
+                diagnostico = {
+                    "id_incendio": p.incendio,
+                    "data_oposta": opostos[0].data,
+                    "area_patch_m2": p.area_m2,
+                    "soma_intersecoes_m2": soma,
+                    "uniao_intersecoes_m2": uniao,
+                    "diferenca_soma_uniao_m2": soma - uniao,
+                    "excesso_sobre_patch_m2": soma - p.area_m2,
+                    "excesso_relativo_sobre_patch": (soma - p.area_m2) / p.area_m2,
+                    "tolerancia_verificacao_m2": tolerancia,
+                    "limiar_vinculo_m2": area_minima_m2,
+                    "intersecoes_por_rank_m2": {
+                        rank: intersecoes[rank].area for rank in sorted(intersecoes)
+                    },
+                }
                 raise ValueError(
                     f"Patch {lado} {p.data} rank {p.rank}: soma das "
-                    "intersecoes maior que a propria area; revisar "
-                    "sobreposicoes em P1"
+                    "intersecoes maior que a propria area; "
+                    + json.dumps(diagnostico, ensure_ascii=False)
                 )
     return arestas, pais, filhos, contatos
 
