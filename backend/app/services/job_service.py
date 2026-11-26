@@ -63,8 +63,13 @@ class JobService:
                 etapa = any(a.startswith("burngeoflow.") for a in args) and any(
                     a == destino or a.startswith(destino + os.sep) for a in normal)
                 if cli or etapa:
-                    encontrados.append(p)
-            except psutil.NoSuchProcess:
+                    try:
+                        dono = p.environ().get("BURNGEOFLOW_JOB_ID")
+                    except (psutil.AccessDenied, psutil.NoSuchProcess):
+                        dono = None
+                    if dono is None or dono == job["id"]:
+                        encontrados.append(p)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
         return encontrados
 
@@ -75,7 +80,8 @@ class JobService:
                 try:
                     proc = psutil.Process(job["pid"])
                     args = proc.cmdline()
-                    if job["id"] in args and "backend.app.jobs.worker" in args:
+                    if (job["id"] in args and "backend.app.jobs.worker" in args
+                        and str(self.store.db) in args):
                         return job
                 except psutil.AccessDenied:
                     return job
