@@ -23,6 +23,9 @@ from time import monotonic
 from typing import Any, Callable
 
 from burngeoflow.config import ConfiguracaoGEE, carregar_configuracao_gee
+from burngeoflow.aquisicao.exportacao_batch import (
+    ErroLote, materializar, limpar_apos_validacao,
+)
 from burngeoflow.validacao.produtos import verificar
 from burngeoflow.aquisicao.geometrias import (
     ErroGeometria, diagnosticar, normalizar_produtos,
@@ -287,6 +290,43 @@ def construir_produtos(
     ).sort("data_millis")
     return p1, p2, qtd_datas
 
+
+
+# Esquema explicitamente escalar: Export.table.toAsset não aceita colunas
+# com objetos Feature, nem sempre infere o esquema de listas produzidas por
+# ee.List.iterate. O P2 científico original permanece intocado.
+P2_CAMPOS_NUMERICOS = (
+    "id_incendio", "ano_dataset", "data_millis", "area_km2", "rank",
+    "numero_componentes", "area_total_km2", "proporcao_area_pct",
+    "ordem_temporal", "rank_global", "overlap_prev_km2", "overlap_prev_pct",
+    "overlap_candidato_pct", "distancia_prev_m", "delta_area_km2",
+    "delta_area_pct", "delta_area_total_km2", "delta_num_componentes",
+    "proporcao_rm_pct",
+)
+P2_CAMPOS_TEXTO = ("data", "metodo_continuidade")
+P2_CAMPOS_BOOLEANOS = ("eh_maior", "rm_eh_maior")
+
+
+def preparar_p2_exportacao(ee: Any, p2: Any) -> Any:
+    """Reconstrói apenas o ESQUEMA da tabela, preservando a geometria P2.
+
+    Cada feição da lista criada por iterate recebe os 23 atributos escalares
+    esperados, explicitamente tipados. Os booleanos derivam do rank, conforme
+    as definições do próprio rastreador. Não invoca a API interativa.
+    """
+    def normalizar(linha: Any) -> Any:
+        f = ee.Feature(linha)
+        propriedades = {
+            campo: ee.Number(f.get(campo)) for campo in P2_CAMPOS_NUMERICOS
+        }
+        propriedades.update({
+            campo: ee.String(f.get(campo)) for campo in P2_CAMPOS_TEXTO
+        })
+        propriedades["eh_maior"] = ee.Number(f.get("rank")).eq(1)
+        propriedades["rm_eh_maior"] = ee.Number(f.get("rank_global")).eq(1)
+        return ee.Feature(f.geometry(), propriedades)
+
+    return p2.map(normalizar).sort("data_millis")
 
 def informar_terminal(mensagem: str) -> None:
     """Mostra mensagens imediatamente no terminal."""
@@ -573,10 +613,17 @@ def adquirir(
     projeto: str | None = None,
     autenticar: bool = False,
     pagina: int = 50,
+    modo_gee: str = "auto",
     ee_modulo: Any | None = None,
     informar: Callable[[str], None] = informar_terminal,
 ) -> tuple[Path, Path, dict]:
-    """Executa consulta, geração e exportação P1/P2; ee_modulo permite mock."""
+    """Exporta P1/P2: modo automático usa batch em eventos extensos.
+
+    Batch materializa a expressão em asset EE e só depois lê as páginas.
+    A integridade geométrica continua condicionada ao validador existente.
+    """
+    if modo_gee not in ("auto", "interativo", "lote"):
+        raise ErroAquisicao("modo_gee deve ser auto, interativo ou lote.")
     if ee_modulo is None:
         config = carregar_configuracao_gee(projeto=projeto)
         ee_modulo = inicializar(config, solicitar_login=autenticar)
@@ -597,19 +644,67 @@ def adquirir(
         f"{ASSET}/{ano_usado}:id={id_incendio}:alg=acumulado_v1:"
         f"max_erro={ERRO_GEOMETRICO_M}:pagina={pagina}"
     )
-    p1 = obter_geojson(
-        ee_modulo, p1_ee, pagina=pagina, rotulo="P1 (componentes)",
-        informar=informar, pasta_paginas=raiz_brutos / "paginas_P1",
-        chave_cache=assinatura_base + ":P1",
-    )
-    salvar_bruto(pasta, id_incendio, "P1", p1)
-    informar("[GEE] P1 bruto salvo em disco. Iniciando P2 (região móvel).")
-    p2 = obter_geojson(
-        ee_modulo, p2_ee, pagina=pagina, rotulo="P2 (região móvel)",
-        informar=informar, pasta_paginas=raiz_brutos / "paginas_P2",
-        chave_cache=assinatura_base + ":P2",
-    )
-    salvar_bruto(pasta, id_incendio, "P2", p2)
+    # Em auto, o corte de 20 observações é apenas uma heurística de custo:
+    # não representa um limite oficial do GEE nem validação científica.
+    estrategia = ("lote" if n_datas >= 20 else "interativo") if modo_gee == "auto" else modo_gee
+    informar(f"[GEE] Estratégia de exportação: {estrategia} ({n_datas} datas)")
+    assets_batch = None
+    checkpoint_batch = None
+
+    def baixar_duas(colecoes: dict[str, Any], *, metodo: str) -> tuple[dict, dict]:
+        pasta_metodo = raiz_brutos / ("paginas_interativas" if metodo == "interativo"
+                                      else "paginas_batch")
+        bruto = {}
+        for nome in ("P1", "P2"):
+            # Pastas por asset/session evitam misturar paginação de tarefas distintas.
+            assinatura = (assinatura_base + ":" + nome if metodo == "interativo"
+                          else assinatura_base + ":batch:" + nome + ":"
+                          + str(assets_batch[nome]))
+            pasta_atual = (pasta_metodo / str(assets_batch[nome]).rsplit("/", 1)[-1]
+                           if assets_batch else raiz_brutos / f"paginas_{nome}")
+            bruto[nome] = obter_geojson(
+                ee_modulo, colecoes[nome], pagina=pagina,
+                rotulo=f"{nome} ({'asset batch' if metodo == 'lote' else 'componentes'})",
+                informar=informar, pasta_paginas=pasta_atual,
+                chave_cache=assinatura,
+            )
+            salvar_bruto(pasta, id_incendio, nome, bruto[nome])
+            if nome == "P1":
+                informar("[GEE] P1 bruto salvo; iniciando leitura de P2.")
+        return bruto["P1"], bruto["P2"]
+
+    if estrategia == "interativo":
+        try:
+            p1, p2 = baixar_duas({"P1": p1_ee, "P2": p2_ee}, metodo="interativo")
+        except ErroAquisicao as exc:
+            msg = str(exc).lower()
+            if modo_gee != "auto" or not any(
+                x in msg for x in ("timed out", "timeout", "deadline exceeded",
+                                   "computation timed out")
+            ):
+                raise
+            informar("[GEE] Timeout interativo detectado; alternando para batch.")
+            estrategia = "lote"
+
+    if estrategia == "lote":
+        if projeto_usado == "teste-sem-rede":
+            raise ErroAquisicao(
+                "Exportação batch exige projeto Google Cloud real e permissão em assets."
+            )
+        try:
+            assets_batch, checkpoint_batch = materializar(
+                ee_modulo, {"P1": p1_ee,
+                            "P2": preparar_p2_exportacao(ee_modulo, p2_ee)},
+                projeto=projeto_usado, incendio=id_incendio, ano=ano_usado,
+                assinatura=assinatura_base + ":batch_v1",
+                pasta=raiz_brutos, informar=informar,
+            )
+        except ErroLote as exc:
+            raise ErroAquisicao(f"Falha no processamento GEE em lote: {exc}") from exc
+        p1, p2 = baixar_duas({
+            "P1": ee_modulo.FeatureCollection(assets_batch["P1"]),
+            "P2": ee_modulo.FeatureCollection(assets_batch["P2"]),
+        }, metodo="lote")
     informar("[GEE] P2 bruto salvo. Diagnosticando geometrias...")
     if len(p2["features"]) != n_datas:
         raise ErroAquisicao(
@@ -628,6 +723,8 @@ def adquirir(
         "componentes_p1": len(p1["features"]),
         "regioes_p2": len(p2["features"]),
         "pagina": pagina,
+        "estrategia_gee": estrategia,
+        "assets_batch_temporarios": list(assets_batch.values()) if assets_batch else [],
         "max_erro_m": ERRO_GEOMETRICO_M,
         "projeto_google_cloud": projeto_usado,
         "momento_utc": datetime.now(timezone.utc).isoformat(),
@@ -644,4 +741,10 @@ def adquirir(
         json.dumps(metadados, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    # Limpeza não é pré-requisito para o resultado local ser válido.
+    # Somente assets explicitamente criados por esta execução são removidos.
+    if assets_batch is not None and checkpoint_batch is not None:
+        limpar_apos_validacao(
+            ee_modulo, assets_batch, checkpoint_batch, informar=informar
+        )
     return caminho_p1, caminho_p2, metadados

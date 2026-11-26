@@ -281,6 +281,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="Solicita login OAuth antes da consulta ao GEE")
     ap.add_argument("--pagina-gee", type=int, default=50,
                     help="Número de feições por página na exportação GEE")
+    ap.add_argument("--modo-gee", choices=("auto", "interativo", "lote"), default="auto",
+                    help="auto: lote para >=20 datas ou fallback por timeout; "
+                         "lote: tarefas batch em assets do projeto")
     ap.add_argument("--somente-aquisicao", action="store_true",
                     help="Obtém e valida P1/P2 do GEE sem executar as análises")
     ap.add_argument("--p1", type=Path, help="GeoJSON P1 para modo local")
@@ -345,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
                 projeto=args.projeto,
                 autenticar=args.autenticar,
                 pagina=args.pagina_gee,
+                modo_gee=args.modo_gee,
             )
         if args.somente_aquisicao:
             print(json.dumps(metadata, indent=2, ensure_ascii=False))

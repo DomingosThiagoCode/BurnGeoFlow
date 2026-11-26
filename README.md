@@ -64,7 +64,18 @@ earthengine authenticate
 Na interface, abra **Processar e acompanhar eventos**, informe o ID,
 escolha origem `Automática` ou `Earth Engine`, e, se souber,
 informe o ano para acelerar a consulta. O serviço acompanha estado e logs.
-O GEE não fornece percentual real confiável durante algumas operações.
+Para incêndios extensos, a aquisição passa a utilizar tarefas GEE **batch**
+com assets temporários e checkpoint para retomada, evitando depender do
+limite interativo de aproximadamente cinco minutos. Os assets são excluídos
+somente após validação e gravação locais. É preciso ter permissão de escrita
+nos assets de `EE_PROJECT_ID`. O GEE não oferece percentual de progresso
+confiável para todas as operações.
+
+Para escolher explicitamente o modo no terminal:
+
+```powershell
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --modo-gee lote
+```
 
 A CLI continua disponível e é recomendada para depuração:
 

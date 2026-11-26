@@ -205,24 +205,141 @@ O teste offline do caso de referência continua disponível:
 python executar_pipeline.py --id 24340828 --baixar-exemplo
 ```
 
-As credenciais OAuth ficam no computador, nunca no repositório; `.env` está no
-`.gitignore`. A exportação usa `ee.data.computeFeatures`, com paginação, sem
-depender do Drive. Em eventos grandes a API pode exceder a capacidade ou
-cotas e encerrar a aquisição com erro sem publicar entradas incompletas.
-**A exportação em lotes por tarefas do GEE ainda não está implementada.**
-### Acompanhamento enquanto o GEE calcula
+As credenciais OAuth ficam no computador, nunca no repositório; `.env`
+está no `.gitignore`.
 
-A avaliação de geometrias pelo Earth Engine é síncrona e não informa
-percentual de conclusão nem tempo restante confiável. Por isso, a cada
-página solicitada o programa imprime imediatamente **extraindo dados, aguarde...**
-e, a cada **30 segundos**, informa o tempo decorrido enquanto aguarda.
-Quando uma página retorna, mostra quantas feições já foram recebidas e
-indica o início de P2 quando P1 termina.
+### Limite de tempo e execução batch
 
-Os avisos significam apenas que o **Python ainda está esperando o servidor**;
-não comprovam que o processamento remoto está avançando. Se o GEE retornar
-uma falha, ela será informada. O programa não cria GeoJSONs incompletos.
-Uma execução iniciada antes dessa atualização não passa a emitir os avisos.
+O processamento **interativo** do Earth Engine deve terminar em até aproximadamente
+**5 minutos** por solicitação. O tamanho de página de `computeFeatures` não
+reduz necessariamente o trabalho geométrico do servidor, pois o mesmo grafo
+de uniões temporais pode ser reavaliado em várias páginas.
+
+O BurnGeoFlow oferece três estratégias:
+
+- `--modo-gee auto` (**padrão**): para 20 ou mais observações, usa
+  tarefas batch; abaixo disso tenta o modo interativo e, em caso de
+  timeout reconhecido, migra para batch. **20 é um limiar operacional,
+  não uma cota do Earth Engine nem um critério científico**.
+- `--modo-gee lote`: materializa P1 e P2 com
+  `ee.batch.Export.table.toAsset` e aguarda o processamento remoto.
+  Cada tarefa é monitorada pelo ID e pode ser retomada por checkpoint.
+- `--modo-gee interativo`: mantém o caminho antigo com
+  `ee.data.computeFeatures` e cache de páginas, apropriado para casos menores.
+
+O modo batch tem limite de tempo muito maior (máximo de dez dias por
+tarefa, sujeito à fila e às cotas do projeto), mas **não garante que
+qualquer geometria vá funcionar**: há limites de memória, tamanho de
+geometria e quantidade de tarefas. A exportação para asset exige
+**permissão de escrita nos assets do projeto Google Cloud** configurado
+em `EE_PROJECT_ID`. Os assets temporários usam identificadores
+`bgf_<id>_<ano>_<sessao>_p1/p2` no projeto autenticado.
+
+#### Executar diretamente no painel
+
+Em **Processar e acompanhar eventos**, informe ID, origem
+`Automática` ou `Earth Engine` e, quando souber, ano. O modo
+`auto` é aplicado automaticamente pelo worker: eventos longos
+não dependem apenas das consultas interativas. O usuário não precisa
+abrir o Code Editor nem copiar manualmente P1/P2.
+
+Para **forçar batch** em caso de falha no painel, usar CLI:
+
+```powershell
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --modo-gee lote
+```
+
+A interface de acompanhamento do BurnGeoFlow continua responsiva,
+porque o worker HTTP já inicia o pipeline em processo separado;
+o aplicativo **não** executa o cálculo do Earth Engine no navegador.
+
+#### Primeiro ensaio autenticado (25/11/2026)
+
+O ID `24340828` (947 registros, 57 datas) confirmou que a exportação
+**P1 batch terminou em COMPLETED**. Na primeira versão, a tarefa P2
+terminou com `Unsupported table schema: Type<Feature>`. Portanto, a
+falha não foi o timeout interativo original nem um erro do painel.
+
+A implementação seguinte reconstrói exclusivamente a representação
+**tabular exportável do P2**, com os 23 atributos esperados e tipos
+escalares explícitos. A geometria produzida pelo rastreamento não é
+simplificada nem modificada por esse procedimento. A tarefa P2 antiga,
+cujo status remoto é `FAILED`, permite **uma única nova tentativa**
+com asset distinto (`_p2_r01`); a tarefa P1 que concluiu é preservada.
+
+Depois de atualizar essa branch, usar exatamente o mesmo comando:
+
+```powershell
+git pull --ff-only origin fix/gee-timeout-batch-assets
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --modo-gee lote --somente-aquisicao
+```
+
+**Não apague `estado_batch_24340828.json` nem o asset P1.** A retomada
+consulta o status da tarefa anterior antes de tomar alguma decisão.
+Se o segundo envio P2 também falhar, o programa interrompe sem gerar
+uma sequência ilimitada de tarefas. É necessário inspecionar o novo
+erro remoto. A aceitação do novo esquema pelo Google Earth Engine
+**continua dependendo desse teste autenticado**; testes de CI são
+offline e não simulam o servidor de esquemas de tabelas.
+
+#### Resultado do ensaio autenticado após a correção (25/11/2026)
+
+O operador executou, no Windows e com autenticação GEE válida:
+
+```powershell
+python executar_pipeline.py --id 24340828 --ano 2020 --origem gee --modo-gee lote --somente-aquisicao
+```
+
+**Resultado observado: sucesso completo de aquisição e validação estrutural**
+para o incêndio 24340828. O sistema:
+- reutilizou a tarefa P1 anterior concluída;
+- detectou a falha anterior da P2 por `Unsupported table schema: Type<Feature>`;
+- criou apenas uma segunda tentativa P2 (`_p2_r01`), que atingiu `COMPLETED`;
+- obteve 978 feições P1 em 20 páginas e 57 feições P2 em duas páginas;
+- normalizou 102 `GeometryCollection` e descartou zero feições sem área;
+- validou e gravou os GeoJSONs locais;
+- removeu os dois assets batch temporários utilizados.
+
+Resumo estrutural informado: 947 perímetros-fonte, 57 datas de
+09/08/2020 a 09/10/2020, 978 componentes P1 e 57 regiões P2.
+Área final reportada pela verificação estrutural: 984,6145 km²
+(P1) e 954,5632 km² (P2). Esses valores não devem ser comparados
+diretamente com áreas métricas LAEA de outros relatórios sem
+reconciliação explícita dos métodos de cálculo e geometrias.
+
+**Escopo da evidência:** processamento batch e validação estrutural.
+A execução usou `--somente-aquisicao`: não testou automaticamente
+todas as análises posteriores, equivalência geométrica com versões
+históricas, uso pelo painel React ou validação independente por satélites.
+O ID maior 24194371, que falhou com timeout no modo interativo,
+continua pendente de teste batch autenticado.
+
+#### Retomada e limpeza segura
+
+O checkpoint de batch fica em
+`execucoes/<ID>/dados/estudo_caso_<ID>/brutos_gee/estado_batch_<ID>.json`.
+Se o Python fechar após iniciar a tarefa, uma nova execução com a mesma
+assinatura pode acompanhar o **mesmo task ID**, sem iniciar novamente a
+exportação. Em caso de timeout local, a tarefa no servidor não é
+cancelada automaticamente. A consulta dos resultados ocorre somente
+quando a tarefa estiver `COMPLETED`.
+
+Após baixar, conferir e gravar ambos os GeoJSONs locais, o aplicativo
+solicita a remoção **somente** dos assets temporários que foram criados
+pelo BurnGeoFlow. Se a limpeza falhar, registra o identificador para
+revisão. Uma falha de exportação ou validação preserva os materiais
+já obtidos; a retomada deve usar a mesma configuração do lote.
+
+Avisos de espera no terminal ou na interface indicam apenas
+**tempo decorrido**, não porcentagem de progresso do Earth Engine.
+Não confundir êxito computacional com validação científica independente.
+
+Documentação Google:
+[Ambientes interativo e batch](https://developers.google.com/earth-engine/guides/processing_environments),
+[Práticas recomendadas e Export](https://developers.google.com/earth-engine/guides/best_practices),
+[Export.table.toAsset](https://developers.google.com/earth-engine/guides/exporting_tables) e
+[GlobFire v2](https://developers.google.com/earth-engine/datasets/catalog/JRC_GWIS_GlobFire_v2_DailyPerimeters).
+
 ### Preservação dos dados e tratamento geométrico
 
 Cada página P1/P2 recebida fica em
