@@ -155,3 +155,19 @@ Números acima são **histórico documentado**, não garantia de que arquivos ai
 | Partição D-005 | 56 transições, erro máximo de 1,49012 × 10⁻⁷ m² e área máxima de P2 anterior fora de P1 igual a 0 m² |
 | SHA-256 P1 v2 | `386aee3aac89c43873ff26faa851d8d80fb961fff1b9056d62f8e89ce672d0da` |
 | SHA-256 P2 v2 | `21f7e61547c1b661eb27fd23e559e28e98cd8fc1080633930d6a09cde8b57b79` |
+
+## Triagem dos anexos de aquisição
+
+Os manifestos históricos declaram GlobFire v2 DailyPerimeters 2020, exportação em lote e P2 progressivo. Os anexos não incluem hashes de aquisição registrados na origem. Os hashes abaixo identificam os arquivos recebidos nesta sessão.
+
+| Evento | Arquivo | SHA-256 recebido |
+| --- | --- | --- |
+| 24340828 | `aquisicao_24340828.json` | `dd349db0b12abf70122b080609ff7e7c29604b7b890fa743bc9ffb32d1e3a603` |
+| 24340828 | `P1_componentes_24340828.geojson` | `9e0808c6b9be8ab0fb62c09c84304f898481ac704104a2003be2f35dc707c157` |
+| 24340828 | `P2_regiao_movel_24340828.geojson` | `d3def85764d5597dd02775beb9e013c956e156ba4de6c1d43ac98adbe4d2b5ae` |
+| 24194371 | `aquisicao_24194371.json` | `cad4f3c842b95a90e4e1824081f50b0250ed92fe0a34fe107246556757509f30` |
+| 24194371 | `P2_regiao_movel_24194371.geojson` | `d12c6773220a29e52c7e8367cbb27362c5dd63bef918dde2ab8e0ff3ab431f8e` |
+
+Em 24340828, P1 e P2 passam na validação estrutural e reproduzem os totais do manifesto (978/57 feições em 57 datas). As propriedades coincidem com a cópia do checkout por data/rank. As coordenadas e os hashes diferem. Em Shapely, todas as geometrias anexadas são válidas, enquanto a cópia do checkout apresenta autointerseções em 172 feições P1 e 55 feições P2. Entre os pares válidos de P1, a maior distância de Hausdorff foi 755,74 m e a maior área de diferença simétrica foi 8,15 m². A equivalência geométrica está pendente.
+
+O P2 de 24194371 tem 128 polígonos válidos em 128 datas (14/07 a 19/11/2020). As áreas finais arredondadas do P1 total e do P2, conforme os atributos do P2, conferem com o manifesto (17.908,2595 e 26,4019 km²). A transferência do P1 publicado excedeu o limite de 32 MiB do executor. O diagnóstico do rank 97 e a validação conjunta aguardam uma cópia integral no workspace ou um anexo compactado que respeite esse limite. Para reconstituir a proveniência, também faltam os dois GeoJSONs originais e o relatório geométrico histórico de `brutos_gee/`.
