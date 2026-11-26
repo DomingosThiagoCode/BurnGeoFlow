@@ -843,3 +843,45 @@ tbody tr:hover { background:#efede5; }
 @media (prefers-reduced-motion:reduce){
   .sidebar.atlas-rail,.atlas-rail-links span {transition:none;}
 }
+
+/* #42: rosáceas pesquisáveis, acessíveis por teclado e touch */
+.rose-card {min-width:0;}
+.rose-card-expanded {grid-column:1/-1;}
+.rose-card-expanded .rose-svg {width:min(100%,390px);max-height:410px;}
+.rose-heading {display:flex;justify-content:space-between;align-items:start;gap:12px;}
+.rose-heading .secondary-button {font-size:10px;white-space:nowrap;}
+.rose-svg {display:block;margin:12px auto;}
+.rose-svg .rose-sector {cursor:pointer;outline:none;transition:fill-opacity 100ms ease;}
+.rose-svg .rose-sector:focus-visible,
+.rose-svg .rose-sector-highlight {stroke:#bb5136;stroke-width:2.4;}
+.rose-svg text.rose-tick {font:600 7px var(--type-ui,sans-serif);fill:#65796d;pointer-events:none;}
+.rose-tooltip {margin-top:11px;padding:12px 14px;border-left:3px solid #ad583c;background:#f3efe5;}
+.rose-tooltip strong {font-size:12px;color:#274d3b;}
+.rose-tooltip p {margin:5px 0 0;color:#586d5d;}
+.rose-tooltip small {display:block;margin-top:7px;color:#64786b;}
+.rose-contributions {margin-top:12px;border-top:1px solid var(--hairline,#d6d0c2);padding-top:12px;}
+.rose-contrib-head {display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.rose-contrib-head strong{font-size:12px;color:#315745;}
+.rose-contributions ul{margin:9px 0;padding:0;list-style:none;max-height:208px;overflow-y:auto;}
+.rose-contributions li{border-bottom:1px solid #e7e3d8;}
+.rose-contributions li button{
+  text-align:left;width:100%;border:0;background:transparent;padding:8px 5px;
+  cursor:pointer;color:#385a48;font:600 11px var(--type-ui,sans-serif);
+}
+.rose-contributions li button:hover,.rose-contributions li button:focus-visible{background:#e1e8db;outline:2px solid #af7156;}
+.rose-period-control{
+  display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;
+  padding:17px;margin:17px 0 20px;background:#ece9de;border:1px solid #d2cbbd;
+}
+.rose-period-control label{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:750;color:#375747;}
+.rose-period-control select{
+  min-width:145px;max-width:100%;padding:8px 10px;background:#fffdf8;
+  border:1px solid #b8c8bb;border-radius:2px;color:#264c38;font-size:12px;
+}
+.rose-period-control [role="status"]{font-size:11px;color:#657568;flex:1 1 130px;}
+@media (max-width:600px) {
+  .rose-period-control {padding:10px;gap:10px;}
+  .rose-period-control select{min-width:120px;}
+  .rose-heading {flex-wrap:wrap;}
+}
+@media (prefers-reduced-motion:reduce){.rose-svg .rose-sector{transition:none;}}
