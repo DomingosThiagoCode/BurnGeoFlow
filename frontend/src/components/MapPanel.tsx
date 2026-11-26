@@ -15,6 +15,7 @@ type Props = {
   mostrarP1: boolean;
   mostrarP2: boolean;
   mapaBase: boolean;
+  destaque?: {coordenadas:[[number,number],[number,number]];rotulo:string}|null;
 };
 
 const VAZIO: Colecao = { type: "FeatureCollection", features: [] };
@@ -50,13 +51,13 @@ function atualizarFonte(mapa: MapaGL, nome: string, dados: Colecao | null): void
 }
 
 export function MapPanel({
-  id, data, p1, p2, mostrarP1, mostrarP2, mapaBase,
+  id, data, p1, p2, mostrarP1, mostrarP2, mapaBase, destaque,
 }: Props) {
   const alvo = useRef<HTMLDivElement>(null);
   const mapa = useRef<MapaGL | null>(null);
-  const dadosMaisRecentes = useRef({ p1, p2 });
+  const dadosMaisRecentes = useRef({ p1, p2, destaque });
   const eventoAjustado = useRef<number | null>(null);
-  dadosMaisRecentes.current = { p1, p2 };
+  dadosMaisRecentes.current = { p1, p2, destaque };
 
   useEffect(() => {
     if (!alvo.current) return;
@@ -117,6 +118,23 @@ export function MapPanel({
         id: "p2-line", type: "line", source: "p2",
         paint: { "line-color": "#2a5f5b", "line-width": 2.7 },
       });
+      instancia.addSource("destaque-tr", {
+        type: "geojson", data: {
+          type:"FeatureCollection",features:[],
+        },
+      });
+      instancia.addLayer({
+        id:"destaque-tr-line",type:"line",source:"destaque-tr",
+        paint:{"line-color":"#e2be6b","line-width":5,"line-opacity":0.96},
+      });
+      instancia.addSource("destaque-tr-pontos", {
+        type:"geojson",data:{type:"FeatureCollection",features:[]},
+      });
+      instancia.addLayer({
+        id:"destaque-tr-circles",type:"circle",source:"destaque-tr-pontos",
+        paint:{"circle-color":"#e2be6b","circle-radius":7,
+          "circle-stroke-width":2,"circle-stroke-color":"#224c3b"},
+      });
       atualizarFonte(instancia, "p1", dadosMaisRecentes.current.p1);
       atualizarFonte(instancia, "p2", dadosMaisRecentes.current.p2);
     });
@@ -146,6 +164,19 @@ export function MapPanel({
     const atualizar = () => {
       atualizarFonte(instancia, "p1", p1);
       atualizarFonte(instancia, "p2", p2);
+      const trecho=destaque?.coordenadas;
+      const linha = trecho?{type:"FeatureCollection",features:[{
+        type:"Feature",properties:{rotulo:destaque.rotulo},
+        geometry:{type:"LineString",coordinates:trecho},
+      }]}:{type:"FeatureCollection",features:[]};
+      const pontos = trecho?{type:"FeatureCollection",features:trecho.map((coord,i)=>({
+        type:"Feature",properties:{extremo:i===0?"anterior":"atual"},
+        geometry:{type:"Point",coordinates:coord},
+      }))}:{type:"FeatureCollection",features:[]};
+      (instancia.getSource("destaque-tr") as GeoJSONSource|undefined)
+        ?.setData(linha as Parameters<GeoJSONSource["setData"]>[0]);
+      (instancia.getSource("destaque-tr-pontos") as GeoJSONSource|undefined)
+        ?.setData(pontos as Parameters<GeoJSONSource["setData"]>[0]);
       const visibilidade = (flag: boolean) => flag ? "visible" : "none";
       for (const nome of ["p1-fill", "p1-line"]) {
         if (instancia.getLayer(nome)) {
@@ -165,7 +196,7 @@ export function MapPanel({
     };
     if (instancia.isStyleLoaded()) atualizar();
     else instancia.once("load", atualizar);
-  }, [p1, p2, mostrarP1, mostrarP2, mapaBase]);
+  }, [p1, p2, mostrarP1, mostrarP2, mapaBase, destaque]);
 
   useEffect(() => {
     if (eventoAjustado.current === id) return;
@@ -185,6 +216,7 @@ export function MapPanel({
       <div className="map-legend" aria-hidden="true">
         <span><i className="swatch swatch-p1" /> Componentes P1</span>
         <span><i className="swatch swatch-p2" /> Região móvel P2</span>
+        {destaque&&<span><i style={{background:"#e2be6b"}}/> TR · {destaque.rotulo}</span>}
       </div>
     </section>
   );
