@@ -57,7 +57,7 @@ const CENAS: Cena[] = [
   {
     label: "05 / P2",
     title: "Uma região acompanhada ao longo do tempo.",
-    text: "P2 segue um componente selecionado inicialmente por sua área e depois rastreado por continuidade geométrica. Não precisa ser o maior componente em todas as datas.",
+    text: "Nesta visualização histórica, P2 acompanha um componente por continuidade geométrica. O projeto está migrando para rastreamento retrospectivo, ainda não homologado nesses quadros.",
     detail: "P2 · região móvel rastreada",
   },
   {
@@ -190,6 +190,11 @@ export default function StoryPage() {
     ? NOMES.map(item => ({ ...item, d: trilha(estudo.frames, indice, item.id), pos: atual?.tr[item.id] }))
     : [], [estudo, atual, indice, mostrarTr]);
 
+  const irCena = (indiceCena:number) => {
+    const alvo = raiz.current?.querySelectorAll<HTMLElement>(".story-step")[limitar(indiceCena,0,CENAS.length-1)];
+    alvo?.scrollIntoView({behavior:reduzirMovimento?"auto":"smooth",block:"start"});
+    setAutoplay(false);
+  };
   const avancar = () => {
     document.getElementById("story-final")?.scrollIntoView({ behavior: reduzirMovimento ? "auto" : "smooth" });
     setAutoplay(false);
@@ -240,7 +245,7 @@ export default function StoryPage() {
         <aside className={"story-visual scene-" + cena} aria-label="Mapa temporal do estudo de caso">
           <div className="story-map-top">
             <div className="story-map-id"><span className="story-map-dot"/> PANTANAL / BRASIL</div>
-            <span>GLOBFIRE V2 · ID 24340828</span>
+            <span className="story-scene-status" aria-live="polite">{CENAS[cena].label} · GLOBFIRE V2</span>
           </div>
           <div className="story-map-plate">
             <svg viewBox={viewBox} role="img" aria-label={"Geometrias cartográficas observadas em " + (atual?.date ?? "2020")}>
@@ -298,6 +303,14 @@ export default function StoryPage() {
                     {mostrarIgt && <span><i className="legend-igt"/>IGT</span>}</>}
               </div>
               <div className="story-buttons">
+                <button type="button" aria-label="Cena anterior" title="Cena anterior"
+                  disabled={cena===0} onClick={()=>irCena(cena-1)}>
+                  <ArrowLeft size={16}/>
+                </button>
+                <button type="button" aria-label="Próxima cena" title="Próxima cena"
+                  disabled={cena===CENAS.length-1} onClick={()=>irCena(cena+1)}>
+                  <ArrowRight size={16}/>
+                </button>
                 <button type="button" disabled={!estudo || reduzirMovimento} onClick={reproduzir}
                   aria-label={autoplay ? "Pausar reprodução temporal" : "Reproduzir observações"} title="Reproduzir ou pausar observações">
                   {autoplay ? <Pause size={16}/> : <Play size={16}/>}
@@ -334,6 +347,7 @@ export default function StoryPage() {
         <div className="story-source-text">
           <p>Os polígonos provêm do estudo histórico do evento 24340828, a partir do JRC/GWIS GlobFire v2, baseado no MODIS MCD64A1. A resolução do produto impõe limites à identificação de detalhes espaciais.</p>
           <p>A sequência animada mostra as observações disponíveis, sem criar datas intermediárias. As geometrias exibidas foram simplificadas apenas para esta visualização; os dados científicos originais permanecem preservados.</p>
+          <p><strong>Versão dos quadros:</strong> P1/P2, TR e IGT desta narrativa são derivados do processamento histórico progressivo. A metodologia retrospectiva v2 está em revisão e não substituiu silenciosamente esta sequência.</p>
           <p>Trajetórias e incrementos são descritores geométricos, não medições diretas da dinâmica física das chamas. Uma validação independente é necessária antes de inferências causais.</p>
           <a href="https://github.com/DomingosThiagoCode/CDG_incendio" target="_blank" rel="noreferrer">Consultar a origem dos dados <ExternalLink size={15}/></a>
         </div>
