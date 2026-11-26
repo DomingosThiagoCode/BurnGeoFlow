@@ -137,9 +137,12 @@ export default function StoryPage() {
       raf = 0;
       const el = raiz.current;
       if (!el) return;
-      const caixa = el.getBoundingClientRect();
-      const comprimento = Math.max(1, caixa.height / CENAS.length);
-      const valor = limitar(-caixa.top / comprimento, 0, CENAS.length - 0.001);
+      const passos = el.querySelector<HTMLElement>(".story-steps");
+      if (!passos) return;
+      const caixa = passos.getBoundingClientRect();
+      const comprimento = Math.max(1, passos.clientHeight / CENAS.length);
+      const deslocamento = window.matchMedia("(max-width: 720px)").matches ? window.innerHeight * 0.5 : 0;
+      const valor = limitar((deslocamento - caixa.top) / comprimento, 0, CENAS.length - 0.001);
       setEtapa(v => Math.abs(v - valor) < 0.008 ? v : valor);
     };
     const aoScroll = () => { if (!raf) raf = requestAnimationFrame(medir); };
@@ -188,7 +191,7 @@ export default function StoryPage() {
     : [], [estudo, atual, indice, mostrarTr]);
 
   const avancar = () => {
-    document.getElementById("story-final")?.scrollIntoView({ behavior: reduzirMovimento ? "instant" : "smooth" });
+    document.getElementById("story-final")?.scrollIntoView({ behavior: reduzirMovimento ? "auto" : "smooth" });
     setAutoplay(false);
   };
   const reproduzir = () => {
