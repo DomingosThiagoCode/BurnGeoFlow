@@ -11,13 +11,18 @@ O BurnGeoFlow reúne três partes distintas:
    reconstruível e gerencia execuções com status e logs em SQLite.
 3. **Frontend React:** interface responsiva com mapa MapLibre, linha do
    tempo e seis abas de análise: Visão geral, Paisagem, Expansão, Movimento,
-   Direções (rosáceas TR/IGT e dos cinco feixes) e Forma. A lateral de
-   navegação acompanha o scroll no desktop.
+   Direções (rosáceas TR/IGT e dos cinco feixes) e Forma. A navegação
+   modular usa uma barra de ícones compacta com expansão por hover/foco
+   no desktop e menu acessível no celular.
 
 **Estado científico:** os resultados calculados são análises geométricas
 descritivas. Uma execução computacional bem-sucedida **não** significa
 validação independente de imagens, nem comprovação de propagação física do
-fogo.
+fogo. O botão **Executar** ainda usa a cadeia científica legada; a preparação
+P1 conectado/P2 retrospectivo e o balanço D-005 existem em modo
+**experimental versionado**. A integração completa às análises permanece
+pendente. Consulte [METODOLOGIA.md](docs/METODOLOGIA.md),
+[ROTEIRO.md](docs/ROTEIRO.md) e [ESTADO_EXECUCAO.md](docs/ESTADO_EXECUCAO.md).
 
 ## Instalação rápida no Windows
 
@@ -45,6 +50,42 @@ python iniciar_burngeoflow.py
 O React compilado é servido pelo próprio FastAPI. Não precisa deixar o
 Vite rodando em outro terminal. O app limita o serviço a
 `127.0.0.1` por padrão: **não o exponha na internet**.
+
+## Páginas e navegação da plataforma
+
+A home narrativa está em **`/apresentacao/`**,
+com oito cenas de scrollytelling sobre dados históricos de 2020. O scroll
+controla observações acumuladas do ID `24340828`; não é uma simulação
+da frente ativa do fogo. O logotipo do atlas leva de volta à apresentação.
+
+A aplicação científica está em **`/`**, organizada por módulos:
+- **Visão geral** (`/#atlas`): mapa temporal sob demanda, áreas P1/P2, patches
+  e controles de evento, data, reprodução e camadas no cartão à direita;
+- **Paisagem, Expansão, Movimento, Direções e Forma** (`/#analise/<nome>`):
+  gráficos e rosáceas. Os setores das rosáceas podem ser selecionados com
+  mouse, toque ou teclado; o recorte temporal usa as datas **observadas**,
+  exibe valores absolutos e percentuais, e só compartilha a escala entre
+  gráficos ponderados na mesma unidade. Escolher uma transição atualiza a
+  data de referência do atlas;
+- **Explorar incêndios** (`/#catalogo`): busca de IDs por bioma oficial
+  IBGE 2019, UF/Brasil (malha IBGE 2024), GeoJSON WGS84 ou polígono
+  desenhado no mapa. Filtros por ano ou datas, margem ±N dias e cache JSON
+  com opção explícita de atualizar. Contagens **na AOI** representam feições
+  que intersectam a região, não a área recortada nem o total do evento;
+  `Ver total` consulta o ID/ano completo separadamente;
+- **Processamento** (`/#processamento`): iniciar jobs, inspecionar a
+  disponibilidade de arquivos/checkpoints, consultar histórico, erros e
+  logs. Um indicador de job ativo aparece na navegação.
+
+O catálogo apresenta **cinco eventos por página**, com busca por ID,
+ordenação e navegação sem repetir consultas GEE apenas por trocar de
+página. Navegação entre módulos preserva seleção de evento e data,
+mantendo os jobs ativos no servidor.
+
+O processamento remoto do GEE pode continuar depois de uma interrupção
+do worker local. A recuperação deve consultar logs e tarefas remotas antes
+de criar qualquer nova aquisição. Não repita o download dos IDs `24340828`
+e `24194371` se já houver dados brutos locais íntegros.
 
 ## Primeiro evento e Google Earth Engine
 
@@ -85,7 +126,9 @@ python executar_pipeline.py --id 24340828 --origem local
 
 Opções avançadas: `--origem auto|local|gee|brutos`,
 `--refazer`, `--somente-aquisicao`, `--saida`,
-`--p1/--p2`. Veja
+`--p1/--p2` e `--preparar-metodologia-v2` (somente P1 local;
+gera derivados experimentais sem substituir os produtos legados).
+Veja
 [referência operacional detalhada](docs/REFERENCIA_OPERACIONAL.md).
 
 ## Fluxo de uso
@@ -163,6 +206,11 @@ fallback durante a homologação, sem apagar funcionalidades nem histórico.
 
 ## Documentação
 
+- [Decisões científicas D-001 a D-016](docs/METODOLOGIA.md)
+- [Roteiro de pesquisa e dependências](docs/ROTEIRO.md)
+- [Estado operacional, merges e pendências](docs/ESTADO_EXECUCAO.md)
+- [Landing e proveniência dos 57 quadros](docs/LANDING_SCROLLYTELLING.md)
+- [Reprocessamento v2 com checkpoints](docs/PLANO_REPROCESSAMENTO_V2.md)
 - [Arquitetura e responsabilidades](docs/ARQUITETURA.md)
 - [Auditoria técnica e riscos](docs/AUDITORIA_ARQUITETURAL_2026-11-12.md)
 - [Backlog priorizado](docs/BACKLOG_REFACTOR.md)

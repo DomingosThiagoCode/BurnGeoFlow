@@ -69,3 +69,25 @@ Validar no navegador: rolagem em ambos os sentidos, pausa/reprodução e botão 
 - disponibilidade offline e chunking por intervalos se a telemetria real indicar lentidão;
 - testar taxas de FPS/CLS no hardware-alvo;
 - caso a landing seja aprovada como página principal, inverter os endereços em uma mudança de roteamento separada e testada.
+## Evolução P2: comandos de cena e proveniência (26/11/2026)
+
+A apresentação permite avançar/recuar entre as oito cenas por botões
+acessíveis por teclado, sem perder o scrollytelling bidirecional.
+A cena ativa aparece no visor cartográfico. O estado de movimento reduzido
+inibe a reprodução automática, mas preserva comandos deliberados.
+
+**Importante:** os 57 quadros do JSON `frontend/public/story/24340828.json`
+continuam baseados na versão histórica de P2 progressivo. A atualização
+para P2 retrospectivo deve ser uma operação rastreável separada, após
+validação geométrica, definição de proveniência e homologação científica.
+A apresentação identifica essa limitação em texto. Não substitua
+os polígonos com geração fictícia de fogo ativo.
+
+### Homologação visual ainda necessária
+
+A CI em Chromium verifica cenas, navegação e responsividade, mas
+a avaliação humana de tipografia, ritmo narrativo, cenas num monitor real,
+FPS/memória no equipamento do operador e revisão dos dados P2 v2
+seguem pendentes na issue #50. Esta entrega não fecha a issue sozinha.
+
+

@@ -1,7 +1,11 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { LineChart, type SerieGrafico } from "./LineChart";
 import { formatarNumero, numero } from "../services/api";
 import type { AnaliseEtapa4, Linha } from "../types";
+import {
+  type ContribuicaoDirecional, DIRECOES, distribuicaoDirecional,
+  indiceDirecional, intervaloSetor,
+} from "../utils/rose";
 
 export type AbaCientifica = "paisagem" | "expansao" | "movimento" | "direcoes" | "forma";
 
@@ -11,6 +15,7 @@ interface Props {
   transicoes: Linha[];
   dia: string;
   selecionarData: (dia: string) => void;
+  mostrarSegmento: (ponto: string, dataAtual: string) => void;
   analise: AnaliseEtapa4 | null;
   carregando: boolean;
   erro: string | null;
@@ -36,64 +41,99 @@ function Aviso({ children }: { children: ReactNode }) {
   return <p className="analysis-caution">{children}</p>;
 }
 
-type AnguloPonderado = { angulo: number; peso: number };
-const DIRECOES = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-  "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+type AnguloPonderado = ContribuicaoDirecional;
 
-function RosaDirecional({ titulo, dados, subtitulo }: {
-  titulo: string;
-  dados: AnguloPonderado[];
-  subtitulo: string;
+function RosaDirecional({
+  titulo, dados, subtitulo, unidade, escalaComum, selecionarData,
+  ponto, mostrarSegmento,
+}: {
+  titulo:string;
+  dados:AnguloPonderado[];
+  subtitulo:string;
+  unidade:"km"|"km²";
+  escalaComum?:number;
+  selecionarData:(data:string)=>void;
+  ponto?:string;
+  mostrarSegmento?:(ponto:string, dataAtual:string)=>void;
 }) {
-  const bins = Array.from({ length: 16 }, () => 0);
-  for (const item of dados) {
-    if (!Number.isFinite(item.angulo) || !Number.isFinite(item.peso) || item.peso <= 0) continue;
-    const indice = Math.floor((((item.angulo % 360) + 360 + 11.25) % 360) / 22.5);
-    bins[indice] += item.peso;
-  }
-  const maior = Math.max(0, ...bins);
-  const total = bins.reduce((s, v) => s + v, 0);
-  const cs = dados.reduce((s, v) => s + (v.peso > 0 ? v.peso * Math.cos(v.angulo * Math.PI / 180) : 0), 0);
-  const sn = dados.reduce((s, v) => s + (v.peso > 0 ? v.peso * Math.sin(v.angulo * Math.PI / 180) : 0), 0);
-  const media = total > 0 && Math.hypot(cs, sn) > 1e-8
-    ? (Math.atan2(sn, cs) * 180 / Math.PI + 360) % 360 : null;
-  const concentracao = total > 0 ? Math.hypot(cs, sn) / total : 0;
-  const raio = 75;
-  const ponto = (az: number, r: number) => {
-    const a = (az - 90) * Math.PI / 180;
-    return [110 + Math.cos(a) * r, 112 + Math.sin(a) * r];
+  const [hover,setHover]=useState<number|null>(null);
+  const [selecionado,setSelecionado]=useState<number|null>(null);
+  const [ampliado,setAmpliado]=useState(false);
+  const distribuicao=useMemo(()=>distribuicaoDirecional(dados),[dados]);
+  const {pesos,total,maximo,media,concentracao,validos}=distribuicao;
+  const maximoRadial = escalaComum && escalaComum>0 ? escalaComum : maximo;
+  const ativo = hover??selecionado;
+  const destaques = ativo===null?[]:
+    validos.filter(d=>indiceDirecional(d.angulo)===ativo)
+      .sort((a,b)=>a.data.localeCompare(b.data));
+  const pesoSetor = ativo===null?0:pesos[ativo];
+  const centro = ativo===null?null:ativo*22.5;
+  const raio=75;
+  const coordenadaPolar = (az:number,r:number) => {
+    const a=(az-90)*Math.PI/180;
+    return [110+Math.cos(a)*r,112+Math.sin(a)*r];
   };
-  const setor = (i: number, r: number) => {
-    const a = ponto(i * 22.5 - 10.7, r);
-    const b = ponto(i * 22.5 + 10.7, r);
-    return "M 110 112 L " + a[0].toFixed(2) + " " + a[1].toFixed(2) +
-      " A " + r.toFixed(2) + " " + r.toFixed(2) + " 0 0 1 " +
-      b[0].toFixed(2) + " " + b[1].toFixed(2) + " Z";
+  const setor = (i:number,r:number) => {
+    const a=coordenadaPolar(i*22.5-10.7,r);
+    const b=coordenadaPolar(i*22.5+10.7,r);
+    return "M 110 112 L "+a[0].toFixed(2)+" "+a[1].toFixed(2)+
+      " A "+r.toFixed(2)+" "+r.toFixed(2)+" 0 0 1 "+
+      b[0].toFixed(2)+" "+b[1].toFixed(2)+" Z";
   };
-  return <section className="rose-card">
-    <h3>{titulo}</h3>
-    <p>{subtitulo}</p>
-    {total === 0 ? <div className="rose-empty">Sem azimutes válidos para esta série.</div> :
-      <svg viewBox="0 0 220 232" className="rose-svg" role="img"
-        aria-label={"Rosácea: " + titulo}>
-        {[0.25, 0.5, 0.75, 1].map(f =>
-          <circle key={f} cx="110" cy="112" r={raio*f}
-            fill="none" stroke="#e4e0d5" strokeWidth="1"/>)}
-        {[0, 45, 90, 135].map(a => {
-          const p = ponto(a, raio), q = ponto(a+180, raio);
+  const selecionar=(i:number)=>{
+    setSelecionado(prev=>prev===i?null:i);
+    const primeira=validos.filter(d=>indiceDirecional(d.angulo)===i)
+      .sort((a,b)=>a.data.localeCompare(b.data))[0];
+    if(primeira?.data) selecionarData(primeira.data);
+  };
+  return <section className={"rose-card "+(ampliado?"rose-card-expanded":"")}>
+    <div className="rose-heading">
+      <div><h3>{titulo}</h3><p>{subtitulo}</p></div>
+      <button type="button" className="secondary-button compact"
+        aria-label={(ampliado?"Reduzir":"Ampliar")+" rosácea "+titulo}
+        aria-pressed={ampliado} onClick={()=>setAmpliado(v=>!v)}>
+        {ampliado?"Reduzir":"Ampliar"}
+      </button>
+    </div>
+    {total===0?<div className="rose-empty">Sem azimutes válidos para este período.</div>:
+      <svg viewBox="0 0 220 232" className="rose-svg" role="group"
+        aria-label={"Rosácea interativa: "+titulo}>
+        {[0.25,0.5,0.75,1].map(fracao=>
+          <g key={fracao}>
+            <circle cx="110" cy="112" r={raio*fracao} fill="none"
+              stroke="#e4e0d5" strokeWidth="1"/>
+            <text x="117" y={108-raio*fracao} className="rose-tick">
+              {formatarNumero(maximoRadial*fracao,2)}
+            </text>
+          </g>)}
+        {[0,45,90,135].map(a=>{
+          const p=coordenadaPolar(a,raio),q=coordenadaPolar(a+180,raio);
           return <line key={a} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]}
             stroke="#d9d6c9" strokeWidth="1"/>;
         })}
-        {bins.map((valor, i) => {
-          if (valor <= 0) return null;
-          const rad = Math.max(2, raio * valor/maior);
-          return <path key={i} d={setor(i, rad)} fill="#35756d"
-            fillOpacity=".72" stroke="#fff" strokeWidth=".7">
-            <title>{DIRECOES[i]}: {formatarNumero(valor / total * 100, 1)}% do peso</title>
+        {pesos.map((valor,i)=>{
+          if(valor<=0)return null;
+          const rad=Math.max(2,raio*valor/Math.max(maximoRadial,valor));
+          return <path key={i} d={setor(i,rad)} role="button" tabIndex={0}
+            aria-label={DIRECOES[i]+", "+intervaloSetor(i)+", "+
+              formatarNumero(valor,2)+" "+unidade+", "+
+              formatarNumero(valor/total*100,1)+"%. Selecionar setor"}
+            aria-pressed={selecionado===i}
+            className={"rose-sector "+(ativo===i?"rose-sector-highlight":"")}
+            fill={ativo===i?"#ab4e38":"#35756d"}
+            fillOpacity={ativo!==null&&ativo!==i?0.38:0.78}
+            stroke="#fff" strokeWidth=".9"
+            onMouseEnter={()=>setHover(i)} onMouseLeave={()=>setHover(null)}
+            onFocus={()=>setHover(i)} onBlur={()=>setHover(null)}
+            onClick={()=>selecionar(i)}
+            onKeyDown={e=>{
+              if(e.key==="Enter"||e.key===" "){e.preventDefault();selecionar(i);}
+            }}>
+            <title>{DIRECOES[i]}: {formatarNumero(valor,2)} {unidade} ({formatarNumero(valor/total*100,1)}%)</title>
           </path>;
         })}
-        {media !== null && (() => {
-          const p = ponto(media, raio + 5);
+        {media!==null&&(()=>{
+          const p=coordenadaPolar(media,raio+5);
           return <line x1="110" y1="112" x2={p[0]} y2={p[1]}
             stroke="#aa4b36" strokeWidth="2.6" strokeLinecap="round"/>;
         })()}
@@ -104,9 +144,34 @@ function RosaDirecional({ titulo, dados, subtitulo }: {
         <text x="17" y="116" textAnchor="middle">O</text>
       </svg>}
     <div className="rose-result">
-      <span>Direção média <strong>{media === null ? "indefinida" : formatarNumero(media, 1) + "°"}</strong></span>
-      <span>Concentração <strong>{total === 0 ? "—" : formatarNumero(concentracao, 2)}</strong></span>
+      <span>Direção média <strong>{media===null?"indefinida":formatarNumero(media,1)+"°"}</strong></span>
+      <span>Concentração <strong>{total===0?"—":formatarNumero(concentracao,2)}</strong></span>
+      <span>Escala radial <strong>{formatarNumero(maximoRadial,2)} {unidade}</strong></span>
     </div>
+    {ativo!==null&&<div className="rose-tooltip" role="status">
+      <strong>{DIRECOES[ativo]} · {intervaloSetor(ativo)}</strong>
+      <p>{formatarNumero(pesoSetor,3)} {unidade} · {total?formatarNumero(pesoSetor/total*100,1):0}% do peso</p>
+      {centro!==null&&<small>Setor centrado em {centro}° a partir do norte, sentido horário.</small>}
+    </div>}
+    {selecionado!==null&&<div className="rose-contributions">
+      <div className="rose-contrib-head">
+        <strong>Transições do setor {DIRECOES[selecionado]}</strong>
+        <button type="button" className="secondary-button compact"
+          onClick={()=>{setSelecionado(null);setHover(null);}}>Limpar seleção</button>
+      </div>
+      {destaques.length===0?<p>Sem contribuições neste período.</p>:
+        <ul>{destaques.slice(0,20).map((d,i)=><li key={d.data+":"+i}>
+          <button type="button" onClick={()=>selecionarData(d.data)}>
+            {d.data||"Data não informada"} · {formatarNumero(d.peso,3)} {unidade}
+          </button>
+        </li>)}</ul>}
+      {destaques.length>20&&<small>Exibindo 20 de {destaques.length} contribuições.</small>}
+      {ponto&&mostrarSegmento&&destaques[0]?.data&&
+        <button type="button" className="secondary-button rose-map-link"
+          onClick={()=>mostrarSegmento(ponto,destaques[0].data)}>
+          Ver deslocamento selecionado no mapa
+        </button>}
+    </div>}
   </section>;
 }
 
@@ -159,7 +224,9 @@ function CincoTrajetorias({ pontos, dia }: { pontos: Linha[]; dia: string }) {
   </section>;
 }
 
-export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, analise, carregando, erro }: Props) {
+export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, mostrarSegmento, analise, carregando, erro }: Props) {
+  const [inicioFiltro,setInicioFiltro]=useState("");
+  const [fimFiltro,setFimFiltro]=useState("");
   const datas = useMemo(() => serie.map(r => r.data ?? ""), [serie]);
   const datasTransicao = useMemo(() => transicoes.map(r => r.data_atual ?? ""), [transicoes]);
   const indicadores = analise?.indicadores ?? [];
@@ -260,36 +327,85 @@ export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, 
   </>;
 
   if (aba === "direcoes") {
-    const tr = transicoes.map(r => ({
-      angulo: numero(r, "tr_azimute_centroide_graus"),
-      peso: numero(r, "tr_deslocamento_centroide_km"),
-    })).filter((v): v is AnguloPonderado => v.angulo !== null && v.peso !== null && v.peso > 0);
-    const igt = transicoes.map(r => ({
-      angulo: numero(r, "igt_azimute_ponderado_graus"),
-      peso: numero(r, "p2_incremento_geometrico_km2"),
-    })).filter((v): v is AnguloPonderado => v.angulo !== null && v.peso !== null && v.peso > 0);
+    const datasDisponiveis=Array.from(new Set([
+      ...transicoes.map(t=>t.data_atual??""),
+      ...segmentos.map(t=>t.data_atual??""),
+    ].filter(Boolean))).sort();
+    const periodo = (r:Linha) => {
+      const data=r.data_atual??"";
+      return data!==""&&(!inicioFiltro||data>=inicioFiltro)&&(!fimFiltro||data<=fimFiltro);
+    };
+    const transicoesPeriodo=transicoes.filter(periodo);
+    const segmentosPeriodo=segmentos.filter(periodo);
+    const tr=transicoesPeriodo.map(r=>({
+      angulo: numero(r,"tr_azimute_centroide_graus"),
+      peso: numero(r,"tr_deslocamento_centroide_km"),
+      data: r.data_atual??"",
+    })).filter((v):v is AnguloPonderado=>v.angulo!==null&&v.peso!==null&&v.peso>0);
+    const igt=transicoesPeriodo.map(r=>({
+      angulo:numero(r,"igt_azimute_ponderado_graus"),
+      peso:numero(r,"p2_incremento_geometrico_km2"),
+      data:r.data_atual??"",
+    })).filter((v):v is AnguloPonderado=>v.angulo!==null&&v.peso!==null&&v.peso>0);
+    const feixes=TRAJETORIAS.map(t=>({
+      ...t,
+      dados:segmentosPeriodo.filter(s=>s.ponto===t.id).map(s=>({
+        angulo:numero(s,"azimute_geodesico_graus"),
+        peso:numero(s,"distancia_geodesica_km"),
+        data:s.data_atual??"",
+      })).filter((v):v is AnguloPonderado=>
+        v.angulo!==null&&v.peso!==null&&v.peso>0),
+    }));
+    const escalaKm=Math.max(0,distribuicaoDirecional(tr).maximo,
+      ...feixes.map(f=>distribuicaoDirecional(f.dados).maximo));
     return <>
       <Introducao titulo="Direções e rosáceas"
-        texto="Distribuições dos azimutes calculados. As rosáceas TR e IGT usam ponderações distintas, explicitadas em cada gráfico. As cinco rosáceas inferiores representam os feixes geométricos da Etapa 4."/>
-      <div className="rose-grid">
-        <RosaDirecional titulo="TR · Centroide" dados={tr} subtitulo="Ponderação: distância do centroide (km)"/>
-        <RosaDirecional titulo="IGT · Incremento P2" dados={igt} subtitulo="Ponderação: incremento geométrico do P2 (km²)"/>
+        texto="Distribuições azimutais com 16 setores. Compare direções apenas entre ponderações com a mesma unidade; selecione setores e datas para sincronizar a linha do tempo."/>
+      <div className="rose-period-control">
+        <label htmlFor="rose-from">A partir de
+          <select id="rose-from" value={inicioFiltro} onChange={e=>setInicioFiltro(e.target.value)}>
+            <option value="">Primeira observação</option>
+            {datasDisponiveis.map(d=><option value={d} key={d}>{d}</option>)}
+          </select>
+        </label>
+        <label htmlFor="rose-to">Até
+          <select id="rose-to" value={fimFiltro} onChange={e=>setFimFiltro(e.target.value)}>
+            <option value="">Última observação</option>
+            {datasDisponiveis.map(d=><option value={d} key={d}>{d}</option>)}
+          </select>
+        </label>
+        <button className="secondary-button compact" type="button"
+          disabled={!inicioFiltro&&!fimFiltro}
+          onClick={()=>{setInicioFiltro("");setFimFiltro("");}}>Limpar período</button>
+        <span role="status">
+          {inicioFiltro&&fimFiltro&&inicioFiltro>fimFiltro?
+            "Intervalo invertido. Ajuste as datas.":
+            transicoesPeriodo.length+" transições observadas no recorte"}
+        </span>
       </div>
-      {analise?.disponivel ? <>
+      <div className="rose-grid">
+        <RosaDirecional key={"tr:"+inicioFiltro+":"+fimFiltro}
+          titulo="TR · Centroide" dados={tr} unidade="km" ponto="centroide"
+          escalaComum={escalaKm} selecionarData={selecionarData}
+          mostrarSegmento={mostrarSegmento}
+          subtitulo="Ponderação: distância do centroide (km)"/>
+        <RosaDirecional key={"igt:"+inicioFiltro+":"+fimFiltro}
+          titulo="IGT · Incremento P2" dados={igt} unidade="km²"
+          selecionarData={selecionarData}
+          subtitulo="Ponderação: incremento geométrico do P2 (km²)"/>
+      </div>
+      {analise?.disponivel?<>
         <h3 className="analysis-subtitle">Cinco feixes representativos</h3>
         <div className="rose-grid">
-          {TRAJETORIAS.map(t => {
-            const dados = segmentos.filter(s => s.ponto === t.id).map(s => ({
-              angulo: numero(s, "azimute_geodesico_graus"),
-              peso: numero(s, "distancia_geodesica_km"),
-            })).filter((v): v is AnguloPonderado =>
-              v.angulo !== null && v.peso !== null && v.peso > 0);
-            return <RosaDirecional key={t.id} titulo={t.rotulo} dados={dados}
-              subtitulo="Ponderação: distância geodésica (km)"/>;
-          })}
+          {feixes.map(t=><RosaDirecional
+            key={t.id+":"+inicioFiltro+":"+fimFiltro}
+            titulo={t.rotulo} dados={t.dados} unidade="km" ponto={t.id}
+            escalaComum={escalaKm} selecionarData={selecionarData}
+            mostrarSegmento={mostrarSegmento}
+            subtitulo="Ponderação: distância geodésica (km)"/>)}
         </div>
-      </> : <div className="empty-chart">As rosáceas dos cinco extremos requerem os arquivos da Etapa 4.</div>}
-      <Aviso>Direção do centroide e direção de ganho de área não são a mesma grandeza. A direção predominante não implica direção do vento ou propagação de fogo ativo.</Aviso>
+      </>:<div className="empty-chart">As rosáceas dos cinco extremos requerem os arquivos da Etapa 4.</div>}
+      <Aviso>Os setores descrevem variações geométricas. Para TR, abra o deslocamento de uma transição no mapa quando os dois pontos geográficos existirem. IGT não é representado por uma seta de movimento. Não infira vento ou propagação de fogo ativo.</Aviso>
     </>;
   }
 

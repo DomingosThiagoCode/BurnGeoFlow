@@ -13,6 +13,8 @@ import { PipelineStatusPanel } from "./PipelineStatusPanel";
 type Props = {
   eventoId: number | null;
   onConcluiu: (idIncendio: number) => void;
+  abertoInicial?: boolean;
+  onStatusAtivo?: (ativo: boolean) => void;
 };
 
 const NOMES: Record<ExecucaoJob["status"], string> = {
@@ -25,8 +27,8 @@ const NOMES: Record<ExecucaoJob["status"], string> = {
 
 const ESTADOS_ATIVOS = new Set(["queued", "running"]);
 
-export function JobsPanel({ eventoId, onConcluiu }: Props) {
-  const [expanded, setExpanded] = useState(false);
+export function JobsPanel({ eventoId, onConcluiu, abertoInicial = false, onStatusAtivo }: Props) {
+  const [expanded, setExpanded] = useState(abertoInicial);
   const [idDigitado, setIdDigitado] = useState("");
   const [origem, setOrigem] = useState<OrigemJob>("auto");
   const [ano, setAno] = useState("");
@@ -123,6 +125,7 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
   const atual = jobs.find(j => j.id === selecionado) ?? null;
   const jobAtivo = jobs.find(j => ESTADOS_ATIVOS.has(j.status));
   const emExecucao = Boolean(jobAtivo);
+  useEffect(() => { onStatusAtivo?.(emExecucao); }, [emExecucao, onStatusAtivo]);
   async function interromper() {
     if (!jobAtivo || !window.confirm('Forçar interrupção do ID '+jobAtivo.incendio+'? Dados já gravados serão mantidos. Tarefas remotas do GEE podem continuar.')) return;
     setInterrompendo(true); setErro(null); setAviso(null);

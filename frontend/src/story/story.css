@@ -184,3 +184,25 @@ html, body, #story-root { margin: 0; min-height: 100%; }
 @media (prefers-reduced-motion: reduce) {
  .story-page *, .story-page *::before, .story-page *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* #50: narrativa controlável por teclado, com estado de cena e profundidade leve */
+.story-scene-status{color:#d7c9a8;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.story-buttons {align-items:center;}
+.story-buttons button:focus-visible{outline:3px solid #ffd5a4;outline-offset:2px;}
+.story-map-plate svg .story-p1,.story-map-plate svg .story-p2,
+.story-map-plate svg .story-igt{
+  transition:fill-opacity 280ms ease,stroke-width 280ms ease;
+}
+.story-visual::after{
+  content:"";position:absolute;inset:56px 0 115px;pointer-events:none;
+  background:radial-gradient(circle at 52% 65%,transparent 15%,#102a2416 70%,#0d211c50 100%);
+}
+@media (max-width:760px){
+ .story-scene-status {font-size:9px;max-width:45%;overflow:hidden;text-overflow:ellipsis;}
+ .story-map-controls {align-items:start;}
+ .story-buttons {flex-wrap:wrap;justify-content:flex-end;}
+}
+@media (prefers-reduced-motion: reduce){
+ .story-map-plate svg .story-p1,.story-map-plate svg .story-p2,
+ .story-map-plate svg .story-igt {transition:none;}
+}

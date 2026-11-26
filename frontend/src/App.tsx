@@ -3,6 +3,7 @@ import {
   Activity, AlertCircle, ArrowDownToLine, CheckCircle2,
   ChevronLeft, ChevronRight, Database, Layers, LoaderCircle,
   Menu, Pause, Play, RefreshCw, Search, X,
+  LayoutDashboard, ChartColumn, Flame, ListFilter, Waypoints, Compass, Shapes,
 } from "lucide-react";
 import { ScientificPanels, type AbaCientifica } from "./components/ScientificPanels";
 // Só importa MapLibre e WebGL quando o usuário solicita o mapa.
@@ -24,6 +25,20 @@ const ABAS = [
   { id: "forma", label: "Forma" },
 ] as const;
 type Aba = "geral" | AbaCientifica;
+type Vista = "atlas" | "catalogo" | "jobs";
+const ABAS_VALIDAS = new Set<Aba>(["geral","paisagem","expansao","movimento","direcoes","forma"]);
+function rotaInicial(): { vista: Vista; aba: Aba } {
+  if (typeof window === "undefined") return {vista:"atlas",aba:"geral"};
+  const hash = window.location.hash.slice(1);
+  if (hash === "catalogo") return {vista:"catalogo",aba:"geral"};
+  if (hash === "processamento") return {vista:"jobs",aba:"geral"};
+  if (hash.startsWith("analise/")) {
+    const candidato = hash.slice("analise/".length) as Aba;
+    if (ABAS_VALIDAS.has(candidato)) return {vista:"atlas",aba:candidato};
+  }
+  return {vista:"atlas",aba:"geral"};
+}
+
 
 function textoErro(erro: unknown): string {
   return erro instanceof Error ? erro.message : "Falha inesperada";
@@ -50,8 +65,33 @@ export default function App() {
   const [buscaId, setBuscaId] = useState("");
   const [buscando, setBuscando] = useState(true);
   const [painelAberto, setPainelAberto] = useState(false);
-  const [aba, setAba] = useState<Aba>("geral");
+  const [vista, setVista] = useState<Vista>(() => rotaInicial().vista);
+  const [aba, setAba] = useState<Aba>(() => rotaInicial().aba);
+  const [jobAtivo, setJobAtivo] = useState(false);
+  const aoStatusJob = useCallback((ativo:boolean)=>setJobAtivo(ativo),[]);
+  useEffect(() => {
+    const sincronizar = () => {
+      const rota = rotaInicial();
+      setVista(rota.vista);
+      setAba(rota.aba);
+      setPainelAberto(false);
+    };
+    window.addEventListener("hashchange", sincronizar);
+    return () => window.removeEventListener("hashchange", sincronizar);
+  }, []);
+  const navegar = (destino:Vista, abaDestino:Aba="geral") => {
+    setVista(destino); setAba(abaDestino); setPainelAberto(false);
+    setTocando(false);
+    if (destino!=="atlas" || abaDestino!=="geral") {
+      setMapaAtivo(false); setP1(null); setP2(null);
+    }
+    const hash = destino==="atlas" ? (abaDestino==="geral" ? "atlas" : "analise/"+abaDestino)
+      : destino==="jobs" ? "processamento" : "catalogo";
+    window.location.hash = hash;
+    window.scrollTo({top:0,behavior:"auto"});
+  };
   const [analise, setAnalise] = useState<AnaliseEtapa4 | null>(null);
+  const [destaqueTR,setDestaqueTR]=useState<{ponto:string;dataAtual:string}|null>(null);
   const [carregandoAnalise, setCarregandoAnalise] = useState(false);
   const [erroAnalise, setErroAnalise] = useState<string | null>(null);
   const [resumo, setResumo] = useState<VisaoEvento | null>(null);
@@ -116,7 +156,7 @@ export default function App() {
     setTransicoes([]);
     setAnalise(null);
     setErroAnalise(null);
-    setAba("geral");
+    setDestaqueTR(null);
     setP1(null);
     setP2(null);
     setData("");
@@ -278,6 +318,32 @@ export default function App() {
     atualizarLista();
   }, [atualizarLista]);
 
+  const segmentoTR = useMemo(() => {
+    if(!destaqueTR||!analise?.disponivel)return null;
+    const segmento=analise.segmentos.find(r=>
+      r.ponto===destaqueTR.ponto&&r.data_atual===destaqueTR.dataAtual);
+    if(!segmento)return null;
+    const p0=analise.pontos.find(r=>r.ponto===destaqueTR.ponto&&r.data===segmento.data_anterior);
+    const p1=analise.pontos.find(r=>r.ponto===destaqueTR.ponto&&r.data===segmento.data_atual);
+    if(!p0||!p1)return null;
+    const a=[numero(p0,"longitude"),numero(p0,"latitude")];
+    const b=[numero(p1,"longitude"),numero(p1,"latitude")];
+    if([...a,...b].some(v=>v===null||!Number.isFinite(v)))return null;
+    const coords=[a,b] as [[number,number],[number,number]];
+    if(coords.some(([lon,lat])=>Math.abs(lon)>180||Math.abs(lat)>90))return null;
+    return {
+      coordenadas:coords,
+      rotulo:(destaqueTR.ponto+" · "+segmento.data_anterior+" → "+segmento.data_atual),
+    };
+  },[destaqueTR,analise]);
+  const abrirSegmento=(ponto:string,dataAtual:string)=>{
+    const existe=analise?.segmentos.some(s=>s.ponto===ponto&&s.data_atual===dataAtual);
+    if(!existe){setMensagem("Segmento geográfico indisponível para esta transição.");return;}
+    setDestaqueTR({ponto,dataAtual});
+    setData(dataAtual);
+    navegar("atlas","geral");
+    setMapaAtivo(true);
+  };
   const existeErro = Boolean(erroEvento);
   const navegaPara = (passo: number) => {
     if (!resumo) return;
@@ -320,7 +386,240 @@ export default function App() {
       </header>
 
       <div className="page-layout">
-        <aside className={"sidebar " + (painelAberto ? "sidebar-open" : "")}>
+        <aside className={"sidebar atlas-rail " + (painelAberto ? "sidebar-open" : "")} aria-label="Navegação do BurnGeoFlow">
+          <nav className="atlas-rail-links" aria-label="Módulos">
+            <button type="button" title="Visão geral" aria-label="Visão geral"
+              aria-current={vista==="atlas"&&aba==="geral"?"page":undefined}
+              className={vista==="atlas"&&aba==="geral"?"rail-active":""}
+              onClick={()=>navegar("atlas","geral")}><LayoutDashboard size={21}/><span>Visão geral</span></button>
+            <div className="rail-category" aria-hidden="true"><span>ANÁLISES</span></div>
+            {ABAS.filter(item=>item.id!=="geral").map((item,index)=>{
+              const Icon=[ChartColumn,Flame,Waypoints,Compass,Shapes][index];
+              return <button key={item.id} type="button" title={item.label} aria-label={item.label}
+                aria-current={vista==="atlas"&&aba===item.id?"page":undefined}
+                className={vista==="atlas"&&aba===item.id?"rail-active":""}
+                onClick={()=>navegar("atlas",item.id)}>
+                <Icon size={20}/><span>{item.label}</span>
+              </button>;
+            })}
+            <div className="rail-category" aria-hidden="true"><span>PLATAFORMA</span></div>
+            <button type="button" title="Explorar incêndios" aria-label="Explorar incêndios"
+              aria-current={vista==="catalogo"?"page":undefined}
+              className={vista==="catalogo"?"rail-active":""}
+              onClick={()=>navegar("catalogo")}><ListFilter size={21}/><span>Explorar incêndios</span></button>
+            <button type="button" title="Processamento" aria-label="Processamento"
+              aria-current={vista==="jobs"?"page":undefined}
+              className={vista==="jobs"?"rail-active":""}
+              onClick={()=>navegar("jobs")}>
+              <Database size={21}/><span>Processamento {jobAtivo?"●":""}</span>
+              {jobAtivo&&<i className="rail-running" aria-label="Execução ativa"/>}
+            </button>
+            <a href="/apresentacao/" title="Página inicial" aria-label="Página inicial">
+              <Flame size={20}/><span>Apresentação</span>
+            </a>
+          </nav>
+        </aside>
+
+        {painelAberto && <button className="sidebar-scrim"
+          aria-label="Fechar menu" onClick={() => setPainelAberto(false)}/>}
+
+        <main className="main-content">
+          <div className="workspace-heading">
+            <div className="workspace-copy">
+              <h1>{vista==="catalogo"?"Catálogo GlobFire":vista==="jobs"?"Processamento de eventos":"Explorador de incêndios"}</h1>
+            </div>
+            <div className="workspace-actions">
+              <span className="workspace-stamp">GLOBFIRE V2 <b>·</b> DADOS HISTÓRICOS</span>
+              <button className="secondary-button" type="button"
+                aria-label="Atualizar lista de eventos"
+                onClick={() => atualizarLista()}><RefreshCw size={16}/> Atualizar</button>
+            </div>
+          </div>
+
+          <div className="workspace-module" hidden={vista!=="catalogo"}>
+            <p className="module-description">Descubra IDs por região, período e registros sem executar o processamento geométrico.</p>
+            <CatalogoPanel abertoInicial />
+          </div>
+          <div id="processamento" className="workspace-module" hidden={vista!=="jobs"}>
+            <p className="module-description">Consulte checkpoints, inicie ou acompanhe execuções. O pipeline v2 experimental permanece separado.</p>
+            <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} abertoInicial onStatusAtivo={aoStatusJob}/>
+          </div>
+          {vista==="atlas" && <>
+
+          {mensagem && <div className="message-box" role="status">
+            <span>{mensagem}</span><button aria-label="Fechar mensagem"
+              onClick={()=>setMensagem("")}><X size={15}/></button>
+          </div>}
+          {erroEvento && <div className="error-panel" role="alert">
+            <AlertCircle size={22}/>
+            <div><strong>Dados indisponíveis</strong><p>{erroEvento}</p></div>
+          </div>}
+          {carregandoEvento && <div className="loading-inline" aria-live="polite">
+            <LoaderCircle size={19} className="spin"/> Carregando evento e séries temporais...
+          </div>}
+          {!resumo && !carregandoEvento && !erroEvento && (
+            <div className="empty-state">
+              <Database size={32}/>
+              <h2>Nenhum incêndio selecionado</h2>
+              <p>Selecione um evento já processado ou informe um ID local.</p>
+            </div>
+          )}
+
+          {resumo && id !== null && (
+            <>
+              <div className="section-title-row">
+                <div className="event-identifier">
+                  <span className="event-dot"/>
+                  <strong>Evento {id}</strong>
+                  <span className="date-label">· {data ? nomeDia(data) : "..."}</span>
+                </div>
+                <span className="period-label">
+                  {resumo.total_datas} observações · {resumo.periodo_inicio} a {resumo.periodo_fim}
+                </span>
+              </div>
+
+              {!resumo.tem_series && <div role="status" className="map-warning">Análise científica ainda indisponível. Valores preliminares dos atributos GeoJSON (não LAEA). {Object.entries(etapasParciais).map(([k,v])=>k+": "+v).join(" · ")}</div>}
+              <div className="kpi-grid">
+                <Kpi rotulo="Área acumulada (P1)"
+                  valor={formatarNumero(areaP1) + (areaP1 !== null ? " km²" : "")}
+                  detalhe="Cobertura espacial do evento" classe="kpi-accent"/>
+                <Kpi rotulo="Região móvel (P2)"
+                  valor={formatarNumero(areaP2) + (areaP2 !== null ? " km²" : "")}
+                  detalhe="Componente rastreado"/>
+                <Kpi rotulo="Participação P2 / P1"
+                  valor={formatarNumero(dominancia,1) + (dominancia !== null ? "%" : "")}
+                  detalhe="Na data selecionada"/>
+                <Kpi rotulo="Componentes P1"
+                  valor={formatarNumero(patches,0)}
+                  detalhe="Patches desta observação"/>
+              </div>
+
+              <nav className="analysis-tab-list" role="tablist" aria-label="Seções do estudo">
+                {ABAS.map(item => <button key={item.id} type="button" role="tab"
+                  id={"aba-" + item.id} aria-controls={"painel-" + item.id}
+                  aria-selected={aba === item.id}
+                  className={"analysis-tab " + (aba === item.id ? "analysis-tab-active" : "")}
+                  onClick={() => navegar("atlas",item.id)}>{item.label}</button>)}
+                {resumo.tem_series && <a className="analysis-tab-export"
+                  href={urlSerieCSV(id)} download>
+                  <ArrowDownToLine size={15}/> CSV temporal
+                </a>}
+              </nav>
+              <div role="tabpanel" className="analysis-tab-panel"
+                id={"painel-" + aba} aria-labelledby={"aba-" + aba}>
+              {aba === "geral" && <>
+              <div className="atlas-overview-grid">
+                <div className="atlas-overview-primary">
+              <section className="panel map-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">ÁREAS QUEIMADAS</span>
+                    <h2>Mapa temporal do evento</h2>
+                  </div>
+                  <span className="panel-date">{data ? nomeDia(data) : ""}</span>
+                </div>
+                {erroMapa && <div className="map-warning" role="alert">
+                  <AlertCircle size={18}/>{erroMapa}
+                </div>}
+                {!mapaAtivo ? <div className="map-deferred">
+                  <Layers size={34}/>
+                  <h3>Mapa interativo sob demanda</h3>
+                  <p>Os indicadores já estão disponíveis. Abra o mapa apenas quando precisar
+                    explorar a geometria, evitando carregar WebGL e polígonos
+                    durante a inicialização.</p>
+                  <button type="button" className="map-launch"
+                    onClick={() => setMapaAtivo(true)}>
+                    <Layers size={17}/> Abrir mapa do evento
+                  </button>
+                </div> : <>
+                  {carregandoMapa && <div className="map-loader" aria-live="polite">
+                    <LoaderCircle className="spin" size={18}/> Atualizando geometrias...
+                  </div>}
+                  <Suspense fallback={<div className="map-deferred" role="status">
+                    <LoaderCircle className="spin" size={24}/>
+                    <p>Carregando módulo cartográfico...</p>
+                  </div>}>
+                    <MapPanel id={id} data={data} p1={p1} p2={p2}
+                      mostrarP1={p1Ativo} mostrarP2={p2Ativo}
+                      mapaBase={mapaBase} destaque={segmentoTR}/>
+                  </Suspense>
+                </>}
+                <div className="map-footer">
+                  <p>Geometrias originais em EPSG:4326. Contatos e incrementos não representam frentes ativas do fogo.</p>
+                  {segmentoTR&&<button type="button" className="secondary-button compact"
+                    onClick={()=>setDestaqueTR(null)}>Limpar destaque TR</button>}
+                  {mapaAtivo && <button type="button"
+                    className="secondary-button compact"
+                    onClick={() => { setMapaAtivo(false); setP1(null); setP2(null); }}
+                  >Fechar mapa e liberar memória</button>}
+                  <button type="button" onClick={exportarGeoJSON}
+                    disabled={!data} className="secondary-button compact">
+                    <ArrowDownToLine size={15}/> Exportar GeoJSON
+                  </button>
+                </div>
+              </section>
+
+              {transicao && <div className="transitions-grid">
+                <div className="transition-card">
+                  <span>Área nova nesta transição</span>
+                  <strong>{formatarNumero(numero(transicao,"area_nova_evento_km2"),3)} km²</strong>
+                </div>
+                <div className="transition-card">
+                  <span>Incorporação prequeimada pelo P2</span>
+                  <strong>{formatarNumero(numero(transicao,"p2_incremento_ja_queimado_km2"),3)} km²</strong>
+                </div>
+                <div className="transition-card">
+                  <span>Convergências geométricas</span>
+                  <strong>{formatarNumero(numero(transicao,"eventos_convergencia"),0)}</strong>
+                </div>
+                {numero(transicao, "dias_intervalo") !== 1 &&
+                  <div className="transition-alert">Intervalo entre observações maior que um dia.</div>}
+              </div>}
+
+              <section className="panel details-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">COMPONENTES</span>
+                    <h2>Patches da data selecionada</h2>
+                  </div>
+                  <span className="subtle-pill">
+                    {p1?.features.length ?? 0} feições carregadas
+                  </span>
+                </div>
+                {p1Ativo && p1?.features.length ? (
+                  <div className="table-scroll"><table>
+                    <thead><tr><th>Rank</th><th>Data</th><th>Área GEE</th></tr></thead>
+                    <tbody>{p1.features.slice().sort(
+                      (a,b)=>Number(a.properties.rank ?? 0)-Number(b.properties.rank ?? 0)
+                    ).slice(0,100).map((f,i)=><tr key={i}>
+                      <td>#{f.properties.rank ?? "?"}</td>
+                      <td>{f.properties.data ?? data}</td>
+                      <td>{formatarNumero(Number(f.properties.area_km2 ?? 0),3)} km²</td>
+                    </tr>)}</tbody>
+                  </table></div>
+                ) : <p className="muted">Habilite P1 para consultar os componentes.</p>}
+                {(p1?.features.length ?? 0) > 100 && <p className="muted">
+                  Exibindo os primeiros 100 patches. Exporte o GeoJSON para consultar todos.
+                </p>}
+              </section>
+
+              <div className="audit-banner">
+                {resumo.validacao_externa_concluida
+                  ? <CheckCircle2 size={19}/>
+                  : <AlertCircle size={19}/>}
+                <div>
+                  <strong>Auditoria: {resumo.status_cientifico.replaceAll("_", " ")}</strong>
+                  <p>{resumo.validacao_externa_concluida
+                    ? "Relatório aponta validação externa concluída."
+                    : "Dados processados, sem validação externa comprovada."}
+                    {resumo.dias_sobreposicao_p1_pendentes.length > 0 &&
+                      " Sobreposição P1 pendente: " +
+                        resumo.dias_sobreposicao_p1_pendentes.join(", ") + "."}
+                  </p>
+                </div>
+              </div>
+                </div>
+                <aside className="atlas-floating-controls" aria-label="Gerenciar evento, tempo e camadas">
           <div className="sidebar-group">
             <div className="section-heading">
               <span>GERENCIAMENTO</span>
@@ -421,215 +720,22 @@ export default function App() {
             <p>Use o painel de processamento para consultar o Earth Engine,
               reutilizar o cache e acompanhar as análises sem executar comandos manuais.</p>
             <a className="text-button" href="#processamento"
-              onClick={() => setPainelAberto(false)}>Ir para processamento</a>
-          </div>
-        </aside>
-
-        {painelAberto && <button className="sidebar-scrim"
-          aria-label="Fechar menu" onClick={() => setPainelAberto(false)}/>}
-
-        <main className="main-content">
-          <div className="workspace-heading">
-            <div className="workspace-copy">
-              <h1>Explorador de incêndios</h1>
-            </div>
-            <div className="workspace-actions">
-              <span className="workspace-stamp">GLOBFIRE V2 <b>·</b> DADOS HISTÓRICOS</span>
-              <button className="secondary-button" type="button"
-                aria-label="Atualizar lista de eventos"
-                onClick={() => atualizarLista()}><RefreshCw size={16}/> Atualizar</button>
-            </div>
+              onClick={e => {e.preventDefault();navegar("jobs");}}>Ir para processamento</a>
           </div>
 
-          <div id="processamento" className="jobs-anchor">
-            <CatalogoPanel />
-            <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} />
-          </div>
-
-          {mensagem && <div className="message-box" role="status">
-            <span>{mensagem}</span><button aria-label="Fechar mensagem"
-              onClick={()=>setMensagem("")}><X size={15}/></button>
-          </div>}
-          {erroEvento && <div className="error-panel" role="alert">
-            <AlertCircle size={22}/>
-            <div><strong>Dados indisponíveis</strong><p>{erroEvento}</p></div>
-          </div>}
-          {carregandoEvento && <div className="loading-inline" aria-live="polite">
-            <LoaderCircle size={19} className="spin"/> Carregando evento e séries temporais...
-          </div>}
-          {!resumo && !carregandoEvento && !erroEvento && (
-            <div className="empty-state">
-              <Database size={32}/>
-              <h2>Nenhum incêndio selecionado</h2>
-              <p>Selecione um evento já processado ou informe um ID local.</p>
-            </div>
-          )}
-
-          {resumo && id !== null && (
-            <>
-              <div className="section-title-row">
-                <div className="event-identifier">
-                  <span className="event-dot"/>
-                  <strong>Evento {id}</strong>
-                  <span className="date-label">· {data ? nomeDia(data) : "..."}</span>
-                </div>
-                <span className="period-label">
-                  {resumo.total_datas} observações · {resumo.periodo_inicio} a {resumo.periodo_fim}
-                </span>
-              </div>
-
-              {!resumo.tem_series && <div role="status" className="map-warning">Análise científica ainda indisponível. Valores preliminares dos atributos GeoJSON (não LAEA). {Object.entries(etapasParciais).map(([k,v])=>k+": "+v).join(" · ")}</div>}
-              <div className="kpi-grid">
-                <Kpi rotulo="Área acumulada (P1)"
-                  valor={formatarNumero(areaP1) + (areaP1 !== null ? " km²" : "")}
-                  detalhe="Cobertura espacial do evento" classe="kpi-accent"/>
-                <Kpi rotulo="Região móvel (P2)"
-                  valor={formatarNumero(areaP2) + (areaP2 !== null ? " km²" : "")}
-                  detalhe="Componente rastreado"/>
-                <Kpi rotulo="Participação P2 / P1"
-                  valor={formatarNumero(dominancia,1) + (dominancia !== null ? "%" : "")}
-                  detalhe="Na data selecionada"/>
-                <Kpi rotulo="Componentes P1"
-                  valor={formatarNumero(patches,0)}
-                  detalhe="Patches desta observação"/>
-              </div>
-
-              <nav className="analysis-tab-list" role="tablist" aria-label="Seções do estudo">
-                {ABAS.map(item => <button key={item.id} type="button" role="tab"
-                  id={"aba-" + item.id} aria-controls={"painel-" + item.id}
-                  aria-selected={aba === item.id}
-                  className={"analysis-tab " + (aba === item.id ? "analysis-tab-active" : "")}
-                  onClick={() => {
-                    setAba(item.id);
-                    if (item.id !== "geral") {
-                      setMapaAtivo(false);
-                      setP1(null);
-                      setP2(null);
-                    }
-                  }}>{item.label}</button>)}
-                {resumo.tem_series && <a className="analysis-tab-export"
-                  href={urlSerieCSV(id)} download>
-                  <ArrowDownToLine size={15}/> CSV temporal
-                </a>}
-              </nav>
-              <div role="tabpanel" className="analysis-tab-panel"
-                id={"painel-" + aba} aria-labelledby={"aba-" + aba}>
-              {aba === "geral" && <>
-              <section className="panel map-panel">
-                <div className="panel-heading">
-                  <div>
-                    <span className="eyebrow">ÁREAS QUEIMADAS</span>
-                    <h2>Mapa temporal do evento</h2>
-                  </div>
-                  <span className="panel-date">{data ? nomeDia(data) : ""}</span>
-                </div>
-                {erroMapa && <div className="map-warning" role="alert">
-                  <AlertCircle size={18}/>{erroMapa}
-                </div>}
-                {!mapaAtivo ? <div className="map-deferred">
-                  <Layers size={34}/>
-                  <h3>Mapa interativo sob demanda</h3>
-                  <p>Os indicadores já estão disponíveis. Abra o mapa apenas quando precisar
-                    explorar a geometria, evitando carregar WebGL e polígonos
-                    durante a inicialização.</p>
-                  <button type="button" className="map-launch"
-                    onClick={() => setMapaAtivo(true)}>
-                    <Layers size={17}/> Abrir mapa do evento
-                  </button>
-                </div> : <>
-                  {carregandoMapa && <div className="map-loader" aria-live="polite">
-                    <LoaderCircle className="spin" size={18}/> Atualizando geometrias...
-                  </div>}
-                  <Suspense fallback={<div className="map-deferred" role="status">
-                    <LoaderCircle className="spin" size={24}/>
-                    <p>Carregando módulo cartográfico...</p>
-                  </div>}>
-                    <MapPanel id={id} data={data} p1={p1} p2={p2}
-                      mostrarP1={p1Ativo} mostrarP2={p2Ativo}
-                      mapaBase={mapaBase}/>
-                  </Suspense>
-                </>}
-                <div className="map-footer">
-                  <p>Geometrias originais em EPSG:4326. Contatos e incrementos não representam frentes ativas do fogo.</p>
-                  {mapaAtivo && <button type="button"
-                    className="secondary-button compact"
-                    onClick={() => { setMapaAtivo(false); setP1(null); setP2(null); }}
-                  >Fechar mapa e liberar memória</button>}
-                  <button type="button" onClick={exportarGeoJSON}
-                    disabled={!data} className="secondary-button compact">
-                    <ArrowDownToLine size={15}/> Exportar GeoJSON
-                  </button>
-                </div>
-              </section>
-
-              {transicao && <div className="transitions-grid">
-                <div className="transition-card">
-                  <span>Área nova nesta transição</span>
-                  <strong>{formatarNumero(numero(transicao,"area_nova_evento_km2"),3)} km²</strong>
-                </div>
-                <div className="transition-card">
-                  <span>Incorporação prequeimada pelo P2</span>
-                  <strong>{formatarNumero(numero(transicao,"p2_incremento_ja_queimado_km2"),3)} km²</strong>
-                </div>
-                <div className="transition-card">
-                  <span>Convergências geométricas</span>
-                  <strong>{formatarNumero(numero(transicao,"eventos_convergencia"),0)}</strong>
-                </div>
-                {numero(transicao, "dias_intervalo") !== 1 &&
-                  <div className="transition-alert">Intervalo entre observações maior que um dia.</div>}
-              </div>}
-
-              <section className="panel details-panel">
-                <div className="panel-heading">
-                  <div>
-                    <span className="eyebrow">COMPONENTES</span>
-                    <h2>Patches da data selecionada</h2>
-                  </div>
-                  <span className="subtle-pill">
-                    {p1?.features.length ?? 0} feições carregadas
-                  </span>
-                </div>
-                {p1Ativo && p1?.features.length ? (
-                  <div className="table-scroll"><table>
-                    <thead><tr><th>Rank</th><th>Data</th><th>Área GEE</th></tr></thead>
-                    <tbody>{p1.features.slice().sort(
-                      (a,b)=>Number(a.properties.rank ?? 0)-Number(b.properties.rank ?? 0)
-                    ).slice(0,100).map((f,i)=><tr key={i}>
-                      <td>#{f.properties.rank ?? "?"}</td>
-                      <td>{f.properties.data ?? data}</td>
-                      <td>{formatarNumero(Number(f.properties.area_km2 ?? 0),3)} km²</td>
-                    </tr>)}</tbody>
-                  </table></div>
-                ) : <p className="muted">Habilite P1 para consultar os componentes.</p>}
-                {(p1?.features.length ?? 0) > 100 && <p className="muted">
-                  Exibindo os primeiros 100 patches. Exporte o GeoJSON para consultar todos.
-                </p>}
-              </section>
-
-              <div className="audit-banner">
-                {resumo.validacao_externa_concluida
-                  ? <CheckCircle2 size={19}/>
-                  : <AlertCircle size={19}/>}
-                <div>
-                  <strong>Auditoria: {resumo.status_cientifico.replaceAll("_", " ")}</strong>
-                  <p>{resumo.validacao_externa_concluida
-                    ? "Relatório aponta validação externa concluída."
-                    : "Dados processados, sem validação externa comprovada."}
-                    {resumo.dias_sobreposicao_p1_pendentes.length > 0 &&
-                      " Sobreposição P1 pendente: " +
-                        resumo.dias_sobreposicao_p1_pendentes.join(", ") + "."}
-                  </p>
-                </div>
+                </aside>
               </div>
               </>}
               {aba !== "geral" && <ScientificPanels
                 aba={aba} serie={serie} transicoes={transicoes}
                 dia={data} selecionarData={setData}
+                mostrarSegmento={abrirSegmento}
                 analise={analise} carregando={carregandoAnalise}
                 erro={erroAnalise}/>}
               </div>
             </>
           )}
+          </>}
           <footer className="footer">
             <span>BurnGeoFlow / Atlas cartográfico · Não representa monitoramento de fogo ativo</span>
             <span>Armazenamento local · GEE GlobFire v2</span>
