@@ -78,6 +78,9 @@ class TestEstadoPipeline(unittest.TestCase):
             (pasta/"auditoria_cobertura_p1.json").write_text(
                 '{"componentes":[]}', "utf-8"
             )
+            (pasta/"balanco_expansao_p2.json").write_text(
+                '{"transicoes":[]}', "utf-8"
+            )
             codigo=(Path(__file__).resolve().parents[2] /
                     "burngeoflow"/"processamento"/"metodologia_v2.py")
             md={"metodologia":VERSAO,"sha256_p1_origem":digest(p1),
@@ -86,6 +89,9 @@ class TestEstadoPipeline(unittest.TestCase):
                 "sha256_p2_v2":digest(pasta/"P2_regiao_movel_24340828.geojson"),
                 "sha256_auditoria_cobertura_p1":digest(
                     pasta/"auditoria_cobertura_p1.json"
+                ),
+                "sha256_balanco_expansao_p2":digest(
+                    pasta/"balanco_expansao_p2.json"
                 ),
                 "datas_p1":57,"datas_p2":37,
                 "primeira_data_p2":"2020-08-27"}
@@ -104,7 +110,8 @@ class TestEstadoPipeline(unittest.TestCase):
             for chave in (
                 "sha256_p1_origem", "codigo_sha256",
                 "sha256_p1_v2", "sha256_p2_v2",
-                "sha256_auditoria_cobertura_p1"
+                "sha256_auditoria_cobertura_p1",
+                "sha256_balanco_expansao_p2"
             ):
                 with self.subTest(chave=chave):
                     manifesto.write_text(json.dumps({**md, chave: None}), "utf-8")
@@ -130,6 +137,15 @@ class TestEstadoPipeline(unittest.TestCase):
                              "artefato_perdido")
             (pasta/"auditoria_cobertura_p1.json").write_text(
                 '{"componentes":[]}',"utf-8"
+            )
+            (pasta/"balanco_expansao_p2.json").write_text(
+                '{"transicoes":["alterado"]}', "utf-8"
+            )
+            out=inspecionar_pipeline(24340828,base)
+            self.assertEqual(out["preprocessamento_v2"]["estado"],
+                             "artefato_modificado")
+            (pasta/"balanco_expansao_p2.json").write_text(
+                '{"transicoes":[]}', "utf-8"
             )
             (pasta/"P2_regiao_movel_24340828.geojson").write_text("corrompido","utf-8")
             out=inspecionar_pipeline(24340828,base)
