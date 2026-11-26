@@ -82,7 +82,7 @@ class TestMetodologiaV2(unittest.TestCase):
             self.assertEqual(len(p2["features"]),3)
             balanco=json.loads((folder/"balanco_expansao_p2.json").read_text())
             self.assertEqual(len(balanco["transicoes"]),2)
-            self.assertEqual(resultado["transicoes_balanco_d005"],2)
+            self.assertEqual(result["transicoes_balanco_d005"],2)
             self.assertTrue(all(x["dias_intervalo"]==1 for x in balanco["transicoes"]))
             self.assertTrue(all(x["erro_particao_expansao_m2"]>=0
                                 for x in balanco["transicoes"]))
