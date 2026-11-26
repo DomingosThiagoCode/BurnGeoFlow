@@ -264,12 +264,24 @@ def calcular_metricas(patches: list[Patch]) -> tuple[
             )
         formato_ponderado = 0.0
         perimetro_total = 0.0
+        distintos = {id(p): p for p in grupo}
+        indice = shapely.STRtree([p.geometria for p in distintos.values()])
         for p in grupo:
             forma = indice_forma_vetorial(p.area_m2, p.perimetro_m)
             formato_ponderado += forma * p.area_m2 / area_total
             perimetro_total += p.perimetro_m
-            vizinhos = [q.geometria.distance(p.geometria) for q in grupo if q is not p]
-            distancia = min(vizinhos) / 1000 if vizinhos else None
+            distancia = None
+            if len(distintos) > 1:
+                # A consulta inclusiva retorna o próprio patch e todos os
+                # vizinhos a distância zero, inclusive geometrias idênticas.
+                if len(indice.query_nearest(p.geometria)) > 1:
+                    distancia = 0.0
+                else:
+                    _, distancias = indice.query_nearest(
+                        p.geometria, exclusive=True, all_matches=False,
+                        return_distance=True,
+                    )
+                    distancia = float(distancias[0]) / 1000
             linhas_patch.append({
                 "id_incendio": p.incendio,
                 "data": p.data,

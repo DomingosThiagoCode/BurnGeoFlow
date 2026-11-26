@@ -86,6 +86,25 @@ class MetricasAnaliticasTests(unittest.TestCase):
         self.assertEqual(t[0]["dominancia_maior_patch_pct"], 100)
         self.assertEqual(s[0]["numero_grupos_por_contato_vetorial"], 1)
 
+    def test_distancia_indice_equivale_a_busca_exaustiva(self):
+        geometrias = [
+            box(0, 0, 1, 1), box(0, 0, 1, 1), box(1, 1, 2, 2),
+            box(2, 1, 3, 2), box(5, 1, 6, 2), box(8, 1, 9, 2),
+        ]
+        grupo = [
+            patch_sintetico("2020-01-01", rank, geom)
+            for rank, geom in enumerate(geometrias, 1)
+        ]
+        linhas, _, _, _ = calcular_metricas(grupo)
+        esperadas = [
+            min(p.geometria.distance(q.geometria) for q in grupo if p is not q)
+            / 1000 for p in grupo
+        ]
+        self.assertEqual(
+            [linha["distancia_vizinho_mais_proximo_km"] for linha in linhas],
+            esperadas,
+        )
+
     def test_sobreposicao_real_e_registrada(self):
         a = patch_sintetico("2020-01-01", 1, box(0, 0, 3, 3))
         b = patch_sintetico("2020-01-01", 2, box(1, 1, 4, 4))
