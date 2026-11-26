@@ -1,9 +1,22 @@
 # Estado de execução e mapa anti-retrabalho — BurnGeoFlow
 
-> **Última reconciliação:** 2026-11-26, depois dos merges #53, #51, #49 e #52; GitHub remoto verificado, sem acesso ao disco local.
+> **Última reconciliação:** 2026-11-26, depois dos merges #53, #51, #49, #52 e #54; GitHub remoto verificado, sem acesso ao disco local.
 > **Tipo:** fotografia operacional que DEVE ser reconciliada com issues, PRs, commits e arquivos a cada nova sessão.
 > **Regra:** `main` ≠ PR aberto ≠ experimento validado ≠ conclusão científica.
 > **Ponto de entrada para agentes:** [AGENTS.md](../AGENTS.md), [COORDENACAO_AGENTES.md](COORDENACAO_AGENTES.md), [METODOLOGIA.md](METODOLOGIA.md) e [ROTEIRO.md](ROTEIRO.md).
+
+## Marco de interface P2 (26/11/2026): PR #54 integrada
+
+**[PR #54](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/54) MESCLADA na main** via squash no commit [`07b701b`](https://github.com/DomingosThiagoCode/BurnGeoFlow/commit/07b701b81cf2d2115fedaa961c24eb28575ab020). A [CI da branch no HEAD `5fca29ee`](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45853927468) aprovou frontend (TypeScript, build e Chromium para atlas e landing), API e regressão científica. [CI da main após o merge](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45854298004): verificar conclusão no GitHub; merge aprovado não substitui verificação pós-merge.
+
+- **#40:** catálogo com cinco eventos por página, busca/ordenação global, controles de primeira/última/anterior/próxima; sem consulta GEE ao paginar. Testado no Chromium com oito registros sintéticos.
+- **#43:** módulo `/#catalogo`, `/#processamento`, `/#atlas` e `/#analise/<nome>`, rail compacta expansível por hover/foco sem reflow, drawer mobile, cartão temporal à direita e estado de jobs mantido entre navegações. Sem carregar WebGL antes de abrir o mapa.
+- **#42:** sete rosáceas selecionáveis com 16 setores, teclado/hover/toque, peso absoluto e percentual, filtro temporal, média/concentração circulares e escalas comuns apenas entre unidades compatíveis. Se houver coordenadas de pontos do produto Etapa 4, a seleção de TR pode realçar um segmento real no mapa. Testes unitários e Chromium; não modifica fórmulas científicas.
+- **#41:** README alinhado a páginas/rotas, instalação, logs, catálogo, processamento e distinção dos produtos históricos versus v2 experimental.
+- **#50, parcial:** cena anterior/próxima acessível, identificação de cena e aviso da proveniência P2 progressiva histórica. **Ainda pendente:** atualização e validação científica dos quadros P2 retrospectivos, avaliação visual/performance em equipamento local e decisão de homepage.
+- **#31, parcial:** catálogo com UF/Brasil/AOI já integrado na #49, mas **homologação IBGE/GEE real continua pendente**. Nunca encerrar somente com mocks.
+
+**Regra para Codex:** Não recriar os componentes de interface #40/#41/#42/#43 nem abrir PR para a mesma funcionalidade sem bug reproduzido. Os dados brutos e produtos dos IDs 24340828 e 24194371 não foram reprocessados nem baixados nesta entrega. Issues científicas #2/#3/#34/#44/#45/#46/#47 seguem no seu fluxo separado.
 
 ## Marco de integração seguinte (26/11/2026): catálogo e E2 experimental integrados
 
