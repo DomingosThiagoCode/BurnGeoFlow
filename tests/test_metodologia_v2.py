@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from shapely.geometry import box, mapping
+from shapely.geometry import Polygon, box, mapping
 
 from burngeoflow.processamento.metodologia_v2 import (
     ErroMetodologia, VERSAO, reconstruir,
@@ -31,6 +31,28 @@ def escrever(path, features):
 
 
 class TestMetodologiaV2(unittest.TestCase):
+    def test_autointersecao_apos_projecao_suspende_e_preserva_entrada(self):
+        # Quadrilátero artificial. As cordas projetadas cruzam junto à aresta
+        # quase coincidente, embora a geometria em WGS84 seja válida.
+        poligono = Polygon([(0, 40), (0.004, 40 + 3e-8),
+                            (0.015, 40 + 2e-6), (0.02, 40)])
+        self.assertTrue(poligono.is_valid)
+        with TemporaryDirectory() as tmp:
+            raiz = Path(tmp)
+            origem = raiz / "p1.geojson"
+            # A segunda feição mantém o centro da projeção em (0, 0).
+            escrever(origem, [feat("2020-01-01", 1, poligono, 2),
+                              feat("2020-01-01", 2, box(-0.02, -40 - 2e-6, 0, -39), 2)])
+            entrada = origem.read_bytes()
+            derivados = raiz / "derivados"
+            with self.assertRaisesRegex(ErroMetodologia, "inválida após projeção"):
+                reconstruir(origem, derivados)
+            pasta = derivados / VERSAO
+            diagnostico = json.loads((pasta / "diagnostico_bloqueio.json").read_text())
+            self.assertEqual(diagnostico["detalhes"]["rank"], 1)
+            self.assertFalse((pasta / "manifesto_metodologia.json").exists())
+            self.assertEqual(origem.read_bytes(), entrada)
+
     def test_p1_contato_pontual_e_p2_retro_sem_substituir_entrada(self):
         with TemporaryDirectory() as tmp:
             root=Path(tmp)
