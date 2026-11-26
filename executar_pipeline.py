@@ -137,15 +137,28 @@ def definir_etapas(id_: int, raiz: Path, p1: Path, p2: Path) -> tuple[Etapa, ...
               [str(p1), "--saida", str(e2)],
               (e2 / f"metricas_patches_{id_}.csv",
                e2 / f"metricas_temporais_{id_}.csv",
-               e2 / f"sensibilidade_contato_{id_}.csv")),
+               e2 / f"sensibilidade_contato_{id_}.csv",
+               e2 / f"resumo_metricas_{id_}.json")),
         Etapa("linhagens", py("processamento.linhagens") +
               [str(p1), "--saida", str(e3)],
-              (e3 / f"resumo_transicoes_{id_}.csv",)),
+              (e3 / f"resumo_transicoes_{id_}.csv",
+               e3 / f"linhagens_patches_{id_}.csv",
+               e3 / f"vinculos_temporais_{id_}.csv",
+               e3 / f"eventos_topologicos_{id_}.csv",
+               e3 / f"convergencias_para_qgis_{id_}.geojson",
+               e3 / f"resumo_linhagens_{id_}.json")),
         Etapa("tr_igt", py("analises.tr_igt") +
               [str(p1), str(p2), "--saida", str(e4)],
               (e4 / f"indicadores_regiao_{id_}.csv",
+               e4 / f"pontos_representativos_{id_}.csv",
+               e4 / f"segmentos_trajetorias_{id_}.csv",
+               e4 / f"verificacao_rastreamento_{id_}.csv",
+               e4 / f"cinco_trajetorias_{id_}.geojson",
                e4 / f"incrementos_temporais_{id_}.csv",
+               e4 / f"componentes_incrementos_{id_}.csv",
+               e4 / f"geometrias_incrementos_{id_}.geojson",
                e4 / f"comparacao_tr_igt_{id_}.csv",
+               e4 / f"componentes_reducao_{id_}.csv",
                e4 / f"resumo_regiao_movel_{id_}.json",
                e4 / f"resumo_incrementos_{id_}.json",
                e4 / f"resumo_consolidado_tr_igt_{id_}.json")),
@@ -153,6 +166,7 @@ def definir_etapas(id_: int, raiz: Path, p1: Path, p2: Path) -> tuple[Etapa, ...
               ["--id", str(id_), "--raiz", str(raiz), "--saida", str(e5)],
               (e5 / f"serie_diaria_integrada_{id_}.csv",
                e5 / f"transicoes_integradas_{id_}.csv",
+               e5 / f"fases_descritivas_{id_}.csv",
                e5 / f"relatorio_interpretativo_{id_}.md",
                e5 / f"resumo_etapa5_{id_}.json",
                e5 / f"auditoria_p1_sobreposicoes_{id_}.json")),
@@ -186,6 +200,8 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
     )
     manifesto = {
         "software": "BurnGeoFlow", "versao": "7.1.0",
+        "metodologia_aplicada": "p1_legado_p2_progressivo",
+        "compativel_metodologia_nova": False,
         "id_incendio": id_, "origem": origem,
         "entradas_sha256": hashes, "inicio_utc": agora(),
         "ressalva": "Auditoria geométrica interna, não validação física por sensores.",
@@ -194,14 +210,20 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
     salvar_json(manifesto_path, manifesto)
     logs = raiz / "logs"
     logs.mkdir(parents=True, exist_ok=True)
+    print(
+        "[AVISO] Este é o pipeline legado (P1 não conectado por contato, "
+        "P2 progressivo). A nova metodologia D-001/D-002 permanece "
+        "em integração. Resultados deste fluxo não equivalem à v2.",
+        flush=True,
+    )
     predecessora_reexecutada = False
     for etapa in definir_etapas(id_, raiz, a, b):
         estado = manifesto["etapas"].get(etapa.nome, {})
         assinatura_atual = assinatura_codigo(etapa.nome)
         assinatura_anterior = estado.get("codigo_sha256")
-        codigo_compativel = assinatura_anterior in (None, assinatura_atual)
-        # Registros antigos não tinham assinatura de código. Preservamos o
-        # reuso retrocompatível, mas novas execuções gravam a assinatura.
+        # Registros sem assinatura não provam correspondência de código.
+        # Evitar aceitar artefatos antigos como reproduzíveis por existência.
+        codigo_compativel = assinatura_anterior == assinatura_atual
         # Uma etapa posterior nunca pode reutilizar dados quando qualquer
         # predecessora foi reexecutada na execução atual.
         pode_reutilizar = (
@@ -323,12 +345,44 @@ def main(argv: list[str] | None = None) -> int:
                     help="Baixa o caso de referência 24340828 sem usar GEE")
     ap.add_argument("--refazer", action="store_true",
                     help="Refaz etapas científicas, mesmo que já concluídas")
+    ap.add_argument("--preparar-metodologia-v2", action="store_true",
+                    help="Gerar P1 conectado/P2 retrospectivo em pasta versionada, "
+                         "sem GEE e sem executar etapas dependentes ainda legadas")
     args = ap.parse_args(argv)
     raiz = (args.saida or ROOT / "execucoes" / str(args.id)).resolve()
 
     try:
         if args.id <= 0:
             raise ErroPipeline("ID GlobFire deve ser positivo.")
+        if args.preparar_metodologia_v2:
+            if args.origem not in ("auto", "local") or args.baixar_exemplo or args.somente_aquisicao:
+                raise ErroPipeline(
+                    "--preparar-metodologia-v2 utiliza apenas P1 local, "
+                    "sem aquisição GEE nem download de exemplo."
+                )
+            if args.p2 is not None:
+                raise ErroPipeline(
+                    "Modo v2 usa somente P1 original. Não informe --p2."
+                )
+            fontes = [
+                args.p1,
+                raiz / "dados" / f"estudo_caso_{args.id}" /
+                    f"P1_componentes_{args.id}.geojson",
+                ROOT / "dados" / f"estudo_caso_{args.id}" /
+                    f"P1_componentes_{args.id}.geojson",
+            ]
+            fonte = next((p for p in fontes if p is not None and p.is_file()), None)
+            if fonte is None:
+                raise ErroPipeline(
+                    f"ID {args.id}: P1 original não localizado localmente. "
+                    "Nenhuma aquisição GEE foi iniciada."
+                )
+            from burngeoflow.processamento.metodologia_v2 import reconstruir
+            destino = raiz / "dados" / f"estudo_caso_{args.id}" / "derivados_v2"
+            print(f"[V2] Reconstruindo P1/P2 a partir de {fonte}", flush=True)
+            print(json.dumps(reconstruir(fonte, destino, id_esperado=args.id),
+                             ensure_ascii=False, indent=2), flush=True)
+            return 0
         if (args.p1 is None) != (args.p2 is None):
             raise ErroPipeline("--p1 e --p2 devem ser informados juntos.")
         if args.baixar_exemplo and args.origem in {"gee", "brutos"}:

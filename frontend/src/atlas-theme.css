@@ -672,3 +672,51 @@ tbody tr:hover { background:#efede5; }
   .catalog-draw { padding: 8px; }
   .catalog-draw-map { height: 315px; }
 }
+
+/* Painel de proveniência científica: não confundir arquivo existente com
+   resultado compatível com a metodologia atual. */
+.pipeline-inspector {
+  margin: 18px 0;
+  padding: 17px 20px;
+  border: 1px solid #cfcabb;
+  background: #faf8f0;
+}
+.pipeline-inspector-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 16px; flex-wrap: wrap;
+}
+.pipeline-inspector-head > div {
+  display: flex; align-items: center; gap: 8px;
+  color: #243d35; font-size: 14px;
+}
+.pipeline-inspector-head button { display:flex; align-items:center; gap:7px; }
+.pipeline-list { margin-top: 16px; }
+.pipeline-list h4 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .10em;
+  color: #375949; margin: 23px 0 7px;
+}
+.pipeline-line {
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  align-items: center; gap: 8px; border-bottom: 1px solid #e3e0d5;
+  padding: 9px 0; font-size: 12px;
+}
+.pipeline-line > span:first-child { flex: 1 1 170px; }
+.pipeline-state {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 650;
+  text-align: right; line-height: 1.4;
+}
+.pipeline-ok { color: #336a50; }
+.pipeline-neutral { color: #7c796b; }
+.pipeline-warning { color: #a14b2b; }
+.pipeline-alerts {
+  margin-top: 18px; padding: 14px 16px;
+  border-left: 3px solid #b86c42; background: #f5e9db;
+  color: #79402b; font-size: 12px; line-height: 1.6;
+}
+.pipeline-alerts strong { display:flex; align-items:center; gap:8px; }
+.pipeline-alerts p { margin: 8px 0 0; }
+@media (max-width: 640px) {
+  .pipeline-inspector { padding: 12px; }
+  .pipeline-line { align-items: flex-start; }
+}
