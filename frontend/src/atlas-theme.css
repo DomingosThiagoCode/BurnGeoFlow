@@ -624,3 +624,17 @@ tbody tr:hover { background:#efede5; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior:auto; }
 }
+
+/* Catálogo: formulário compacto e responsivo, alinhado ao painel de jobs. */
+.catalog-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; align-items:end; margin:12px 0; }
+.catalog-fields input,.catalog-fields select { width:100%; min-width:0; box-sizing:border-box; }
+.catalog-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:16px 0; }
+.catalog-advanced { padding:12px 0; border-top:1px solid #c9c6b9; border-bottom:1px solid #c9c6b9; }
+.catalog-advanced summary { cursor:pointer; font-weight:600; }
+.catalog-note { font-size:.83rem; line-height:1.5; }
+.catalog-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-top:12px; }
+.catalog-table th,.catalog-table td { padding:10px; border-bottom:1px solid #d4d1c5; text-align:left; vertical-align:middle; }
+.catalog-table th { white-space:nowrap; }
+.catalog-table .secondary-button { margin:3px 0; white-space:nowrap; }
+.workspace-heading .workspace-copy h1 { font-size:clamp(1.65rem,3vw,2.5rem); line-height:1.15; margin:0; }
+.workspace-heading { padding-top:12px; padding-bottom:16px; }

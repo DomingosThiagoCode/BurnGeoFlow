@@ -67,6 +67,16 @@ def responder_api(route):
     caminho = uri.path
     if caminho == "/api/events":
         dados = [{"id_incendio": EVENTO}]
+    elif caminho == "/api/catalogo":
+        pedido = route.request.post_data_json
+        assert pedido["regiao"] == "Pantanal"
+        assert pedido["inicio"] == "2020-01-01" and pedido["fim"] == "2020-12-31"
+        dados = {"origem":"cache local","consultado_utc":"2020-12-31T00:00:00Z",
+                 "inicio_efetivo":"2020-01-01","fim_efetivo":"2020-12-31",
+                 "eventos":[{"id":EVENTO,"ano":2020,"registros_na_aoi":947,
+                 "registros_totais":None,"datas_distintas":57,"primeira_data":DATAS[0],
+                 "ultima_data":DATAS[-1],"dias_periodo":3,"lacunas":0,
+                 "local":{"p1":True,"p2":True,"serie":True}}]}
     elif caminho == "/api/jobs":
         dados = []
     elif caminho.endswith("/overview"):
@@ -158,7 +168,7 @@ def testar() -> None:
             page.route("**/api/**", responder_api)
             base = "http://127.0.0.1:" + str(httpd.server_port)
             page.goto(base, wait_until="networkidle", timeout=30000)
-            page.get_by_role("heading", name="O território depois do fogo.").wait_for()
+            page.get_by_role("heading", name="Explorador de incêndios", exact=True).wait_for()
             assert page.locator(".brand-icon svg").count() == 1, "Marca topográfica ausente"
             assert page.locator(".kpi-card").first.evaluate(
                 "el => getComputedStyle(el).borderRadius"
@@ -174,6 +184,14 @@ def testar() -> None:
                 "Mapa foi carregado antes da ação do usuário"
             )
             assert not errors, f"Falhas JavaScript na página inicial: {errors}"
+            catalogo = page.get_by_role("button", name="Explorar incêndios")
+            catalogo.click()
+            page.get_by_label("Bioma", exact=True).select_option("Pantanal")
+            page.get_by_label("Ano", exact=True).select_option("2020")
+            page.get_by_role("button", name="Buscar incêndios").click()
+            page.locator(".catalog-table").get_by_text(str(EVENTO) + " / 2020", exact=True).wait_for()
+            catalogo.click()
+            assert not errors, f"Falhas JavaScript no catálogo: {errors}"
             page.get_by_role(
                 "button", name="Abrir mapa do evento",
             ).click()
