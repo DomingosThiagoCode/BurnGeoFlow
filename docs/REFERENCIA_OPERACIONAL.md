@@ -61,7 +61,7 @@ As fórmulas científicas não foram alteradas.
 Para instalar e iniciar:
 
 ```powershell
-python -m pip install -r requirements-api.txt
+python -m pip install -r requirements.txt
 python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -107,7 +107,7 @@ pipeline nem precisa de QGIS para visualizar séries e mapas.
 No PowerShell, a partir da raiz do repositório:
 
 ```powershell
-python -m pip install -r requirements-viewer.txt
+python -m pip install -r requirements.txt
 python -m streamlit run visualizador.py
 ```
 
@@ -177,7 +177,7 @@ baixa GeoJSON por páginas e valida o par antes de executar as análises.
 ### Preparação no Windows / PowerShell
 
 ```powershell
-pip install -r requirements-gee.txt
+pip install -r requirements.txt
 Copy-Item .env.example .env
 # Edite EE_PROJECT_ID no .env com o ID do projeto Google Cloud
 earthengine authenticate
