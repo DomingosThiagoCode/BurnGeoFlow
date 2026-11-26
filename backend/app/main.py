@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import router
 from backend.app.api.jobs import router as jobs_router
+from backend.app.api.catalogo import router as catalogo_router
 from backend.app.core.config import ROOT, caminho_dados, origens_permitidas
 from backend.app.core.errors import (
     DadosInconsistentes, EntradaInvalida, EventoNaoEncontrado,
@@ -75,6 +76,7 @@ def criar_app(*, dados_dir: Path | None = None,
 
     app.include_router(router)
     app.include_router(jobs_router)
+    app.include_router(catalogo_router)
 
     # Interface estática compilada, opcional. Em desenvolvimento, Vite
     # continua servindo o frontend no 127.0.0.1:5173.
