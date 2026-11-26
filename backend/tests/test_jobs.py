@@ -105,6 +105,16 @@ class TestJobsAPI(unittest.TestCase):
                 self.assertEqual(args[0], __import__("sys").executable)
                 self.assertNotIn("shell", popen.call_args.kwargs)
 
+    def test_interromper_job_na_fila(self):
+        with TemporaryDirectory() as temp, patch("backend.app.services.job_service.subprocess.Popen"):
+            with TestClient(criar_app(dados_dir=Path(temp))) as client:
+                j = client.post("/api/jobs", json={"id_incendio":24340828,"origem":"local"}).json()
+                url = "/api/jobs/"+j["id"]+"/interromper"
+                self.assertEqual(client.post(url, headers={"Origin":"https://evil.example"}).status_code,403)
+                self.assertEqual(client.post(url).json()["status"],"interrupted")
+                self.assertEqual(client.post(url).json()["status"],"interrupted")
+                self.assertEqual(client.post("/api/jobs",json={"id_incendio":24340828,"origem":"local"}).status_code,202)
+
     def test_worker_termina_e_loga_sem_gge(self):
         with TemporaryDirectory() as temp:
             base = Path(temp)
