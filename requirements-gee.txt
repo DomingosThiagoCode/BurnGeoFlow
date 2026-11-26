@@ -1,3 +1,2 @@
+# Compatibilidade com comandos antigos. Fonte única: requirements.txt.
 -r requirements.txt
-earthengine-api>=1.4,<2
-python-dotenv>=1.0,<2

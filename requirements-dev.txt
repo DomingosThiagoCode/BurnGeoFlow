@@ -1,2 +1,2 @@
--r requirements-api.txt
-httpx>=0.27,<1
+# Compatibilidade com comandos antigos. Fonte única: requirements.txt.
+-r requirements.txt

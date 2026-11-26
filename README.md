@@ -27,7 +27,7 @@ Abra o PowerShell na pasta do repositório:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-api.txt
+python -m pip install -r requirements.txt
 cd frontend
 npm ci
 npm run build
@@ -35,7 +35,7 @@ cd ..
 python iniciar_burngeoflow.py
 ```
 
-Depois abra <http://127.0.0.1:8000>. Em uso cotidiano, após ativar
+O `requirements.txt` reúne todas as dependências Python; não é necessário instalar arquivos separados para API, GEE ou visualizador. Depois abra <http://127.0.0.1:8000>. Em uso cotidiano, após ativar
 o ambiente Python, basta:
 
 ```powershell
@@ -55,7 +55,6 @@ Se não houver entradas locais, a aquisição GEE exige uma conta Google com
 Earth Engine e um projeto Google Cloud configurado:
 
 ```powershell
-python -m pip install -r requirements-gee.txt
 Copy-Item .env.example .env
 # Configure EE_PROJECT_ID em .env
 earthengine authenticate

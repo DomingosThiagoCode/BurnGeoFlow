@@ -1,7 +1,7 @@
 """Inicializa a versão compilada do BurnGeoFlow com um único servidor local.
 
 Primeiro uso:
-    python -m pip install -r requirements-api.txt
+    python -m pip install -r requirements.txt
     cd frontend
     npm ci
     npm run build

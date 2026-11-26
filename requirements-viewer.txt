@@ -1,4 +1,2 @@
+# Compatibilidade com comandos antigos. Fonte única: requirements.txt.
 -r requirements.txt
-streamlit>=1.39,<2
-pydeck>=0.9,<1
-pandas>=2.0,<3

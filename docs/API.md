@@ -6,7 +6,7 @@ O CLI atual permanece independente e sem alterações.
 
 ## Instalação
 
-    python -m pip install -r requirements-api.txt
+    python -m pip install -r requirements.txt
 
 ## Iniciar
 
