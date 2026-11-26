@@ -153,10 +153,20 @@ Avaliar os indicadores TR/IGT segundo:
 
 **Pendências:** definir procedimentos quantitativos, casos sintéticos e reais, critérios de comparação, controles e evidências mínimas para cada dimensão. Não estabelecer limiares arbitrários nem tratar os cinco critérios como testes já executados.
 
+## D-012 — Segmentação temporal de referência pelo P1 e BIC
+
+**Estado:** decisão conceitual aprovada; especificação estatística, implementação e validação pendentes.
+
+Utilizar inicialmente a série temporal da área queimada acumulada total do P1 para construir modelos candidatos de segmentação temporal. Selecionar entre modelos comparáveis pelo menor BIC (k ln(n) − 2 ln(verossimilhança máxima)), equilibrando ajuste e complexidade. Investigar posteriormente o comportamento dos indicadores TR/IGT do P2 nas fases identificadas, evitando usar esses mesmos indicadores para definir as fases de referência e depois alegar capacidade de distingui-las.
+
+**Justificativa:** o P1 caracteriza o evento completo; a segmentação constitui referência construída sem utilizar diretamente os indicadores TR/IGT, não uma validação externa ou independência estatística garantida. O BIC seleciona modelos candidatos, não identifica causas físicas nem garante a existência de múltiplas fases.
+
+**Pendências:** especificar família de modelos, verossimilhança, tratamento de datas irregulares e autocorrelação, contagem de parâmetros incluindo pontos de mudança quando aplicável, duração mínima dos segmentos e comparação com modelo sem mudanças. Verificar sensibilidade e não forçar segmentação quando os dados não a sustentarem. Interpretar fases como padrões da evolução observada da área queimada, não fases físicas da combustão.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Tolerância numérica e desempate residual.
 - Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
 - Operacionalização quantitativa e validação dos cinco critérios da D-011.
-- Segmentação temporal/BIC, validação e generalização.
+- Especificação estatística da segmentação D-012; validação e generalização.
