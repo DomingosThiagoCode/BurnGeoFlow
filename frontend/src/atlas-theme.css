@@ -885,3 +885,25 @@ tbody tr:hover { background:#efede5; }
   .rose-heading {flex-wrap:wrap;}
 }
 @media (prefers-reduced-motion:reduce){.rose-svg .rose-sector{transition:none;}}
+
+/* Seletor do evento compartilhado por todas as telas do atlas. */
+.atlas-event-toolbar {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:16px;
+  align-items:end;
+  max-width:720px;
+  margin:0 0 20px;
+  padding:14px 16px;
+  background:#e8e3d7;
+  border:1px solid #c8c5b6;
+}
+.atlas-event-toolbar .form-label{display:block;color:#37594a;}
+.atlas-event-toolbar .field{width:100%;min-width:0;}
+.atlas-event-toolbar .find-event{margin:0;min-width:0;}
+.atlas-event-toolbar .inline-field{display:flex;gap:8px;}
+.atlas-event-toolbar .inline-field .field{flex:1 1 0;}
+.atlas-event-toolbar .field-action{flex:0 0 43px;}
+@media (max-width:600px){
+  .atlas-event-toolbar{grid-template-columns:minmax(0,1fr);gap:12px;padding:12px;}
+}
