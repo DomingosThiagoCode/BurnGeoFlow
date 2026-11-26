@@ -99,7 +99,9 @@ class TestMetodologiaV2(unittest.TestCase):
             self.assertEqual(r["datas_p2"],1)
             self.assertEqual(r["primeira_data_p2"],"2020-01-02")
 
-    def test_area_sobreposta_suspende_e_salva_diagnostico(self):
+    def test_sobreposicao_intradata_conserva_cobertura_e_registra_evidencia(self):
+        # Dois patches que se sobrepõem são um único componente D-002.
+        # A sobreposição não pode duplicar a área ou escolher um "dono".
         with TemporaryDirectory() as tmp:
             root=Path(tmp)
             origem=root/"p1.geojson"
@@ -107,13 +109,41 @@ class TestMetodologiaV2(unittest.TestCase):
                 feat("2020-01-01",1,box(0,0,2,2),2),
                 feat("2020-01-01",2,box(1,1,3,3),2),
             ])
-            with self.assertRaisesRegex(ErroMetodologia,"sobreposição intradata"):
-                reconstruir(origem,root/"derivados")
+            original=origem.read_bytes()
+            resultado=reconstruir(origem,root/"derivados")
             pasta=root/"derivados"/VERSAO
-            d=json.loads((pasta/"diagnostico_bloqueio.json").read_text())
-            self.assertEqual(d["status"],"bloqueado_revisao_topologica")
-            self.assertTrue(d["detalhes"]["sobreposicao_laea_m2"]>1)
-            self.assertFalse((pasta/"manifesto_metodologia.json").exists())
+            auditoria=json.loads((pasta/"auditoria_cobertura_p1.json").read_text())
+            p1=json.loads((pasta/"P1_componentes_24340828.geojson").read_text())
+            self.assertEqual(resultado["datas_p1"],1)
+            self.assertEqual(resultado["componentes_com_residuo_positivo"],1)
+            self.assertTrue(auditoria["requer_revisao_qualitativa"])
+            self.assertEqual(len(auditoria["componentes"]),1)
+            self.assertEqual(auditoria["componentes"][0]["ranks_origem"],[1,2])
+            self.assertGreater(auditoria["componentes"][0]["area_contada_repetidamente_m2"],0)
+            self.assertEqual(len(p1["features"]),1)
+            self.assertEqual(p1["features"][0]["properties"]["ranks_origem"],[1,2])
+            self.assertEqual(p1["features"][0]["properties"]["numero_componentes"],1)
+            self.assertLess(
+                p1["features"][0]["properties"]["area_km2"]*1e6,
+                auditoria["componentes"][0]["area_somada_m2"]
+            )
+            self.assertEqual(origem.read_bytes(),original)
+            self.assertFalse((pasta/"diagnostico_bloqueio.json").exists())
+
+    def test_cobertura_de_disjuntos_nao_inventa_sobreposicao(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            origem=root/"p1.geojson"
+            escrever(origem,[
+                feat("2020-01-01",1,box(0,0,1,1),2),
+                feat("2020-01-01",2,box(3,3,4,4),2),
+            ])
+            resultado=reconstruir(origem,root/"derivados")
+            auditoria=json.loads(
+                (root/"derivados"/VERSAO/"auditoria_cobertura_p1.json").read_text()
+            )
+            self.assertEqual(resultado["componentes_com_residuo_positivo"],0)
+            self.assertEqual(auditoria["componentes"],[])
 
 
 if __name__=="__main__":
