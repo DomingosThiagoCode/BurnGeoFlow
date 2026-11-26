@@ -75,7 +75,12 @@ class TestEstadoPipeline(unittest.TestCase):
             pasta.mkdir(parents=True)
             for tipo in ("P1_componentes","P2_regiao_movel"):
                 (pasta/f"{tipo}_24340828.geojson").write_text("gerado","utf-8")
+            codigo=(Path(__file__).resolve().parents[2] /
+                    "burngeoflow"/"processamento"/"metodologia_v2.py")
             md={"metodologia":VERSAO,"sha256_p1_origem":digest(p1),
+                "codigo_sha256":digest(codigo),
+                "sha256_p1_v2":digest(pasta/"P1_componentes_24340828.geojson"),
+                "sha256_p2_v2":digest(pasta/"P2_regiao_movel_24340828.geojson"),
                 "datas_p1":57,"datas_p2":37,
                 "primeira_data_p2":"2020-08-27"}
             (pasta/"manifesto_metodologia.json").write_text(json.dumps(md),"utf-8")
@@ -83,6 +88,10 @@ class TestEstadoPipeline(unittest.TestCase):
             self.assertEqual(out["preprocessamento_v2"]["estado"],
                              "preprocessado_nao_integrado")
             self.assertFalse(out["pronto_para_reprocessamento_integral_v2"])
+            (pasta/"P2_regiao_movel_24340828.geojson").write_text("corrompido","utf-8")
+            out=inspecionar_pipeline(24340828,base)
+            self.assertEqual(out["preprocessamento_v2"]["estado"],
+                             "artefato_modificado")
             p1.write_text("modificado","utf-8")
             out=inspecionar_pipeline(24340828,base)
             self.assertEqual(out["preprocessamento_v2"]["estado"],
