@@ -33,6 +33,19 @@ def eventos(r: RepositorioEventos = Depends(repo)):
     return [{"id_incendio": n} for n in r.listar()]
 
 
+@router.get("/events/{incendio}/pipeline-status")
+def progresso_pipeline(incendio: int, r: RepositorioEventos = Depends(repo)):
+    """Diagnóstico de checkpoints, inclusive para eventos incompletos.
+
+    Não exige P1/P2 completos, não consulta o GEE e não altera arquivos.
+    """
+    from backend.app.services.estado_pipeline import inspecionar_pipeline
+    from backend.app.core.errors import EntradaInvalida
+    if incendio <= 0:
+        raise EntradaInvalida("ID deve ser positivo.")
+    return inspecionar_pipeline(incendio, r.base)
+
+
 @router.get("/events/{incendio}/overview", response_model=VisaoEvento)
 def resumo(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.resumo(incendio)
