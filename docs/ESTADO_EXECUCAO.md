@@ -5,6 +5,24 @@
 > **Regra:** `main` ≠ PR aberto ≠ experimento validado ≠ conclusão científica.
 > **Ponto de entrada para agentes:** [AGENTS.md](../AGENTS.md), [COORDENACAO_AGENTES.md](COORDENACAO_AGENTES.md), [METODOLOGIA.md](METODOLOGIA.md) e [ROTEIRO.md](ROTEIRO.md).
 
+## Marco multiagente de 26/11/2026
+
+O checkout `/workspace/BurnGeoFlow` permaneceu limpo em `work` (`2e0dba6`). O protocolo e o estado foram lidos em `origin/main` (`a2aeda5`). Os dois agentes usaram branches, worktrees e ambientes isolados. As seções abaixo preservam o inventário anterior ao marco.
+
+| Frente | Estado e evidência |
+| --- | --- |
+| #44 / PR #51 | HEAD `f226caa5` reaproveitado. Cinco testes dirigidos passaram. No P1 local de 24340828, as seis saídas de linhagens foram idênticas às legadas, com 56 transições, 963 vínculos, 1,27 s e pico de RSS de 83.276 KiB. As branches adicionais de diagnóstico não trazem evidência do patch de 24194371. |
+| #2 / PR #53 | Rascunho em `df2ead8`, sobre a branch de proveniência existente. Páginas GEE passam por validação antes de serem gravadas em cache. As duas cópias locais de cada produto legado de 24340828 são byte a byte idênticas. A validação confirmou 57 datas e 978/57 feições em P1/P2. Passaram 34 testes direcionados. |
+| #3, #45, #34, #46 e #47 / PR #52 | HEAD `5535416` adiciona evidência de desempates de ancestralidade, verificação de proveniência de checkpoints, validação estrutural com calendário próprio de P2 e testes sintéticos de conectividade, continuidade e representatividade. O pré-processador continua experimental. |
+| #34 / índice espacial | Branch existente `f5cf9c7`, 11 testes aprovados. As quatro saídas de métricas comparadas foram idênticas à busca exaustiva. Medianas no P1 de 24340828 de 0,2152 s e 0,2167 s, respectivamente. Em 900 patches sintéticos no mesmo dia, 0,5432 s e 0,0371 s. Script em `/workspace/scratch/bgf-34/benchmark.py`. |
+| #46 / D-005 | Protótipo local `ff3c6c0` em `agente/46-expansao`, também na integração de verificação. No P2 experimental de 24340828, as 56 transições apresentaram erro máximo de partição de `1,49e-7 m²` e área máxima do P2 anterior fora do P1 de `0 m²`. A produção depende dos contratos finais de P1/P2. |
+
+O marco local `agente/integracao-e2` (`ab73580`, código testado) passou 190 testes científicos e 26 de API. O frontend passou cinco testes, build, verificação de bundle e smoke de atlas e landing com Chromium do sistema. No caso 24340828, a execução legada isolada concluiu em 35,45 s, com pico de RSS de 129.444 KiB. A segunda execução reutilizou as oito etapas. O pré-processamento experimental gerou 369 componentes P1 e 57 datas em P1 e P2, com desvio absoluto máximo de área diária de `1,25e-12 km²` em relação à união dos componentes legados reprojetados. Os hashes dos derivados permaneceram iguais após adicionar a auditoria de desempates. Logs e manifestos dessa execução ficam em `/workspace/bgf-integracao/.git-evidencias`.
+
+O CI foi aprovado nos HEADs publicados de #52 (`5535416`, execução `45833662550`) e #53 (`df2ead8`, execução `45833126995`). [CI #52](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45833662550) · [CI #53](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45833126995)
+
+O P1 legado de 24194371 e os brutos GEE não foram localizados no ambiente. A próxima ação é disponibilizar uma cópia do P1 de 24194371 para leitura, registrar o SHA-256 e usar o [diagnóstico da PR #51](DIAGNOSTICO_TOPOLOGIA_LINHAGENS.md) com uma pasta de saída isolada. A equivalência GEE/local de #2 requer os brutos e seu manifesto. O diagnóstico real de #44 precede a homologação de #3/#45/#46 e a regressão científica integral de #47. A autorização de merge na `main` permanece pendente.
+
 ## 0. Resumo executivo, sem ambiguidades
 
 1. **A metodologia científica D-001 a D-016 está documentada e conceitualmente aprovada**, mas sua implementação integral e validação NÃO estão concluídas.
