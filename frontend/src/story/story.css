@@ -1,5 +1,6 @@
 /* BurnGeoFlow / O território depois do fogo
    Estilos isolados: nenhuma regra global da aplicação científica é modificada. */
+html, body, #story-root { margin: 0; min-height: 100%; }
 .story-page {
   --story-paper: #f5f2e9;
   --story-ink: #202d28;
@@ -144,10 +145,10 @@
  .story-header nav { gap: 12px; }
  .story-header nav a { font-size: 10px; }
  .story-header nav a:nth-child(-n+2) { display: none; }
- .story-layout { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
- .story-visual { grid-column: 1; grid-row: 1; position: sticky; top: 0; height: 56svh; z-index: 1; }
- .story-steps { grid-column: 1; grid-row: 1; z-index: 2; padding-top: 56svh; pointer-events: none; }
- .story-step { min-height: 86svh; align-items: start; padding: 10svh 25px 45px; background: var(--story-paper); pointer-events: auto; }
+ .story-layout { display: flex; flex-direction: column; align-items: stretch; }
+ .story-visual { order: -1; position: sticky; top: 0; height: 52svh; width: 100%; z-index: 3; }
+ .story-steps { order: 1; position: relative; z-index: 1; width: 100%; }
+ .story-step { min-height: 70svh; align-items: start; padding: 8svh 25px 45px; background: var(--story-paper); }
  .story-step-inner { max-width: 590px; margin: 0 auto; }
  .story-numeral { font-size: 38px; margin-bottom: 25px; }
  .story-step h1 { font-size: clamp(44px, 10.5vw, 65px); margin-top: 22px; }
