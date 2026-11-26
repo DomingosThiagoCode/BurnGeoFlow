@@ -518,23 +518,27 @@ def obter_geojson(
             pasta_paginas / f"pagina_{indice_pagina:05d}.json"
             if pasta_paginas is not None else None
         )
-        if arquivo_pagina is not None and arquivo_pagina.is_file():
-            recuperado = json.loads(arquivo_pagina.read_text(encoding="utf-8"))
-            if (recuperado.get("chave_cache") != chave_cache
-                    or recuperado.get("token_entrada") != token):
+        do_cache = arquivo_pagina is not None and arquivo_pagina.is_file()
+        contexto = f"{rotulo}, página {indice_pagina}"
+        if do_cache:
+            contexto = f"{contexto}, cache {arquivo_pagina}"
+            try:
+                recuperado = json.loads(arquivo_pagina.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise ErroAquisicao(f"Cache GEE ilegível: {contexto}.") from exc
+            if (not isinstance(recuperado, dict)
+                    or recuperado.get("chave_cache") != chave_cache
+                    or "token_entrada" not in recuperado
+                    or recuperado["token_entrada"] != token):
                 raise ErroAquisicao(
-                    f"Cache GEE incompatível: {arquivo_pagina}. "
+                    f"Cache GEE incompatível: {contexto}. "
                     "Não será reutilizado para evitar misturar conjuntos diferentes."
                 )
-            resposta = recuperado["resposta"]
-            informar(f"[GEE] {rotulo}, página {indice_pagina}: "
-                    "reutilizada do cache local.")
+            resposta = recuperado.get("resposta")
         else:
             try:
                 with aviso_espera(
-                    f"{rotulo}, página {indice_pagina}",
-                    informar=informar,
-                    intervalo_s=intervalo_aviso_s,
+                    contexto, informar=informar, intervalo_s=intervalo_aviso_s,
                 ):
                     resposta = ee.data.computeFeatures(params)
             except Exception as exc:
@@ -542,38 +546,45 @@ def obter_geojson(
                     f"Falha na exportação paginada, após {len(feicoes)} feições: "
                     f"{type(exc).__name__}: {exc}"
                 ) from exc
-            if (arquivo_pagina is not None and isinstance(resposta, dict)
-                    and isinstance(resposta.get("features"), list)):
-                salvar_json_atomico(arquivo_pagina, {
-                    "chave_cache": chave_cache,
-                    "token_entrada": token,
-                    "resposta": resposta,
-                })
         if (not isinstance(resposta, dict)
                 or not isinstance(resposta.get("features"), list)):
-            raise ErroAquisicao("Resposta inválida de computeFeatures.")
-        feicoes.extend(resposta["features"])
-        informar(f"[GEE] {rotulo}: página {indice_pagina} recebida; "
-                f"{len(feicoes)} feições obtidas até agora.")
-        if len(feicoes) > limite:
+            raise ErroAquisicao(f"Resposta inválida de computeFeatures: {contexto}.")
+        novas_feicoes = resposta["features"]
+        for indice, feicao in enumerate(novas_feicoes, start=len(feicoes)):
+            if (not isinstance(feicao, dict) or feicao.get("type") != "Feature"
+                    or not isinstance(feicao.get("geometry"), dict)
+                    or not isinstance(feicao.get("properties"), dict)):
+                raise ErroAquisicao(f"Feição {indice} inválida: {contexto}.")
+        proximo = resposta.get("next_page_token")
+        if proximo is None:
+            proximo = resposta.get("nextPageToken")
+        if proximo is not None and not isinstance(proximo, str):
+            raise ErroAquisicao(f"Token de paginação inválido: {contexto}.")
+        if proximo in vistos:
+            raise ErroAquisicao(f"Paginação GEE repetiu um token: {contexto}.")
+        if len(feicoes) + len(novas_feicoes) > limite:
             raise ErroAquisicao(
                 f"Limite de {limite} feições excedido. "
                 "A exportação em lotes precisará ser habilitada para esse evento."
             )
-        proximo = resposta.get("next_page_token") or resposta.get("nextPageToken")
+        if not (feicoes or novas_feicoes or proximo):
+            raise ErroAquisicao(f"Nenhuma feição obtida pelo GEE: {contexto}.")
+        if do_cache:
+            informar(f"[GEE] {rotulo}, página {indice_pagina}: "
+                    "reutilizada do cache local.")
+        elif arquivo_pagina is not None:
+            salvar_json_atomico(arquivo_pagina, {
+                "chave_cache": chave_cache,
+                "token_entrada": token,
+                "resposta": resposta,
+            })
+        feicoes.extend(novas_feicoes)
+        informar(f"[GEE] {rotulo}: página {indice_pagina} recebida; "
+                f"{len(feicoes)} feições obtidas até agora.")
         if not proximo:
             break
-        if proximo in vistos:
-            raise ErroAquisicao("Paginação GEE repetiu um token.")
-        vistos.add(str(proximo))
-        token = str(proximo)
-    if not feicoes:
-        raise ErroAquisicao("Nenhuma feição obtida pelo GEE.")
-    for indice, f in enumerate(feicoes):
-        if (not isinstance(f, dict) or f.get("type") != "Feature"
-                or not isinstance(f.get("geometry"), dict)
-                or not isinstance(f.get("properties"), dict)):
-            raise ErroAquisicao(f"Feição {indice} inválida na resposta GEE.")
+        vistos.add(proximo)
+        token = proximo
     informar(f"[GEE] {rotulo}: extração concluída, "
             f"{len(feicoes)} feições recebidas.")
     return {"type": "FeatureCollection", "features": feicoes}

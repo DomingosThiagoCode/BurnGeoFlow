@@ -54,6 +54,43 @@ class TestePaginacao(unittest.TestCase):
         self.assertEqual(len(resposta["features"]), 2)
         self.assertEqual(compute.call_args_list[1].args[0]["pageToken"], "p2")
 
+    def test_retomada_reutiliza_pagina_valida_e_recupera_pagina_rejeitada(self):
+        p1, _ = exemplo()
+        primeira = {"features": p1["features"], "nextPageToken": "p2"}
+        segunda = {"features": p1["features"]}
+        compute = Mock(side_effect=[
+            primeira, {"features": [None]}, segunda,
+        ])
+        ee = SimpleNamespace(data=SimpleNamespace(computeFeatures=compute))
+        with TemporaryDirectory() as raiz:
+            pasta = Path(raiz)
+            kwargs = {
+                "pasta_paginas": pasta, "chave_cache": "v1:P1",
+                "informar": lambda _: None,
+            }
+            with self.assertRaisesRegex(ErroAquisicao, "Feição 1"):
+                obter_geojson(ee, "expr", **kwargs)
+            self.assertTrue((pasta / "pagina_00001.json").is_file())
+            self.assertFalse((pasta / "pagina_00002.json").exists())
+            retomado = obter_geojson(ee, "expr", **kwargs)
+            self.assertEqual(retomado["features"], p1["features"] * 2)
+            self.assertEqual(compute.call_count, 3)
+            self.assertEqual(compute.call_args.args[0]["pageToken"], "p2")
+            self.assertEqual(obter_geojson(ee, "expr", **kwargs), retomado)
+            self.assertEqual(compute.call_count, 3)
+
+    def test_cache_corrompido_e_preservado_sem_requisicao(self):
+        compute = Mock()
+        ee = SimpleNamespace(data=SimpleNamespace(computeFeatures=compute))
+        with TemporaryDirectory() as raiz:
+            pasta = Path(raiz)
+            arquivo = pasta / "pagina_00001.json"
+            arquivo.write_bytes(b'{"chave_cache":')
+            with self.assertRaisesRegex(ErroAquisicao, "Cache GEE ilegível"):
+                obter_geojson(ee, "expr", pasta_paginas=pasta, chave_cache="v1:P1")
+            self.assertEqual(arquivo.read_bytes(), b'{"chave_cache":')
+        compute.assert_not_called()
+
     def test_mensagens_ao_receber_pagina(self):
         p1, _ = exemplo()
         mensagens = []
