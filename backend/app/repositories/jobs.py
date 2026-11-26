@@ -7,7 +7,7 @@ uma tarefa em andamento. Migrações futuras exigirão backup explícito.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import os
+import psutil
 from pathlib import Path
 import sqlite3
 from typing import Any
@@ -37,15 +37,11 @@ def vivo(pid: int | None) -> bool:
     if not pid or pid < 1:
         return False
     try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
+        processo = psutil.Process(pid)
+        return processo.is_running() and processo.status() != psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
         return False
-    except PermissionError:
-        return True
-    except OSError:
-        # Windows pode não permitir verificação estável via kill(pid,0).
-        # Desconhecido deve ser tratado como vivo: não declarar falha falsa.
+    except psutil.AccessDenied:
         return True
 
 
