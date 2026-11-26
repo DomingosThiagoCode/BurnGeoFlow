@@ -4,7 +4,7 @@ import { formatarNumero, numero } from "../services/api";
 import type { AnaliseEtapa4, Linha } from "../types";
 import {
   type ContribuicaoDirecional, DIRECOES, distribuicaoDirecional,
-  indiceDirecional, intervaloSetor, filtrarIntervalo,
+  indiceDirecional, intervaloSetor,
 } from "../utils/rose";
 
 export type AbaCientifica = "paisagem" | "expansao" | "movimento" | "direcoes" | "forma";
@@ -216,6 +216,8 @@ function CincoTrajetorias({ pontos, dia }: { pontos: Linha[]; dia: string }) {
 }
 
 export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, analise, carregando, erro }: Props) {
+  const [inicioFiltro,setInicioFiltro]=useState("");
+  const [fimFiltro,setFimFiltro]=useState("");
   const datas = useMemo(() => serie.map(r => r.data ?? ""), [serie]);
   const datasTransicao = useMemo(() => transicoes.map(r => r.data_atual ?? ""), [transicoes]);
   const indicadores = analise?.indicadores ?? [];
@@ -316,36 +318,83 @@ export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, 
   </>;
 
   if (aba === "direcoes") {
-    const tr = transicoes.map(r => ({
-      angulo: numero(r, "tr_azimute_centroide_graus"),
-      peso: numero(r, "tr_deslocamento_centroide_km"),
-    })).filter((v): v is AnguloPonderado => v.angulo !== null && v.peso !== null && v.peso > 0);
-    const igt = transicoes.map(r => ({
-      angulo: numero(r, "igt_azimute_ponderado_graus"),
-      peso: numero(r, "p2_incremento_geometrico_km2"),
-    })).filter((v): v is AnguloPonderado => v.angulo !== null && v.peso !== null && v.peso > 0);
+    const datasDisponiveis=Array.from(new Set([
+      ...transicoes.map(t=>t.data_atual??""),
+      ...segmentos.map(t=>t.data_atual??""),
+    ].filter(Boolean))).sort();
+    const periodo = (r:Linha) => {
+      const data=r.data_atual??"";
+      return data!==""&&(!inicioFiltro||data>=inicioFiltro)&&(!fimFiltro||data<=fimFiltro);
+    };
+    const transicoesPeriodo=transicoes.filter(periodo);
+    const segmentosPeriodo=segmentos.filter(periodo);
+    const tr=transicoesPeriodo.map(r=>({
+      angulo: numero(r,"tr_azimute_centroide_graus"),
+      peso: numero(r,"tr_deslocamento_centroide_km"),
+      data: r.data_atual??"",
+    })).filter((v):v is AnguloPonderado=>v.angulo!==null&&v.peso!==null&&v.peso>0);
+    const igt=transicoesPeriodo.map(r=>({
+      angulo:numero(r,"igt_azimute_ponderado_graus"),
+      peso:numero(r,"p2_incremento_geometrico_km2"),
+      data:r.data_atual??"",
+    })).filter((v):v is AnguloPonderado=>v.angulo!==null&&v.peso!==null&&v.peso>0);
+    const feixes=TRAJETORIAS.map(t=>({
+      ...t,
+      dados:segmentosPeriodo.filter(s=>s.ponto===t.id).map(s=>({
+        angulo:numero(s,"azimute_geodesico_graus"),
+        peso:numero(s,"distancia_geodesica_km"),
+        data:s.data_atual??"",
+      })).filter((v):v is AnguloPonderado=>
+        v.angulo!==null&&v.peso!==null&&v.peso>0),
+    }));
+    const escalaKm=Math.max(0,distribuicaoDirecional(tr).maximo,
+      ...feixes.map(f=>distribuicaoDirecional(f.dados).maximo));
     return <>
       <Introducao titulo="Direções e rosáceas"
-        texto="Distribuições dos azimutes calculados. As rosáceas TR e IGT usam ponderações distintas, explicitadas em cada gráfico. As cinco rosáceas inferiores representam os feixes geométricos da Etapa 4."/>
-      <div className="rose-grid">
-        <RosaDirecional titulo="TR · Centroide" dados={tr} subtitulo="Ponderação: distância do centroide (km)"/>
-        <RosaDirecional titulo="IGT · Incremento P2" dados={igt} subtitulo="Ponderação: incremento geométrico do P2 (km²)"/>
+        texto="Distribuições azimutais com 16 setores. Compare direções apenas entre ponderações com a mesma unidade; selecione setores e datas para sincronizar a linha do tempo."/>
+      <div className="rose-period-control">
+        <label htmlFor="rose-from">A partir de
+          <select id="rose-from" value={inicioFiltro} onChange={e=>setInicioFiltro(e.target.value)}>
+            <option value="">Primeira observação</option>
+            {datasDisponiveis.map(d=><option value={d} key={d}>{d}</option>)}
+          </select>
+        </label>
+        <label htmlFor="rose-to">Até
+          <select id="rose-to" value={fimFiltro} onChange={e=>setFimFiltro(e.target.value)}>
+            <option value="">Última observação</option>
+            {datasDisponiveis.map(d=><option value={d} key={d}>{d}</option>)}
+          </select>
+        </label>
+        <button className="secondary-button compact" type="button"
+          disabled={!inicioFiltro&&!fimFiltro}
+          onClick={()=>{setInicioFiltro("");setFimFiltro("");}}>Limpar período</button>
+        <span role="status">
+          {inicioFiltro&&fimFiltro&&inicioFiltro>fimFiltro?
+            "Intervalo invertido. Ajuste as datas.":
+            transicoesPeriodo.length+" transições observadas no recorte"}
+        </span>
       </div>
-      {analise?.disponivel ? <>
+      <div className="rose-grid">
+        <RosaDirecional key={"tr:"+inicioFiltro+":"+fimFiltro}
+          titulo="TR · Centroide" dados={tr} unidade="km"
+          escalaComum={escalaKm} selecionarData={selecionarData}
+          subtitulo="Ponderação: distância do centroide (km)"/>
+        <RosaDirecional key={"igt:"+inicioFiltro+":"+fimFiltro}
+          titulo="IGT · Incremento P2" dados={igt} unidade="km²"
+          selecionarData={selecionarData}
+          subtitulo="Ponderação: incremento geométrico do P2 (km²)"/>
+      </div>
+      {analise?.disponivel?<>
         <h3 className="analysis-subtitle">Cinco feixes representativos</h3>
         <div className="rose-grid">
-          {TRAJETORIAS.map(t => {
-            const dados = segmentos.filter(s => s.ponto === t.id).map(s => ({
-              angulo: numero(s, "azimute_geodesico_graus"),
-              peso: numero(s, "distancia_geodesica_km"),
-            })).filter((v): v is AnguloPonderado =>
-              v.angulo !== null && v.peso !== null && v.peso > 0);
-            return <RosaDirecional key={t.id} titulo={t.rotulo} dados={dados}
-              subtitulo="Ponderação: distância geodésica (km)"/>;
-          })}
+          {feixes.map(t=><RosaDirecional
+            key={t.id+":"+inicioFiltro+":"+fimFiltro}
+            titulo={t.rotulo} dados={t.dados} unidade="km"
+            escalaComum={escalaKm} selecionarData={selecionarData}
+            subtitulo="Ponderação: distância geodésica (km)"/>)}
         </div>
-      </> : <div className="empty-chart">As rosáceas dos cinco extremos requerem os arquivos da Etapa 4.</div>}
-      <Aviso>Direção do centroide e direção de ganho de área não são a mesma grandeza. A direção predominante não implica direção do vento ou propagação de fogo ativo.</Aviso>
+      </>:<div className="empty-chart">As rosáceas dos cinco extremos requerem os arquivos da Etapa 4.</div>}
+      <Aviso>Os setores descrevem variações geométricas. A seleção atualiza a data do atlas, mas não desenha segmentos que não estejam georreferenciados no mapa. Não infira vento ou propagação de fogo ativo.</Aviso>
     </>;
   }
 
