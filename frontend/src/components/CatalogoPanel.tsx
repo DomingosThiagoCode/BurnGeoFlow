@@ -18,8 +18,8 @@ async function post<T>(path:string, body?:unknown):Promise<T> {
   if(!res.ok) throw new Error(typeof data.detail==="string"?data.detail:data.error?.message??"Falha na consulta");
   return data as T;
 }
-export function CatalogoPanel() {
-  const [aberto,setAberto]=useState(false);
+export function CatalogoPanel({ abertoInicial = false }: { abertoInicial?: boolean } = {}) {
+  const [aberto,setAberto]=useState(abertoInicial);
   const [modo,setModo]=useState<"regiao"|"uf"|"pais"|"arquivo"|"desenho">("regiao");
   const [regioes,setRegioes]=useState<RegioesDisponiveis|null>(null);
   const [uf,setUf]=useState("MS");
