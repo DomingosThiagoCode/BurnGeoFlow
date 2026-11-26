@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -218,16 +219,26 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
             arquivo.parent.mkdir(parents=True, exist_ok=True)
             if arquivo.is_file():
                 arquivo.unlink()  # Evita aceitar arquivo antigo se a etapa nao escrever novo.
+        # Força a mesma codificação na origem e no leitor, inclusive no Windows.
+        ambiente = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
         # stdout continua separado (algumas etapas produzem JSON).
         if etapa.nome == "regularizar_diagnostico":
             stderr_linhas = []
             with subprocess.Popen(etapa.comando, cwd=ROOT, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE, text=True,
+                                  stderr=subprocess.PIPE, text=True, env=ambiente,
                                   encoding="utf-8", errors="replace") as proc:
                 def acompanhar():
                     for linha in proc.stderr:
                         stderr_linhas.append(linha)
-                        print(linha.rstrip(), flush=True)
+                        try:
+                            print(linha.rstrip(), flush=True)
+                        except UnicodeEncodeError:
+                            # Não abandonar a drenagem do pipe por falha de exibição.
+                            cod = sys.stdout.encoding or "ascii"
+                            print(linha.rstrip().encode(cod, errors="backslashreplace").decode(cod), flush=True)
+                        except OSError:
+                            # O consumidor do terminal pode ter fechado; continue drenando.
+                            pass
                 leitor = Thread(target=acompanhar)
                 leitor.start()
                 stdout = proc.stdout.read()
@@ -237,7 +248,7 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
                                                     "".join(stderr_linhas))
         else:
             resultado = subprocess.run(
-                etapa.comando, cwd=ROOT, capture_output=True,
+                etapa.comando, cwd=ROOT, capture_output=True, env=ambiente,
                 text=True, encoding="utf-8", errors="replace", check=False
             )
         (logs / f"{etapa.nome}.log").write_text(
