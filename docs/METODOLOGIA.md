@@ -26,7 +26,7 @@ Este documento registra as decisões acordadas da pesquisa, independentemente da
 
 **Evidência da necessidade da revisão:** evento 24194371, 128 datas, área final total 17.908,2595 km² e P2 progressivo final 26,4019 km², conforme aquisição reportada. A implementação atual de aquisição em `burngeoflow/aquisicao/earth_engine.py` usa o maior componente inicial e rastreamento progressivo; portanto diverge desta decisão. O P2 retrospectivo ainda precisa ser implementado e testado, incluindo no caso original 24340828. Resultados dependentes de P2 antigo devem ser identificados como tal e recalculados após a revisão, preservando proveniência.
 
-**Ainda em discussão:** tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação dos indicadores durante fusões. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. A representatividade é tratada na D-006.
+**Ainda em discussão:** tolerâncias geométricas, interpretação dos indicadores durante fusões. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. A representatividade é tratada na D-006.
 
 ## D-002 — Conectividade por borda ou vértice no P1
 
@@ -48,7 +48,7 @@ Não criar saltos espaciais por proximidade para prolongar artificialmente o P2.
 
 **Justificativa:** a região que se torna dominante ao final pode ter surgido depois do início do incêndio. A proximidade de outro patch não demonstra ancestralidade. A duração distinta de P1 e P2 não constitui, por si só, erro.
 
-**Implicações:** não preencher datas anteriores com geometrias fictícias ou zeros; distinguir ausência de P2 de ausência de incêndio. Adequar validação, interface, indicadores e integração às datas efetivamente disponíveis. Registrar motivo de encerramento, data inicial do P2 e diagnóstico de eventuais inconsistências. Não interpretar falhas geométricas como nascimento confirmado. O tratamento específico de contato exclusivamente pontual entre observações sem área de interseção permanece por decidir, distinguindo a conectividade intradata D-002 da ancestralidade temporal.
+**Implicações:** não preencher datas anteriores com geometrias fictícias ou zeros; distinguir ausência de P2 de ausência de incêndio. Adequar validação, interface, indicadores e integração às datas efetivamente disponíveis. Registrar motivo de encerramento, data inicial do P2 e diagnóstico de eventuais inconsistências. Não interpretar falhas geométricas como nascimento confirmado. A elegibilidade por área de interseção positiva está definida na D-007.
 
 ## D-004 — Desempate entre ancestrais do P2
 
@@ -90,10 +90,20 @@ Não excluir observações ou interromper o rastreamento do P2 apenas porque sua
 
 **Limites:** não estabelecer percentual mínimo arbitrário; distinguir ausência de P2 de participação zero; sinalizar indicadores matematicamente indefinidos, geometrias inválidas e limitações de resolução independentemente da representatividade. Não inventar valores para observações ausentes.
 
+## D-007 — Ancestralidade temporal exige sobreposição de área
+
+**Estado:** decisão conceitual aprovada; implementação e validação pendentes.
+
+Para selecionar um ancestral do P2, exigir área de interseção positiva entre o componente da observação anterior e o componente posterior rastreado. Contatos exclusivamente por vértice ou borda, sem área de interseção, não são suficientes para estabelecer ancestralidade temporal.
+
+**Justificativa:** distinguir a conectividade espacial intradata (D-002), que inclui contatos pontuais, da continuidade temporal de uma região queimada acumulada, para a qual se espera a preservação de área anteriormente queimada. Investigar inconsistências topológicas ou numéricas antes de interpretar ausência de sobreposição como surgimento de um novo componente. Na ausência de ancestral elegível após diagnóstico, aplicar D-003, sem fallback por distância.
+
+**Validação pendente:** casos de interseção positiva, contato pontual, contato por borda, ausência de contato e pequenas interseções sujeitas à precisão geométrica. Tolerâncias numéricas ainda devem ser justificadas; não confundir área positiva com comprovação de causalidade física.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
-- Contato exclusivamente pontual entre datas no rastreamento; tolerância numérica e desempate residual.
+- Tolerância numérica e desempate residual.
 - Regularização, tolerâncias e auditoria topológica (issue #44).
 - Interpretação e seleção de indicadores TR/IGT.
 - Segmentação temporal/BIC, validação e generalização.
