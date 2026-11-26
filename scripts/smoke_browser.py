@@ -67,9 +67,16 @@ def responder_api(route):
     caminho = uri.path
     if caminho == "/api/events":
         dados = [{"id_incendio": EVENTO}]
+    elif caminho == "/api/catalogo/regioes":
+        dados = {"biomas":["Pantanal","Amazônia","Cerrado","Caatinga","Mata Atlântica","Pampa"],
+                 "pais":"Brasil",
+                 "ufs":[{"codigo":"MS","nome":"Mato Grosso do Sul"},
+                        {"codigo":"RJ","nome":"Rio de Janeiro"}]}
     elif caminho == "/api/catalogo":
         pedido = route.request.post_data_json
-        assert pedido["regiao"] == "Pantanal"
+        assert pedido.get("regiao") in ("Pantanal", "UF:MS", "Brasil") or (
+            pedido.get("geometria", {}).get("type") == "Polygon"
+        ), pedido
         assert pedido["inicio"] == "2020-01-01" and pedido["fim"] == "2020-12-31"
         dados = {"origem":"cache local","consultado_utc":"2020-12-31T00:00:00Z",
                  "inicio_efetivo":"2020-01-01","fim_efetivo":"2020-12-31",
@@ -78,7 +85,18 @@ def responder_api(route):
                  "ultima_data":DATAS[-1],"dias_periodo":3,"lacunas":0,
                  "local":{"p1":True,"p2":True,"serie":True}}]}
     elif caminho == "/api/jobs":
-        dados = []
+        if route.request.method == "POST":
+            pedido = route.request.post_data_json
+            assert pedido == {
+                "id_incendio": EVENTO, "origem": "auto", "ano": 2020,
+            }, pedido
+            dados = {"id": "a"*32,"incendio":EVENTO,"origem":"auto",
+                     "ano":2020,"status":"queued","pid":None,
+                     "created_at":"2020-12-31T00:00:00Z","started_at":None,
+                     "finished_at":None,"heartbeat_at":None,
+                     "exit_code":None,"error":None}
+        else:
+            dados = []
     elif caminho.endswith("/overview"):
         dados = resumo()
     elif caminho.endswith("/series"):
@@ -190,6 +208,14 @@ def testar() -> None:
             page.get_by_label("Ano", exact=True).select_option("2020")
             page.get_by_role("button", name="Buscar incêndios").click()
             page.locator(".catalog-table").get_by_text(str(EVENTO) + " / 2020", exact=True).wait_for()
+            # A seleção alternativa precisa usar a mesma API, sem carregar P1/P2.
+            page.get_by_label("Área de pesquisa").select_option("uf")
+            page.get_by_label("Estado").select_option("MS")
+            page.get_by_role("button", name="Buscar incêndios").click()
+            page.locator(".catalog-table").get_by_text(str(EVENTO) + " / 2020", exact=True).wait_for()
+            page.once("dialog", lambda dialog: dialog.accept())
+            page.get_by_role("button", name="Processar ID").first.click()
+            page.get_by_text("Execução criada. Acompanhe no painel de processamento.").wait_for()
             catalogo.click()
             assert not errors, f"Falhas JavaScript no catálogo: {errors}"
             page.get_by_role(
