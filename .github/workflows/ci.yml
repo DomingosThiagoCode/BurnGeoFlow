@@ -113,11 +113,15 @@ jobs:
           python -m pip install "playwright>=1.50,<2"
           python -m playwright install --with-deps chromium
           python scripts/smoke_browser.py
+      - name: Smoke test do scrollytelling (desktop e mobile)
+        run: python scripts/smoke_story.py
       - name: Evidências visuais do atlas (desktop e mobile)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: burngeoflow-atlas-visual
-          path: artifacts/atlas/*.png
+          path: |
+            artifacts/atlas/*.png
+            artifacts/story/*.png
           retention-days: 14
           if-no-files-found: ignore
