@@ -1,16 +1,28 @@
 # Estado de execução e mapa anti-retrabalho — BurnGeoFlow
 
-> **Última reconciliação:** 2026-11-26 (revisão manual do GitHub, sem acesso ao disco local do operador).
+> **Última reconciliação:** 2026-11-26, depois dos merges autorizados #53 e #51; GitHub remoto verificado, sem acesso ao disco local.
 > **Tipo:** fotografia operacional que DEVE ser reconciliada com issues, PRs, commits e arquivos a cada nova sessão.
 > **Regra:** `main` ≠ PR aberto ≠ experimento validado ≠ conclusão científica.
 > **Ponto de entrada para agentes:** [AGENTS.md](../AGENTS.md), [COORDENACAO_AGENTES.md](COORDENACAO_AGENTES.md), [METODOLOGIA.md](METODOLOGIA.md) e [ROTEIRO.md](ROTEIRO.md).
+
+## Marco de integração de 26/11/2026: entregas efetivas na main
+
+- **[PR #53](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/53) MESCLADA** por squash no commit [`5fbc82f`](https://github.com/DomingosThiagoCode/BurnGeoFlow/commit/5fbc82f347812e8b37d38aeb3794ef66815c321f). GEE: validação pré-cache, preservação de página corrompida e hash SHA-256 de brutos/publicados. [CI da main após #53 aprovada nos três jobs](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45846590746). **Issue #2 segue aberta**, pois equivalência remota GEE/local não foi comprovada.
+- **[PR #51](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/51) MESCLADA** por squash no commit [`2e5781c`](https://github.com/DomingosThiagoCode/BurnGeoFlow/commit/2e5781cb0cc92fd9e4a4d01a7df0b6a943429c9e). Diagnóstico em etapa de linhagens, com interseção duplicada, ranks e arquivo de evidência sem alterar geometrias. [CI da main após #51](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45846849159): verificar conclusão antes de anunciar resultado. **Issue #44 segue aberta**, pois não existe reparo topológico científico homologado.
+- **[PR #49](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/49) aberta e DRAFT:** catálogo ampliado (UF/Brasil/AOI desenhada), CI aprovada na branch; conflito de integração e testes reais IBGE/GEE pendentes. O catálogo por bioma já existia na main.
+- **[PR #52](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/52) aberta e DRAFT:** P1/P2 v2 e checkpoints experimentais; CI na branch não equivale à integração científica. A branch `agente/integracao-e2` tem contratos/trabalho posteriores e divergiu da PR; comparar antes de qualquer merge.
+- **Nenhum outro PR ou issue criado por causa destes dois merges.** A investigação de faces `investigacao/d013-d014-faces` é experimento segregado, não correção aprovada nem produto de produção.
+- **Nada de reaquisição GEE dos IDs 24340828 e 24194371** sem confirmação de ausência/corrupção dos insumos locais. Os dois casos ainda aguardam reprocessamento integral na metodologia nova.
+- **Outras evidências remotas:** `agente/integracao-e2` em `148471e` com CI verde; `947a82c` não localizado remotamente na última investigação, pode existir apenas no workspace original do Codex.
+
+> Esta seção é o estado pós-merge. Notas históricas abaixo devem ser interpretadas conforme este marco, nunca como prova de PR ainda aberta.
 
 ## 0. Resumo executivo, sem ambiguidades
 
 1. **A metodologia científica D-001 a D-016 está documentada e conceitualmente aprovada**, mas sua implementação integral e validação NÃO estão concluídas.
 2. **A `main` ainda executa o pipeline científico legado:** P1 sem o agrupamento por contato da D-002 como produto oficial e P2 progressivo a partir do maior componente inicial, incompatível com a D-001. NÃO declarar saída antiga como resultado da nova metodologia.
 3. **PR #52 (DRAFT, fora da `main`):** primeiro pré-processador P1 conectado/P2 retrospectivo + inspeção de checkpoints no painel. Experimental, não integrado aos validadores/etapas finais; NÃO permite reprocessamento científico completo.
-4. **PR #51 (DRAFT, fora da `main`):** diagnóstico da falha topológica de linhagens do ID 24194371. Não contém correção científica da causa.
+4. **PR #51 (MESCLADA na `main`):** diagnóstico da falha topológica de linhagens do ID 24194371. Não contém correção científica da causa.
 5. **PR #49 (DRAFT, fora da `main`):** amplia o catálogo por UF/Brasil e AOI desenhada; faltam testes reais dos limites IBGE e consulta GEE autenticada.
 6. **Landing narrativa:** primeira versão JÁ EXISTE na `main`, em `/apresentacao/`. Issue #50 trata da evolução e homologação, NÃO de criar outra landing do zero.
 7. **Não reexecutar aquisição GEE dos IDs 24340828 e 24194371** só para testar uma mudança de pipeline. Primeiro localizar/verificar os insumos locais e seus hashes. Não presumir que os arquivos locais estão presentes nesta sessão.
@@ -19,7 +31,7 @@
 
 | Área | Já na `main` | Ainda NÃO é |
 | --- | --- | --- |
-| Aquisição | Consulta GlobFire v2/GEE, caminhos interativo e batch, exportações e cache/retomada em assets, P1/P2 legados | Aquisição universalmente robusta para eventos enormes; metodologia P2 retrospectiva |
+| Aquisição | Consulta GlobFire v2/GEE, caminhos interativo e batch, cache/retomada, verificação de páginas e hashes de arquivos (#53), P1/P2 legados | Equivalência autenticada GEE/local não concluída; metodologia P2 retrospectiva |
 | Orquestrador | `executar_pipeline.py`, oito etapas, `execucao.json`, hashes das entradas, assinatura de código e reaproveitamento de etapas | Motor integralmente atualizado à D-001/D-002, auditoria completa de perdas/versões ou retomada fina de todos os subpassos |
 | API | FastAPI, leitura de eventos/GeoJSONs/séries, jobs SQLite e logs | Inspeção explícita de integridade/checkpoints por ID da PR #52 |
 | Atlas | React/TypeScript, mapa, P1/P2 legados, séries e indicadores, execução por ID | Navegação final modular (#43), rosáceas interativas (#42), design definitivo |
@@ -35,15 +47,14 @@ Documentos de referência já existentes: `docs/ARQUITETURA.md`, `docs/REFERENCI
 
 | PR e issue(s) | Branch e HEAD inspecionado | Entrega técnica efetiva | Evidência CI no HEAD | O que NÃO foi entregue |
 | --- | --- | --- | --- | --- |
-| [#51](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/51), issue #44 | `fix/44-diagnostico-intersecoes`, `f226caa5` | `burngeoflow/validacao/diagnostico_linhagens.py`; modifica `processamento/linhagens.py` para emitir JSON com soma/união, área duplicada, ranks, SHA e LAEA. Testes sintéticos em `tests/test_diagnostico_linhagens.py`. Guia `docs/DIAGNOSTICO_TOPOLOGIA_LINHAGENS.md`. | [Aprovado](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45828297827) | Diagnóstico nos dados reais; explicação causal; correção topológica; reprocessamento 24194371 |
 | [#52](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/52), issues #3/#45/#34/#46 (parcial) | `feat/e2-metodologia-v2-checkpoints`, `79c42fb8` | `processamento/metodologia_v2.py`: agrupamento P1 por contato e P2 retrospectivo, bloqueio de sobreposições; `--preparar-metodologia-v2` só local; derivados versionados; manifesto e progresso por data; SHA do código/insumos/saídas; API `/api/events/{id}/pipeline-status`; `frontend/src/components/PipelineStatusPanel.tsx`, testes. | [Aprovado](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45830497673) | Pipeline v2 oficial; TR/IGT e integração adaptados à duração menor de P2; recuperação completa de checkpoints; validação nos dois IDs reais; tratamento científico definitivo de todas as inconsistências |
 | [#49](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/49), issue #31 | `feat/31-catalogo-completo-aoi`, `3ebdc062` | Limites estaduais e Brasil IBGE 2024, cache de malhas, seleção de UF, polígono desenhado via `AoiDrawMap.tsx`, filtros e testes de contrato | [Aprovado](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45822318498) | Homologação dos arquivos oficiais reais/consultas GEE para novas AOIs; integração/merge; paginação #40 |
 
-**Todos os três PRs permanecem DRAFT, abertos e não mesclados**, conforme consulta de 26/11/2026. CI verde indica regressão automatizada no HEAD indicado, não aceitação científica ou aprovação de merge. Antes de retomar, verificar se ainda estão abertos, os SHA e o CI mais recente.
+**Apenas as PRs #49 e #52 deste quadro permanecem abertas e DRAFT** após os merges #51/#53. CI verde não equivale a validação científica ou autorização para substituir produtos legados. Conferir status vivo antes de retomar.
 
 ### Arquivos com provável colisão
 
-- PR #51 é dona temporária de `burngeoflow/processamento/linhagens.py`.
+- A `main` agora contém o diagnóstico da #51 em `burngeoflow/processamento/linhagens.py`; novos desenvolvimentos nesse arquivo devem preservar a instrumentação.
 - PR #52 usa `executar_pipeline.py`, `burngeoflow/processamento/metodologia_v2.py`, `backend/app/api/routes.py`, `backend/app/services/estado_pipeline.py`, `frontend/src/components/JobsPanel.tsx`, `PipelineStatusPanel.tsx` e `frontend/src/atlas-theme.css`.
 - PR #49 usa `backend/app/api/catalogo.py`, `burngeoflow/aquisicao/catalogo.py`, `limites_ibge.py`, `frontend/src/components/CatalogoPanel.tsx`, `AoiDrawMap.tsx` e `atlas-theme.css`.
 - **Colisão real de CSS:** PRs #49 e #52 alteram `frontend/src/atlas-theme.css`. Integração sequencial e resolução manual são necessárias.
@@ -90,14 +101,14 @@ Números acima são **histórico documentado**, não garantia de que arquivos ai
 - `GET /api/events/<ID>/pipeline-status` e o botão `Inspecionar arquivos` no painel: leitura sob demanda de brutos, hash, versão, faltantes, etapas legadas e erros. O progresso registrado por datas **não é barra de progresso de execução integral nem garante processo ativo**.
 - O botão principal `Executar` **continua usando o pipeline legado**; mesmo após a PR #52, NÃO o anunciar como botão de reprocessamento v2.
 
-**Somente na PR #51, até merge:**
+**Na `main` após o merge da PR #51:**
 - `resultados/etapa3/diagnostico_topologia_<ID>_<data>_<lado>_r<rank>.json`: evidência quando a soma de interseções viola o limite existente.
 
 ## 6. Definição explícita de “feito” e “não feito”
 
-**FEITO no código e na CI, mas AINDA NÃO INTEGRADO:** componentes e testes das PRs #49/#51/#52, conforme seção 2.
+**FEITO no código e na CI, mas AINDA NÃO INTEGRADO:** componentes e testes das PRs #49/#52 e da branch `agente/integracao-e2`. PRs #51/#53 já estão na main.
 
-**FEITO na `main`:** API/atlas/landing inicial/catálogo bioma/worker GEE batch/estágios científicos legados, conforme seção 1.
+**FEITO na `main`:** API/atlas/landing inicial/catálogo bioma/worker GEE batch/estágios científicos legados, cache/proveniência #53 e diagnóstico de linhagens #51.
 
 **NÃO FEITO / NÃO COMPROVADO:**
 - Aprovação da política numérica de tolerâncias e reparação em todos os casos;
@@ -111,8 +122,8 @@ Números acima são **histórico documentado**, não garantia de que arquivos ai
 
 ## 7. Retomada recomendada: ação exata, evitando retrabalho
 
-1. Verificar issues e PRs vivos: `gh pr view 49`, `gh pr view 51`, `gh pr view 52` e `gh issue view 44`, `gh issue view 3`, `gh issue view 45`, `gh issue view 46`.
-2. Abrir a [PR #51](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/51) e usar o diagnóstico nos **arquivos locais** de 24194371, sem adquirir GEE novamente; preservar SHA de entrada e registrar evidência real em #44.
+1. Verificar issues e PRs vivos: `gh pr view 49`, `gh pr view 52`, `gh issue view 44`, `gh issue view 3`, `gh issue view 45`, `gh issue view 46`. As PRs #51/#53 já foram mescladas.
+2. Usar o diagnóstico #51 **já presente na main** nos arquivos reais de 24194371, sem readquirir GEE; preservar SHA de entrada e registrar evidência real em #44.
 3. Em paralelo, revisar/continuar o código e testes da [PR #52](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/52) para contratos P2 com início próprio; **não gerar indicadores finais pela v2 até compatibilizar #46**.
 4. Submeter o catálogo da [PR #49](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/49) a homologação IBGE/GEE apenas quando houver ambiente, sem abrir outra implementação de catálogo.
 5. Após revisão/homologação e autorização de merge, integrar PRs de modo sequencial; resolver colisões e repetir CI no HEAD integrado.
