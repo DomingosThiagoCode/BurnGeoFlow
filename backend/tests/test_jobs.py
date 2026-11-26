@@ -115,6 +115,30 @@ class TestJobsAPI(unittest.TestCase):
                 self.assertEqual(client.post(url).json()["status"],"interrupted")
                 self.assertEqual(client.post("/api/jobs",json={"id_incendio":24340828,"origem":"local"}).status_code,202)
 
+    def test_interromper_worker_desaparecido_libera_fila(self):
+        import psutil
+        with TemporaryDirectory() as temp:
+            service = JobService(Path(temp))
+            j = service.store.criar(24194371, "auto", None)
+            service.store.iniciar(j["id"], 999999)
+            with patch("backend.app.services.job_service.psutil.Process",
+                       side_effect=psutil.NoSuchProcess(999999)), patch.object(service, "_orfaos", return_value=[]):
+                self.assertEqual(service.interromper(j["id"])["status"], "interrupted")
+                self.assertEqual(service.store.criar(24194371, "local", None)["status"], "queued")
+
+    def test_reconciliar_worker_antigo_sem_descendentes(self):
+        import psutil
+        with TemporaryDirectory() as temp:
+            service = JobService(Path(temp))
+            j = service.store.criar(24194371, "auto", None)
+            service.store.iniciar(j["id"], 999999)
+            with service.store.conexao() as c:
+                c.execute("UPDATE jobs SET heartbeat_at=? WHERE id=?",
+                          ((datetime.now(timezone.utc)-timedelta(minutes=10)).isoformat(),j["id"]))
+            with patch("backend.app.services.job_service.psutil.Process",
+                       side_effect=psutil.NoSuchProcess(999999)), patch.object(service, "_orfaos", return_value=[]):
+                self.assertEqual(service.obter(j["id"])["status"], "interrupted")
+
     def test_worker_termina_e_loga_sem_gge(self):
         with TemporaryDirectory() as temp:
             base = Path(temp)

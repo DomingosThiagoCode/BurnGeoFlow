@@ -10,7 +10,8 @@ from threading import Lock
 import psutil
 
 from backend.app.core.config import ROOT
-from backend.app.repositories.jobs import JobStore, JobConflito
+from backend.app.repositories.jobs import JobStore, JobConflito, parse_utc
+from datetime import datetime, timezone
 
 _CANCEL_LOCK = Lock()
 
@@ -46,14 +47,59 @@ class JobService:
             raise RuntimeError("Erro ao iniciar execução local") from exc
         return self.store.obter(job["id"])
 
+    def _orfaos(self, job: dict) -> list:
+        """Descendentes sem worker: só processos do mesmo evento e checkout."""
+        destino = os.path.normcase(str(self.base / str(job["incendio"])))
+        script = os.path.normcase(str(ROOT / "executar_pipeline.py"))
+        inicio = parse_utc(job["started_at"] or job["created_at"]).timestamp()
+        encontrados = []
+        for p in psutil.process_iter(["cmdline", "create_time"]):
+            try:
+                args = p.info["cmdline"] or []
+                if not args or (p.info["create_time"] or 0) < inicio - 2:
+                    continue
+                normal = [os.path.normcase(a) for a in args]
+                cli = script in normal and destino in normal
+                etapa = any(a.startswith("burngeoflow.") for a in args) and any(
+                    a == destino or a.startswith(destino + os.sep) for a in normal)
+                if cli or etapa:
+                    try:
+                        dono = p.environ().get("BURNGEOFLOW_JOB_ID")
+                    except (psutil.AccessDenied, psutil.NoSuchProcess):
+                        dono = None
+                    if dono is None or dono == job["id"]:
+                        encontrados.append(p)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        return encontrados
+
+    def _reconciliar(self, job: dict) -> dict:
+        if job["status"] == "running":
+            ultima = parse_utc(job["heartbeat_at"] or job["created_at"])
+            if (datetime.now(timezone.utc) - ultima).total_seconds() >= 120:
+                try:
+                    proc = psutil.Process(job["pid"])
+                    args = proc.cmdline()
+                    if (job["id"] in args and "backend.app.jobs.worker" in args
+                        and str(self.store.db) in args):
+                        return job
+                except psutil.AccessDenied:
+                    return job
+                except psutil.NoSuchProcess:
+                    pass
+                if self._orfaos(job):
+                    return job
+                return self.store.interromper(job["id"], "running", job["pid"])
+        return self.store.reconciliar(job)
+
     def obter(self, job_id: str) -> dict:
         if not re.fullmatch(r"[0-9a-f]{32}", job_id):
             raise ValueError("ID de execução inválido")
-        return self.store.reconciliar(self.store.obter(job_id))
+        return self._reconciliar(self.store.obter(job_id))
 
     def listar(self, limite: int = 20) -> list[dict]:
         return [
-            self.store.reconciliar(j) for j in self.store.listar(limite)
+            self._reconciliar(j) for j in self.store.listar(limite)
         ]
 
     def interromper(self, job_id: str) -> dict:
@@ -65,24 +111,39 @@ class JobService:
                 return job
             # Nunca sinalizar um PID arbitrário ou reciclado.
             try:
-                proc = psutil.Process(job["pid"])
-                args = proc.cmdline()
+                proc = None
+                try:
+                    candidato = psutil.Process(job["pid"])
+                    args = candidato.cmdline()
+                except psutil.NoSuchProcess:
+                    args = []
                 if ("backend.app.jobs.worker" not in args or "--id" not in args
                     or args[args.index("--id")+1:args.index("--id")+2] != [job_id]
                     or "--database" not in args
                     or args[args.index("--database")+1:args.index("--database")+2] != [str(self.store.db)]):
-                    raise JobConflito("PID não corresponde ao worker desta execução.")
+                    raizes = self._orfaos(job)
+                else:
+                    proc = candidato
+                    raizes = [proc]
+                if not raizes:
+                    return self.store.interromper(job_id, "running", job["pid"])
                 # Congela o worker antes de capturar a árvore de descendentes.
                 suspensos = []
                 try:
-                    proc.suspend()
-                    suspensos.append(proc)
+                    for raiz in raizes:
+                        try:
+                            raiz.suspend()
+                            suspensos.append(raiz)
+                        except psutil.NoSuchProcess:
+                            continue
                     # Suspender pais antes de inspecionar seus filhos impede novos
                     # subprocessos durante a coleta.
-                    fila = [proc]
+                    fila = list(suspensos)
                     while fila:
                         pai = fila.pop()
                         for filho in pai.children():
+                            if filho in suspensos:
+                                continue
                             try:
                                 filho.suspend()
                                 suspensos.append(filho)
@@ -105,7 +166,9 @@ class JobService:
                         except psutil.Error:
                             pass
             except psutil.NoSuchProcess as exc:
-                raise JobConflito("Worker desapareceu; atualize o estado antes de tentar novamente.") from exc
+                if not self._orfaos(job):
+                    return self.store.interromper(job_id, "running", job["pid"])
+                raise JobConflito("Ainda há subprocessos; tente interromper novamente.") from exc
             except psutil.Error as exc:
                 raise JobConflito(f"Não foi possível interromper com segurança: {exc}") from exc
             return self.store.interromper(job_id, "running", job["pid"])

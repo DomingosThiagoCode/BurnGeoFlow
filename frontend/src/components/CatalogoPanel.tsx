@@ -42,7 +42,7 @@ export function CatalogoPanel() {
         area={geometria:g,origem};
       }
       setResultado(await post<Resultado>("/api/catalogo",{...area,inicio:avancado?inicio:ano+"-01-01",fim:avancado?fim:ano+"-12-31",margem:avancado?Number(margem):0,atualizar}));
-    }catch(e){setMsg(String(e));}finally{setBusy(false);}
+    }catch(e){setMsg(e instanceof Error ? e.message : String(e));}finally{setBusy(false);}
   }
   async function total(e:Evento){
     setBusy(true);setMsg("");
@@ -72,7 +72,7 @@ export function CatalogoPanel() {
             <select id="catalog-region" value={regiao} onChange={e=>setRegiao(e.target.value)}>{["Pantanal","Amazônia","Cerrado","Caatinga","Mata Atlântica","Pampa"].map(n=><option key={n}>{n}</option>)}</select></div>}
           <div className="jobs-form-field"><label htmlFor="catalog-year">Ano</label><select id="catalog-year" value={ano} onChange={e=>{setAno(e.target.value);setInicio(e.target.value+"-01-01");setFim(e.target.value+"-12-31");}}>{Array.from({length:20},(_,i)=>2020-i).map(n=><option key={n}>{n}</option>)}</select></div>
         </div>
-        {modo==="regiao"&&<p className="catalog-note">Limites dos biomas: IBGE 2019 (1:250.000), disponibilizados pelo IBAMA. A primeira consulta baixa a delimitação oficial.</p>}
+        {modo==="regiao"&&<p className="catalog-note">Limites dos biomas: IBGE 2019 (1:250.000). A primeira consulta baixa e armazena o arquivo oficial.</p>}
         {modo==="arquivo"&&<div className="catalog-fields">
           <div className="jobs-form-field"><label htmlFor="catalog-file">Arquivo GeoJSON</label><input id="catalog-file" type="file" accept=".geojson,.json" onChange={async e=>{const f=e.target.files?.[0];if(f)setGeo(await f.text());}}/></div>
           <div className="jobs-form-field"><label htmlFor="catalog-source">Fonte e versão</label><input id="catalog-source" required value={origem} onChange={e=>setOrigem(e.target.value)} placeholder="Ex.: IBGE 2019"/></div>

@@ -56,7 +56,8 @@ def trabalhar(database: Path, base: Path, job_id: str) -> int:
             processo = subprocess.Popen(
                 comando, cwd=ROOT, stdin=subprocess.DEVNULL,
                 stdout=log, stderr=subprocess.STDOUT,
-                env={**os.environ, "PYTHONUNBUFFERED":"1"},
+                env={**os.environ, "PYTHONUNBUFFERED":"1", "PYTHONIOENCODING":"utf-8",
+                     "PYTHONUTF8":"1", "BURNGEOFLOW_JOB_ID":job_id},
                 close_fds=True,
             )
             codigo = processo.wait()
