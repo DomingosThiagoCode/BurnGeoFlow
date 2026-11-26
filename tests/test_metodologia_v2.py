@@ -61,9 +61,8 @@ class TestMetodologiaV2(unittest.TestCase):
             d1=[e for e in p1["features"] if e["properties"]["data"]=="2020-01-01"]
             self.assertEqual(len(d1),2)  # contato somente por vértice agrupa
             self.assertIn([1,3],[e["properties"]["ranks_origem"] for e in d1])
-            self.assertEqual(p2["features"][0]["properties"]["ranks_origem"] if
-                "ranks_origem" in p2["features"][0]["properties"] else
-                p1["features"][0]["properties"]["metodologia"], VERSAO)
+            self.assertEqual(p2["features"][0]["properties"]["rank"],2)
+            self.assertEqual(p2["features"][-1]["properties"]["rank"],1)
 
     def test_p2_sem_ancestral_nao_inventa_mais_datas(self):
         with TemporaryDirectory() as tmp:
