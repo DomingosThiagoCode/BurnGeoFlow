@@ -107,7 +107,7 @@ function RosaDirecional({
             </text>
           </g>)}
         {[0,45,90,135].map(a=>{
-          const p=coordenadaPolar(a,raio),q=ponto(a+180,raio);
+          const p=coordenadaPolar(a,raio),q=coordenadaPolar(a+180,raio);
           return <line key={a} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]}
             stroke="#d9d6c9" strokeWidth="1"/>;
         })}
