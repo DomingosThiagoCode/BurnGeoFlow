@@ -123,6 +123,8 @@ def responder_api(route):
                 "id_incendio": str(EVENTO), "data": d, "ponto": nome,
                 "x_laea_m": str(1000 + i * 200 + j * 40),
                 "y_laea_m": str(2000 + i * 100 + j * 70),
+                "longitude": str(-56.3 + i*.015 + j*.002),
+                "latitude": str(-17.0 + i*.008 + j*.002),
             } for i, d in enumerate(DATAS) for j, nome in enumerate(nomes)],
             "segmentos": [{
                 "id_incendio": str(EVENTO),
@@ -290,6 +292,13 @@ def testar() -> None:
             rosa = page.locator(".rose-card").first
             rosa.locator("path.rose-sector").first.click()
             rosa.get_by_text("Transições do setor", exact=False).wait_for()
+            rosa.get_by_role("button", name="Ver deslocamento selecionado no mapa").click()
+            page.get_by_role("button", name="Limpar destaque TR").wait_for()
+            assert page.locator(".map-legend").get_by_text("TR ·",exact=False).count()>=1
+            page.get_by_role("button", name="Limpar destaque TR").click()
+            barra.get_by_role("button", name="Direções").click()
+            rosa = page.locator(".rose-card").first
+            rosa.locator("path.rose-sector").first.click()
             rosa.get_by_role("button", name="Limpar seleção").click()
             rosa.get_by_role("button", name="Ampliar rosácea TR · Centroide").click()
             assert "rose-card-expanded" in (rosa.get_attribute("class") or "")
