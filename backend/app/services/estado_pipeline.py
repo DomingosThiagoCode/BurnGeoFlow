@@ -65,6 +65,9 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
         v2_base/f"P2_regiao_movel_{id_incendio}.geojson",
     ]
     diagnostico, _ = _ler_json(v2_base/"diagnostico_bloqueio.json")
+    progresso_v2, erro_progresso = _ler_json(
+        v2_base/"estado_preprocessamento.json"
+    )
     metadados_v2 = {
         "versao": VERSAO,
         "estado": "pendente",
@@ -72,9 +75,17 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
         "datas_p1": manifesto_v2.get("datas_p1"),
         "datas_p2": manifesto_v2.get("datas_p2"),
         "arquivos": {"p1":_arquivo(arqs_v2[0]), "p2":_arquivo(arqs_v2[1])},
-        "erro": erro_v2,
+        "erro": erro_v2 or erro_progresso,
+        "progresso": progresso_v2,
     }
-    if erro_v2:
+    if progresso_v2.get("estado") == "executando":
+        # Sem heartbeat de processo: o arquivo pode representar uma
+        # execução ativa OU interrompida. Não inventar que segue rodando.
+        metadados_v2["estado"] = "execucao_nao_finalizada"
+    elif progresso_v2.get("estado") == "bloqueado_topologia":
+        metadados_v2["estado"] = "bloqueado_topologia"
+        metadados_v2["erro"] = progresso_v2.get("erro")
+    elif erro_v2:
         metadados_v2["estado"] = "erro_manifesto"
     elif manifesto_v2:
         if manifesto_v2.get("metodologia") != VERSAO:
@@ -85,9 +96,24 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
             metadados_v2["estado"] = "origem_ausente"
         else:
             origem_manifesto = manifesto_v2.get("sha256_p1_origem")
-            # Comparar a fonte real, nunca confiar apenas no arquivo de saída.
+            codigo_sha = manifesto_v2.get("codigo_sha256")
+            codigo_atual = digest(
+                Path(__file__).resolve().parents[3] /
+                "burngeoflow" / "processamento" / "metodologia_v2.py"
+            )
             if origem_manifesto != digest(originais[0]):
                 metadados_v2["estado"] = "origem_alterada"
+            elif codigo_sha != codigo_atual:
+                metadados_v2["estado"] = "codigo_v2_alterado"
+            elif not all(manifesto_v2.get(k) for k in (
+                "sha256_p1_v2","sha256_p2_v2"
+            )):
+                metadados_v2["estado"] = "proveniencia_incompleta"
+            elif any(
+                manifesto_v2.get(k) != digest(p)
+                for k,p in zip(("sha256_p1_v2","sha256_p2_v2"),arqs_v2)
+            ):
+                metadados_v2["estado"] = "artefato_modificado"
             else:
                 metadados_v2["estado"] = "preprocessado_nao_integrado"
     elif diagnostico:
@@ -159,6 +185,8 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
     if metadados_v2["estado"] in {
         "bloqueado_topologia","erro_manifesto","artefato_perdido",
         "origem_ausente","origem_alterada","versao_incompativel",
+        "codigo_v2_alterado","proveniencia_incompleta","artefato_modificado",
+        "execucao_nao_finalizada",
     }:
         alertas.append("Pré-processamento v2 comprometido: "+metadados_v2["estado"])
     if metadados_v2["estado"] == "preprocessado_nao_integrado":
