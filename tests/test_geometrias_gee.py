@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from hashlib import sha256
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -128,14 +129,25 @@ class TestePersistencia(unittest.TestCase):
         p1, p2 = amostra()
         with TemporaryDirectory() as temp:
             pasta = Path(temp)
-            a, b, _ = pastas_brutas(pasta, 24340828)
+            a, b, diagnostico = pastas_brutas(pasta, 24340828)
             salvar_json_atomico(a, p1)
             salvar_json_atomico(b, p2)
+            brutos = [a.read_bytes(), b.read_bytes()]
             caminhos = reprocessar_brutos(
                 24340828, pasta, informar=lambda x: None)
             self.assertTrue(caminhos[0].exists())
             self.assertTrue(caminhos[1].exists())
             self.assertEqual(caminhos[2]["origem"], "brutos_gee_em_disco")
+            relatorio = json.loads(diagnostico.read_text(encoding="utf-8"))
+            self.assertEqual(relatorio["versao_proveniencia"], 1)
+            self.assertEqual([a.read_bytes(), b.read_bytes()], brutos)
+            for nome, bruto, publicado in zip(("P1", "P2"), (a, b), caminhos):
+                for campo, arquivo in (("geojsons_brutos", bruto),
+                                        ("geojsons_publicados", publicado)):
+                    self.assertEqual(relatorio[campo][nome], {
+                        "arquivo": arquivo.name,
+                        "sha256": sha256(arquivo.read_bytes()).hexdigest(),
+                    })
 
 
 class TesteCachePaginas(unittest.TestCase):

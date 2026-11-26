@@ -559,3 +559,92 @@ será tratada separadamente na Etapa 7.3.
 
 Mais detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e
 [docs/PROVENIENCIA.md](docs/PROVENIENCIA.md).
+
+## Catálogo GlobFire: seleção de áreas, limites e cache (issue #31)
+
+A aba **Explorar incêndios** permite pesquisar metadados antes de iniciar
+a aquisição completa. O catálogo **não executa** `union`, `dissolve`, P1,
+P2, TR nem IGT. Ele filtra perímetros GlobFire por área/data e agrega
+atributos `Id` e `IDate`. A consulta continua sujeita a quotas do
+Earth Engine, especialmente para AOIs extensas.
+
+### Delimitação espacial
+
+- **Biomas brasileiros:** malha oficial IBGE Biomas 2019, 1:250.000,
+  obtida e armazenada uma única vez pelo serviço.
+- **Estados brasileiros e Brasil:** malha territorial do IBGE **2024**,
+  arquivo `BR_UF_2024.zip` do diretório oficial do IBGE. As 27 UFs
+  possuem seleção própria; a opção Brasil reúne todas elas.
+- **Arquivo GeoJSON:** uma feição Polygon/MultiPolygon em WGS84, com
+  fonte e versão informadas pelo usuário. Limite de arquivo na interface:
+  5 MB; a API verifica a validade geométrica.
+- **Desenho livre:** a ferramenta de mapa é aberta sob demanda. Cada
+  clique adiciona um vértice; são necessários ao menos três. Os pontos
+  podem ser desfeitos ou limpos; o servidor recusa geometria inválida,
+  incluindo autointerseções. O desenho é uma AOI de descoberta, não um
+  limite administrativo oficial.
+
+*Países diferentes do Brasil:* importar GeoJSON da delimitação, com
+fonte e versão. Este módulo não dispõe de cadastro internacional de
+fronteiras. Não presume coordenadas de regiões nomeadas.
+
+Fontes das malhas:
+- Biomas: `https://geoftp.ibge.gov.br/informacoes_ambientais/estudos_ambientais/biomas/vetores/Biomas_250mil.zip`
+- UFs: `https://geoftp.ibge.gov.br/organizacao_do_territorio/malhas_territoriais/malhas_municipais/municipio_2024/Brasil/BR_UF_2024.zip`
+
+### Período de pesquisa
+
+As coleções GlobFire v2 DailyPerimeters abrangem **2001–2020**.
+A consulta escolhe o período inclusivo e uma margem opcional de até
+365 dias antes/depois, respeitando os limites do conjunto. O período
+central aceita até 366 dias corridos; quando a margem atravessa dezembro,
+os dados são consultados por ano, em coleções anuais diferentes.
+O catálogo **não preenche** dias não observados.
+
+### Como interpretar o inventário
+
+- **Registros na região:** quantidade de feições que *intersectam*
+  a AOI no período efetivo selecionado, não apenas a parte interior
+  de sua geometria. Não confundir com número de pixels ou de incêndios.
+- **Total ID/ano:** inicialmente **não consultado**. O botão
+  `Ver total` busca separadamente o total de feições daquele ID/ano,
+  mesmo que parte do evento esteja fora da AOI ou da janela temporal.
+  Isso evita subestimar eventos extensos.
+- **Datas distintas:** quantidade de timestamps `IDate` encontrados
+  na região e janela; **dias do período** é a duração inclusiva entre
+  primeira e última data observada; **lacunas** = duração menos datas.
+- **Local:** verifica a existência de P1, P2 e série do evento nos
+  diretórios já processados. A consulta ao catálogo não os altera.
+
+### Persistência
+
+O diretório `execucoes/catalogo_globfire/` guarda apenas resultados
+de metadados em JSON e limites IBGE em cache. A chave depende da fonte,
+versão do GlobFire, geometria e origem da AOI, período, margem e regra
+de filtragem. A mesma consulta pode ser reutilizada offline depois
+que a delimitação estiver em cache; `Atualizar consulta GEE` consulta
+o servidor deliberadamente. Cache JSON corrompido é recusado com
+orientação para atualizar. A consulta pode resultar em zero eventos
+sem ser um erro.
+
+### Homologação manual pendente
+
+Testes automatizados cobrem geometrias IBGE sintéticas, respostas da
+API, validação de datas e reutilização offline do catálogo. Antes de
+encerrar definitivamente a issue, executar em uma máquina com acesso
+ao GEE e ao servidor IBGE:
+
+1. Consultar Pantanal/2020 duas vezes e conferir `GEE` seguido de
+   `cache local`.
+2. Testar um estado (p.ex., MS) e Brasil e confirmar que as AOIs
+   oficiais realmente são obtidas no ZIP IBGE 2024.
+3. Desenhar um polígono pequeno, importar a mesma geometria como
+   GeoJSON, comparar IDs e contagens.
+4. Testar datas atravessando dezembro/janeiro com margem; inspecionar
+   origem e número de registros, sem tratar contagens na AOI como totais.
+5. Iniciar um ID pequeno a partir do catálogo e confirmar o
+   encaminhamento ao histórico de tarefas, sem reaquisição de dados
+   locais existentes.
+
+Não atualizar indicadores científicos ou declarar validação externa
+em função de êxito dessas consultas.

@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -10,9 +11,21 @@ from burngeoflow.aquisicao.earth_engine import ASSET, ANO_MINIMO, ANO_MAXIMO, in
 from burngeoflow.config import carregar_configuracao_gee
 
 def janela(inicio, fim, margem):
-    a, b = date.fromisoformat(inicio), date.fromisoformat(fim)
-    if a > b or not 0 <= margem <= 365:
-        raise ValueError("Período ou margem inválidos.")
+    """Período ISO de no máximo 366 dias, com margem e anos adjacentes."""
+    if not isinstance(inicio, str) or not isinstance(fim, str):
+        raise ValueError("As datas devem usar o formato YYYY-MM-DD.")
+    if not all(re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) for v in (inicio, fim)):
+        raise ValueError("As datas devem usar o formato YYYY-MM-DD.")
+    try:
+        a, b = date.fromisoformat(inicio), date.fromisoformat(fim)
+    except ValueError as exc:
+        raise ValueError("Data inexistente ou inválida.") from exc
+    if not isinstance(margem, int) or not 0 <= margem <= 365:
+        raise ValueError("A margem deve estar entre 0 e 365 dias.")
+    if a > b:
+        raise ValueError("A primeira data deve ser anterior à última.")
+    if (b - a).days > 365:
+        raise ValueError("Escolha um período de no máximo 366 dias corridos.")
     if a.year < ANO_MINIMO or b.year > ANO_MAXIMO:
         raise ValueError("Período deve estar entre 2001 e 2020.")
     x = max(date(ANO_MINIMO, 1, 1), a - timedelta(days=margem))
@@ -69,7 +82,17 @@ def catalogo(base, geometria, origem, inicio, fim, margem=0, atualizar=False, co
     pasta = Path(base); pasta.mkdir(parents=True,exist_ok=True)
     arquivo = pasta / (chave+".json")
     if arquivo.is_file() and not atualizar:
-        return {**json.loads(arquivo.read_text(encoding="utf-8")), "origem":"cache local"}
+        try:
+            guardado = json.loads(arquivo.read_text(encoding="utf-8"))
+            if not isinstance(guardado, dict) or any(
+                guardado.get(k) != v for k, v in pedido.items()
+            ) or not isinstance(guardado.get("eventos"), list):
+                raise ValueError("Conteúdo incompatível.")
+        except (OSError, ValueError, TypeError) as exc:
+            raise ValueError(
+                "Cache de catálogo inválido ou corrompido. Use Atualizar consulta GEE."
+            ) from exc
+        return {**guardado, "origem":"cache local"}
     eventos = consulta(geometria,x,y,anos)
     doc = {**pedido,"consultado_utc":datetime.now(timezone.utc).isoformat(),"eventos":eventos}
     with NamedTemporaryFile(mode="w",encoding="utf-8",dir=pasta,delete=False) as tmp:

@@ -11,7 +11,8 @@ Um commit ou Pull Request não é uma condição de encerramento. Continue enqua
 - `docs/METODOLOGIA.md`: decisões científicas D-001 a D-016; leia integralmente antes de alterar o núcleo.
 - `docs/ROTEIRO.md`: ordem, dependências e marcos de validação.
 - `README.md`, issues e comentários pertinentes, PRs, branches, testes e workflows relevantes.
-- `docs/ESTADO_EXECUCAO.md`, quando existente: memória operacional; reconcilie com o GitHub.
+- `docs/ESTADO_EXECUCAO.md`: memória operacional obrigatória e mapa anti-retrabalho, **já criado na main**; reconcilie com o GitHub.
+- `docs/COORDENACAO_AGENTES.md`: protocolo obrigatório quando houver agentes Codex em paralelo, com worktrees, claims, ownership, contratos e handoffs.
 
 Não refaça o planejamento já existente. Corrija divergências entre código e metodologia; não altere silenciosamente decisões científicas aprovadas. Se uma decisão quantitativa ainda estiver pendente, registre alternativas, evidências e consequências, sem inventar aprovação.
 
@@ -21,7 +22,7 @@ Não refaça o planejamento já existente. Corrija divergências entre código e
 |---|---|
 | P0 | #44 inconsistência topológica das linhagens; #2 aquisição GEE/proveniência; #3 conectividade por vértices no P1; #45 P2 retrospectivo |
 | P1 | #34 desempenho, memória e retomada; #46 produtos científicos; #47 testes sintéticos, regressão e avaliação científica |
-| P2 | #43 navegação; #31 catálogo; #40 paginação; #42 rosáceas; #41 README |
+| P2 | #43 navegação; #31 catálogo; #40 paginação; #42 rosáceas; #41 README; #50 landing narrativa |
 | P3 | #48 validação em novos incêndios; #4 documentação, distribuição e publicação |
 
 Reconcilie a lista com o estado atual do GitHub. O ROTEIRO.md prevalece sobre uma fila estática. Comece pelo diagnóstico #44, coordenado com #2 e #3; estabilize P1 antes de reconstruir P2 (#45). #34 pode avançar em paralelo quando ajudar a desbloquear o núcleo. Prepare testes #47 desde o início. Não inicie refatoração visual antes da estabilidade científica e regressão básica previstas no roteiro. Não confunda implementação com avaliação exploratória (E4) ou validação independente (E5).
@@ -87,7 +88,7 @@ Use insumos locais válidos quando possível e valide GEE autenticado quando nec
 
 ## 9. Memória operacional e retomada
 
-Crie ou mantenha `docs/ESTADO_EXECUCAO.md` como registro compacto com:
+Mantenha `docs/ESTADO_EXECUCAO.md` como registro compacto e **reconcilie sempre com a branch/PR atual**. Já existe um inventário inicial das entregas na main, PRs abertas e lacunas (não recomece esse levantamento sem mudança efetiva de estado). Preserve:
 - Issues concluídas, em andamento e bloqueadas, dependências e impedimentos.
 - Branches, PRs, commits/SHA e estado dos workflows.
 - Evidências técnicas e científicas, última ação e próxima ação exata.
@@ -109,3 +110,19 @@ Uma issue só é concluída quando os critérios de aceite vigentes forem satisf
 Ao executar o backlog, encerre somente quando todas as issues do escopo estiverem concluídas, quando todas as atividades restantes estiverem bloqueadas, ou quando o ambiente atingir um limite técnico/de utilização. Nos dois últimos casos, preserve o estado e informe precisamente como retomar. Ao final, relate concisamente issues resolvidas, pendências, PRs, testes, evidências e bloqueios.
 
 Quando acionado para o backlog, inicie imediatamente pela próxima tarefa desbloqueada conforme o roteiro. Não se limite a descrever um plano. Execute, teste, monitore, corrija, valide e avance, com rigor científico e economia de recursos.
+
+
+## 12. Operação multiagente: evitar retrabalho e colisões
+
+**Obrigatório ao iniciar qualquer sessão de agentes paralelos:** ler `docs/ESTADO_EXECUCAO.md` e `docs/COORDENACAO_AGENTES.md`. O coordenador distribui um dono por issue/subtarefa e confirma os arquivos reservados. A propriedade intelectual da metodologia permanece em `docs/METODOLOGIA.md`, nunca em um palpite de agente.
+
+- **Snapshot inicial de 26/11/2026:** PRs [#49](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/49), [#51](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/51) e [#52](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/52) estavam abertas, DRAFT, com CI verde no HEAD, **mas fora da main**. A landing inicial em `/apresentacao/` já estava na main; [issue #50](https://github.com/DomingosThiagoCode/BurnGeoFlow/issues/50) pede evolução, não nova landing. Confirme o status vivo antes de trabalhar.
+- **Não duplicar PRs nem programas existentes.** #51 já instrumenta o erro topológico de 24194371; #52 já contém pré-processador v2 experimental, CLI local e inspeção de checkpoints; #49 já implementa UF/Brasil/AOI desenhada do catálogo. Continue ou revise os trabalhos existentes, em vez de reconstruí-los.
+- **Dono de integração único por domínio:** topologia #44; P1/P2 #3/#45; contratos e indicadores #34/#46; catálogo #31; landing #50. Registre claim por issue e branch. QA #47 pode trabalhar em testes independentes, sem mudar contrato científico às escondidas.
+- **Um worktree e uma branch por agente;** não compartilhar checkout, subprocessos nem caches mutáveis. Evitar escrita simultânea em `executar_pipeline.py`, `linhagens.py`, `metodologia_v2.py`, `atlas-theme.css`, `AGENTS.md` e `docs/METODOLOGIA.md`. Resolver conflitos de integração no dono da PR.
+- **Não iniciar jobs GEE para 24340828/24194371 sem evidência de ausência/corrupção de insumos locais e autorização específica.** Ambos já tiveram aquisição. Preservar `brutos_gee/`, legados, caches, SHA e logs antes de qualquer reprocessamento.
+- **O botão principal Executar não é o pipeline v2.** A PR #52 prepara derivados isolados; validadores, TR/IGT, integração, robustez e visualização para P2 com datas próprias ainda precisam de trabalho (#46). Não reprocessar os dois IDs integralmente como se a metodologia estivesse pronta.
+- **Critério de verdade para reportar progresso:** distinguir explicitamente `feito na main`, `implementado na branch`, `CI aprovado no último SHA`, `testado nos dados reais`, `cientificamente validado` e `pendente`. Nenhuma dessas etapas é automaticamente equivalente à seguinte.
+- **Handoff obrigatório:** issue/PR, branch/SHA, arquivos, testes/CI, evidências, bloqueio e próximo passo. O coordenador atualiza `ESTADO_EXECUCAO.md` em marcos reais, não a cada execução do CI.
+
+Se a tarefa é pontual, o escopo pedido continua prevalecendo sobre a missão de trabalhar o backlog inteiro. Se não houver tarefa disponível sem conflito, entregue análise/testes não destrutivos e informe precisamente qual dependência bloqueia a implementação.
