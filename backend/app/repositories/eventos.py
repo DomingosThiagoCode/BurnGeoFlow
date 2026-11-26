@@ -6,6 +6,7 @@ from datetime import date
 from functools import lru_cache
 from hashlib import sha256
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -126,6 +127,36 @@ class RepositorioEventos:
                 raise DadosInconsistentes(
                     f"{nome.upper()} não corresponde ao SHA-256 da Etapa 5"
                 )
+
+    def preliminares(self, incendio: int) -> dict:
+        arquivos = self._obrigatorios(incendio)
+        indice = IndiceGeoJSON(arquivos["raiz"])
+        p1, m1 = indice.obter("p1", arquivos["p1"], incendio)
+        p2, m2 = indice.obter("p2", arquivos["p2"], incendio)
+        def valor(v):
+            try:
+                n = float(v)
+                return n if math.isfinite(n) and n >= 0 else None
+            except (TypeError, ValueError):
+                return None
+        linhas = []
+        for dia, qtd in sorted(m1["datas"].items()):
+            # Área total declarada no produto original, não soma de patches.
+            # Não atribuir valores LAEA a dados de outra proveniência.
+            with (p1 / (dia + ".jsonl")).open(encoding="utf-8") as f:
+                props = json.loads(next(f))["properties"]
+            a = valor(props.get("area_total_km2"))
+            b = None
+            if dia in m2["datas"]:
+                with (p2 / (dia + ".jsonl")).open(encoding="utf-8") as f:
+                    b = valor(json.loads(next(f))["properties"].get("area_km2"))
+            linhas.append({"data": dia, "area_p1_atributo_km2": a,
+                           "area_p2_atributo_km2": b, "numero_patches": qtd})
+        manifesto = _json_obj(arquivos["raiz"] / "execucao.json")
+        etapas = {k: v.get("status", "desconhecido") for k, v in manifesto.get("etapas", {}).items()
+                  if isinstance(v, dict)}
+        return {"fonte": "Atributos originais dos GeoJSONs; não são métricas LAEA auditadas.",
+                "linhas": linhas, "etapas": etapas}
 
     def series(self, incendio: int) -> list[dict]:
         arquivos = self._obrigatorios(incendio)
