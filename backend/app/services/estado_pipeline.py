@@ -81,6 +81,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
         v2_base/f"P1_componentes_{id_incendio}.geojson",
         v2_base/f"P2_regiao_movel_{id_incendio}.geojson",
         v2_base/"auditoria_cobertura_p1.json",
+        v2_base/"balanco_expansao_p2.json",
     ]
     diagnostico, _ = _ler_json(v2_base/"diagnostico_bloqueio.json")
     progresso_v2, erro_progresso = _ler_json(
@@ -96,6 +97,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
             "p1":_arquivo(arqs_v2[0]),
             "p2":_arquivo(arqs_v2[1]),
             "auditoria_p1":_arquivo(arqs_v2[2]),
+            "balanco_p2":_arquivo(arqs_v2[3]),
         },
         "erro": erro_v2 or erro_progresso,
         "progresso": progresso_v2,
@@ -122,6 +124,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
                 "sha256_p1_origem", "codigo_sha256",
                 "sha256_p1_v2", "sha256_p2_v2",
                 "sha256_auditoria_cobertura_p1",
+                "sha256_balanco_expansao_p2",
             )
             codigo = (Path(__file__).resolve().parents[3] /
                       "burngeoflow" / "processamento" / "metodologia_v2.py")
