@@ -10,6 +10,7 @@ a equivalencia com artigo externo depende de verificacao bibliografica.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from datetime import date
 from hashlib import sha256
 import json
@@ -19,7 +20,7 @@ import sys
 
 import pyproj
 import shapely
-from shapely.geometry import mapping, shape
+from shapely.geometry import MultiPolygon, Polygon, mapping, shape
 
 from burngeoflow.analises.paisagem import carregar_p1, projetar_patches, salvar_csv
 from burngeoflow.validacao.topologia_p2 import reconciliar_p2
@@ -49,6 +50,42 @@ def partes_poligonais(geom):
     if geom.geom_type in ("MultiPolygon", "GeometryCollection"):
         return [p for g in geom.geoms for p in partes_poligonais(g)]
     raise ValueError(f"Diferenca nao poligonal: {geom.geom_type}")
+
+
+def calcular_balanco_expansao_p2(
+    anterior: Polygon | MultiPolygon,
+    atual: Polygon | MultiPolygon,
+    componentes_p1_anterior: Iterable[Polygon | MultiPolygon],
+) -> dict[str, float]:
+    """Quantifica o balanço D-005 de uma transição observada, em m².
+
+    P2 e os componentes de P1 devem estar no mesmo CRS LAEA em metros.
+    O P1 anterior deve conter o componente P2 anterior. A área de P2
+    anterior fora de P1 e o erro de fechamento são expostos sem aplicar
+    tolerâncias, preencher datas ou atribuir o crescimento à combustão.
+    """
+    componentes = list(componentes_p1_anterior)
+    if not componentes:
+        raise ValueError("P1 anterior deve conter pelo menos um componente")
+    for geometria in (anterior, atual, *componentes):
+        if (not isinstance(geometria, (Polygon, MultiPolygon))
+                or not geometria.is_valid or geometria.area <= 0):
+            raise ValueError("P1 e P2 devem conter polígonos válidos de área positiva")
+
+    uniao_p1_anterior = shapely.union_all(componentes)
+    expansao = atual.difference(anterior)
+    area_nova = atual.difference(uniao_p1_anterior).area
+    incorporada = expansao.intersection(uniao_p1_anterior).area
+    perdida = anterior.difference(atual).area
+    return {
+        "expansao_bruta_m2": expansao.area,
+        "area_nova_observada_m2": area_nova,
+        "area_previamente_queimada_incorporada_m2": incorporada,
+        "area_perdida_m2": perdida,
+        "variacao_liquida_m2": atual.area - anterior.area,
+        "p2_anterior_fora_p1_m2": anterior.difference(uniao_p1_anterior).area,
+        "erro_particao_expansao_m2": abs(expansao.area - area_nova - incorporada),
+    }
 
 
 def calcular_incremento(anterior, atual, inv, geod, *, evento, dia0, dia1):
