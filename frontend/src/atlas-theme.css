@@ -743,3 +743,103 @@ tbody tr:hover { background:#efede5; }
   .catalog-pagination { justify-content: center; }
   .catalog-pagination .secondary-button { padding: 8px 9px; }
 }
+
+/* #43: navegação compacta com expansão por hover/foco, sem reflow */
+.page-layout { grid-template-columns: 68px minmax(0,1fr); }
+.page-layout > .main-content { min-width:0; }
+.sidebar.atlas-rail {
+  position: sticky;
+  top: 80px;
+  align-self: start;
+  width: 68px;
+  height: calc(100dvh - 80px);
+  min-height: 440px;
+  padding: 14px 8px;
+  overflow: hidden;
+  z-index: 65;
+  box-sizing: border-box;
+  transition: width 180ms ease, box-shadow 180ms ease;
+  background: #e8e3d7;
+  border-right: 1px solid #c6c5b7;
+}
+.sidebar.atlas-rail:hover,
+.sidebar.atlas-rail:focus-within,
+.sidebar.atlas-rail.sidebar-open {
+  width: 250px;
+  box-shadow: 12px 0 26px #20352b25;
+}
+.atlas-rail-links { display:flex;flex-direction:column;gap:4px;min-width:226px; }
+.atlas-rail-links > button,
+.atlas-rail-links > a {
+  border:0;
+  background: transparent;
+  color:#355144;
+  padding:12px 15px;
+  display:flex;align-items:center;gap:20px;
+  width:100%;
+  min-height:44px;
+  cursor:pointer;
+  font:700 12px var(--type-ui, sans-serif);
+  border-left:3px solid transparent;
+  text-decoration:none;
+  text-align:left;
+}
+.atlas-rail-links > button svg,.atlas-rail-links > a svg{flex:0 0 20px;}
+.atlas-rail-links > button:hover,.atlas-rail-links > a:hover,
+.atlas-rail-links .rail-active{background:#d5dfd4;color:#234c39;border-left-color:#b96243;}
+.atlas-rail-links > button:focus-visible,.atlas-rail-links > a:focus-visible {
+  outline:2px solid #bb6347;outline-offset:-2px;
+}
+.atlas-rail-links > button span,.atlas-rail-links > a span,.rail-category span{
+  white-space:nowrap;opacity:0;transition:opacity 120ms ease;
+}
+.sidebar.atlas-rail:hover .atlas-rail-links span,
+.sidebar.atlas-rail:focus-within .atlas-rail-links span,
+.sidebar.atlas-rail.sidebar-open .atlas-rail-links span{opacity:1;}
+.rail-category{margin:14px 0 3px;padding:0 15px;font:800 9px var(--type-ui, sans-serif);color:#7d8d80;letter-spacing:.13em;}
+.rail-running { width:7px;height:7px;background:#b95b3e;border-radius:50%;flex:0 0 7px; }
+.workspace-module[hidden] {display:none!important;}
+.workspace-module {max-width:1500px;margin:0 auto 30px;min-height:62vh;}
+.module-description {font-size:13px;color:#687c6d;max-width:700px;line-height:1.6;}
+.atlas-overview-grid { display:grid;grid-template-columns:minmax(0,1fr) 260px;align-items:start;gap:18px; }
+.atlas-overview-primary {min-width:0;}
+.atlas-floating-controls {
+  position:sticky;top:98px;align-self:start;
+  max-height:calc(100dvh - 114px);overflow:auto;
+  background:#e8e3d7;border:1px solid #c8c5b6;
+  padding:22px 18px 14px;box-shadow:0 8px 28px #203a2e12;
+}
+.atlas-floating-controls .section-heading,
+.atlas-floating-controls .form-label{color:#37594a;}
+.atlas-floating-controls .field{color:#294c3b;background:#faf9f2;border-color:#b5c1b5;}
+.atlas-floating-controls .selected-day{background:#25483b;}
+.atlas-floating-controls .selected-day span,.atlas-floating-controls .selected-day strong{color:#fbf4e9;}
+.atlas-floating-controls .layer-toggle{color:#36594a;}
+.atlas-floating-controls .sidebar-note p{color:#576c60;}
+.atlas-floating-controls .sidebar-group:last-child{margin-bottom:0;}
+@media (max-width:1240px){
+  .page-layout {grid-template-columns:68px minmax(0,1fr);}
+  .atlas-overview-grid {grid-template-columns:minmax(0,1fr) 235px;gap:12px;}
+  .atlas-floating-controls {padding:16px 12px;}
+}
+@media (max-width:1040px) {
+  .atlas-overview-grid{grid-template-columns:minmax(0,1fr);}
+  .atlas-floating-controls{position:static;max-height:none;overflow:visible;}
+}
+@media (max-width:840px) {
+  .page-layout{display:block;}
+  .sidebar.atlas-rail {
+    position:fixed;top:73px;left:0;bottom:0;
+    width:min(270px,86vw);height:auto;min-height:0;
+    z-index:90;overflow-y:auto;transform:translateX(-110%);
+    transition:transform 180ms ease;
+  }
+  .sidebar.atlas-rail:hover,.sidebar.atlas-rail:focus-within,
+  .sidebar.atlas-rail.sidebar-open{width:min(270px,86vw);box-shadow:12px 0 26px #20352b35;}
+  .sidebar.atlas-rail.sidebar-open{transform:translateX(0);}
+  .sidebar.atlas-rail .atlas-rail-links span{opacity:1;}
+}
+@media (max-width:600px){ .sidebar.atlas-rail{top:68px;} }
+@media (prefers-reduced-motion:reduce){
+  .sidebar.atlas-rail,.atlas-rail-links span {transition:none;}
+}
