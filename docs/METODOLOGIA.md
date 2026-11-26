@@ -26,12 +26,23 @@ Este documento registra as decisões acordadas da pesquisa, independentemente da
 
 **Evidência da necessidade da revisão:** evento 24194371, 128 datas, área final total 17.908,2595 km² e P2 progressivo final 26,4019 km², conforme aquisição reportada. A implementação atual de aquisição em `burngeoflow/aquisicao/earth_engine.py` usa o maior componente inicial e rastreamento progressivo; portanto diverge desta decisão. O P2 retrospectivo ainda precisa ser implementado e testado, incluindo no caso original 24340828. Resultados dependentes de P2 antigo devem ser identificados como tal e recalculados após a revisão, preservando proveniência.
 
-**Ainda em discussão:** regra de empate, ausência de sobreposição (não autorizar salto automático sem decisão), critério topológico de conectividade do P1, tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
+**Ainda em discussão:** regra de empate, ausência de sobreposição (não autorizar salto automático sem decisão), tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
+
+## D-002 — Conectividade por borda ou vértice no P1
+
+**Estado:** decisão conceitual aprovada pelo usuário; implementação e validação pendentes.
+
+Polígonos que compartilham uma borda ou um vértice pertencem ao mesmo patch. Polígonos separados permanecem distintos. A relação é transitiva: A tocando B e B tocando C formam um único componente, ainda que A e C não se toquem diretamente.
+
+**Justificativa:** o produto MODIS de origem tem resolução espacial nominal de 500 m. O contato pontual possui área de interseção nula, mas a ausência de contato por borda não permite inferir desconexão física nessa escala. Trata-se de uma convenção de conectividade vetorial análoga conceitualmente à vizinhança 8, não de reconstrução exata da grade raster original nem de evidência de propagação física.
+
+**Consequências:** agrupar os polígonos sem adicionar área artificial, sem buffer para unir componentes separados e sem alterar os dados brutos. Um patch lógico pode ser representado por MultiPolygon quando seus interiores são separados e suas fronteiras se tocam em pontos. Recalcular contagem, áreas, ranking, métricas, linhagens e P2 retrospectivo (D-001) sobre o P1 resultante. Verificar a compatibilidade dos indicadores TR/IGT com essa representação. Preservar o cenário sem agrupamento pontual para comparação de sensibilidade, quando viável.
+
+**Validação pendente:** casos sintéticos de toque pontual, borda compartilhada, cadeias de contatos e separação; casos reais 24194371 e 24340828. Tolerâncias de precisão, reparos e sobreposições reais permanecem em discussão (issue #44). Não confundir agrupamento por contato com correção de sobreposições.
 
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
-- Conectividade dos componentes (contato pontual versus borda).
 - Empates e ausência de sobreposição no rastreamento.
 - Fusões e distinção entre incorporação e expansão.
 - Regularização, tolerâncias e auditoria topológica (issue #44).
