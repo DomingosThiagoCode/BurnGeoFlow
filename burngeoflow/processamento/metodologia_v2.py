@@ -272,6 +272,29 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         raise
     if not p2:
         raise ErroMetodologia("P2 retrospectivo não encontrou componente final.")
+    # D-005: decompor a expansão de P2 em queima recém-observada e
+    # incorporação de cobertura P1 anterior. O calendário é o de P2,
+    # não se inventam observações nos dias ausentes.
+    from burngeoflow.analises.incrementos import calcular_balanco_expansao_p2
+    balancos = []
+    for anterior_p2, atual_p2 in zip(p2, p2[1:]):
+        dia_anterior, dia_atual = anterior_p2["data"], atual_p2["data"]
+        dia_gap = (
+            datetime.strptime(dia_atual, "%Y-%m-%d") -
+            datetime.strptime(dia_anterior, "%Y-%m-%d")
+        ).days
+        balanco = calcular_balanco_expansao_p2(
+            anterior_p2["item"]["geometria"],
+            atual_p2["item"]["geometria"],
+            [c["geometria"] for c in componentes[dia_anterior]],
+        )
+        balancos.append({
+            "id_incendio": incendio,
+            "data_anterior": dia_anterior, "data_atual": dia_atual,
+            "dias_intervalo": dia_gap, "lacuna_temporal": dia_gap > 1,
+            **balanco,
+        })
+
     # Atributos oficiais do produto NOVO calculados na LAEA (não área EE).
     totais = {d:sum(c["area_m2"] for c in v)/1e6 for d,v in componentes.items()}
     features_p1 = []
@@ -330,6 +353,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         "primeira_data_p2":p2[0]["data"],
         "ultima_data_p2":p2[-1]["data"],
         "desempates_p2": desempates,
+        "transicoes_balanco_d005": len(balancos),
         "politica_cobertura_intradata": "uniao_sem_duplicacao_com_ranks_origem",
         "componentes_com_residuo_positivo": len(auditoria_cobertura),
         "residuo_positivo_total_m2": sum(
@@ -361,6 +385,15 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         "componentes": auditoria_cobertura,
     })
     manifesto["sha256_auditoria_cobertura_p1"] = _hash(auditoria_path)
+    balanco_path = pasta/"balanco_expansao_p2.json"
+    _salvar_json(balanco_path, {
+        "id_incendio": incendio,
+        "metodologia": VERSAO,
+        "indicador": "D-005_area_nova_vs_incorporacao_previamente_queimada",
+        "referencia_temporal": "datas_observadas_da_regiao_p2",
+        "transicoes": balancos,
+    })
+    manifesto["sha256_balanco_expansao_p2"] = _hash(balanco_path)
     _salvar_json(pasta/"manifesto_metodologia.json",manifesto)
     _salvar_json(estado_path, {
         "id_incendio":incendio, "versao":VERSAO,
