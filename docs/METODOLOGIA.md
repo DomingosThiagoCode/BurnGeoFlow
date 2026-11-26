@@ -26,7 +26,7 @@ Este documento registra as decisões acordadas da pesquisa, independentemente da
 
 **Evidência da necessidade da revisão:** evento 24194371, 128 datas, área final total 17.908,2595 km² e P2 progressivo final 26,4019 km², conforme aquisição reportada. A implementação atual de aquisição em `burngeoflow/aquisicao/earth_engine.py` usa o maior componente inicial e rastreamento progressivo; portanto diverge desta decisão. O P2 retrospectivo ainda precisa ser implementado e testado, incluindo no caso original 24340828. Resultados dependentes de P2 antigo devem ser identificados como tal e recalculados após a revisão, preservando proveniência.
 
-**Ainda em discussão:** tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação dos indicadores durante fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
+**Ainda em discussão:** tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação dos indicadores durante fusões. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. A representatividade é tratada na D-006.
 
 ## D-002 — Conectividade por borda ou vértice no P1
 
@@ -80,10 +80,20 @@ Como R0 integra U0, a expansão bruta corresponde à soma da área nova e da ár
 
 **Implicações:** manter TR/IGT sobre a região selecionada, identificar intervalos com incorporação/fusão para contextualizar seus resultados e não confundir deslocamento geométrico com propagação física. Validar conservação das áreas em casos sintéticos e reais, incluindo perdas e lacunas entre datas.
 
+## D-006 — Representatividade do P2 como indicador, não como filtro
+
+**Estado:** decisão conceitual aprovada; implementação e validação pendentes.
+
+Não excluir observações ou interromper o rastreamento do P2 apenas porque sua área absoluta ou sua participação na área total do incêndio é pequena. Calcular e disponibilizar a representatividade R(t) = 100 × área(P2(t)) / área(P1(t)), utilizando áreas comparáveis e a união dos componentes do P1 na mesma data.
+
+**Justificativa:** o objeto do P2 é a linhagem espacial principal do componente dominante final (D-001), não o incêndio inteiro em todas as datas. Uma pequena participação relativa não invalida a observação nem justifica uma troca de componente. Os indicadores descrevem o P2; sua extrapolação para o evento completo deve ser contextualizada pela representatividade e pelas análises do P1.
+
+**Limites:** não estabelecer percentual mínimo arbitrário; distinguir ausência de P2 de participação zero; sinalizar indicadores matematicamente indefinidos, geometrias inválidas e limitações de resolução independentemente da representatividade. Não inventar valores para observações ausentes.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Contato exclusivamente pontual entre datas no rastreamento; tolerância numérica e desempate residual.
 - Regularização, tolerâncias e auditoria topológica (issue #44).
-- Representatividade, interpretação e seleção de indicadores TR/IGT.
+- Interpretação e seleção de indicadores TR/IGT.
 - Segmentação temporal/BIC, validação e generalização.
