@@ -122,6 +122,13 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
 
     manifesto, erro_manifesto = _ler_json(raiz/"execucao.json")
     hashes = manifesto.get("entradas_sha256") or {}
+    if not isinstance(hashes, dict):
+        hashes = {}
+        erro_manifesto = "entradas_sha256 não é um objeto"
+    etapas_historicas = manifesto.get("etapas") or {}
+    if not isinstance(etapas_historicas, dict):
+        etapas_historicas = {}
+        erro_manifesto = "etapas não é um objeto"
     entrada_confere = local_ok and bool(hashes)
     if entrada_confere:
         entrada_confere = all(
@@ -132,7 +139,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
     etapas = []
     cadeia_ok = True
     for etapa in definir_etapas(id_incendio,raiz,*originais):
-        entrada = (manifesto.get("etapas") or {}).get(etapa.nome, {})
+        entrada = etapas_historicas.get(etapa.nome, {})
         if not isinstance(entrada, dict):
             entrada = {}
         original = entrada.get("status")
@@ -176,6 +183,11 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
         })
 
     alertas = []
+    if local_ok and not (raiz/"execucao.json").is_file():
+        alertas.append(
+            "P1/P2 presentes, mas execucao.json não foi encontrado. "
+            "Produtos derivados não possuem comprovação de proveniência."
+        )
     if not local_ok:
         alertas.append("P1/P2 locais incompletos: verificar insumos antes do processamento.")
     if erro_manifesto:
