@@ -100,10 +100,24 @@ Para selecionar um ancestral do P2, exigir área de interseção positiva entre 
 
 **Validação pendente:** casos de interseção positiva, contato pontual, contato por borda, ausência de contato e pequenas interseções sujeitas à precisão geométrica. Tolerâncias numéricas ainda devem ser justificadas; não confundir área positiva com comprovação de causalidade física.
 
+## D-008 — Preservação da geometria científica e simplificação visual
+
+**Estado:** decisão conceitual aprovada; implementação e validação pendentes.
+
+- Preservar geometrias originais válidas como referência científica, sem simplificação automática motivada somente pelo desempenho.
+- Reparar geometrias inválidas quando necessário, mantendo os dados brutos imutáveis e registrando método, alterações de área, perímetro, topologia e eventuais perdas. Reparos que alterem substancialmente a geometria exigem investigação, não aceitação silenciosa.
+- Permitir simplificação e generalização em cópias destinadas exclusivamente à visualização, inclusive por escala/zoom, sem alimentar cálculos científicos com essas cópias.
+- Priorizar índices espaciais, processamento por data, streaming, reutilização de resultados e outras otimizações que preservem a definição matemática dos indicadores.
+- Uma eventual simplificação para fins científicos exige estudo de sensibilidade e aprovação metodológica específica, considerando área, perímetro, conectividade, centroides, extremos e TR/IGT.
+
+**Justificativa:** a geometria é o próprio objeto da análise. O ganho de velocidade não justifica alterações geométricas não avaliadas. A representação cartográfica pode ser mais leve sem comprometer a referência científica, desde que não induza interpretações erradas.
+
+**Pendências:** tolerâncias numéricas, critérios quantitativos de reparo e investigação do issue #44 continuam em aberto; não aumentar tolerâncias indiscriminadamente para ocultar inconsistências. Validar a separação entre os produtos científicos e visuais.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Tolerância numérica e desempate residual.
-- Regularização, tolerâncias e auditoria topológica (issue #44).
+- Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
 - Interpretação e seleção de indicadores TR/IGT.
 - Segmentação temporal/BIC, validação e generalização.
