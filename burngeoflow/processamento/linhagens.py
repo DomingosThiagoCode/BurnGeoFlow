@@ -23,6 +23,9 @@ import shapely
 from burngeoflow.analises.paisagem import (
     Patch, carregar_p1, projetar_patches, salvar_csv,
 )
+from burngeoflow.validacao.diagnostico_linhagens import (
+    ExcessoIntersecoes, diagnosticar_intersecoes,
+)
 
 
 CAMPOS_LINHAGENS = [
@@ -124,10 +127,19 @@ def vincular_por_area(
                               (atuais, por_nov, "atual")):
         for p in grupo:
             if somas[p.rank] > p.area_m2 + max(1.0, p.area_m2 * 1e-8):
-                raise ValueError(
+                opostos = atuais if lado == "anterior" else anteriores
+                diagnostico = diagnosticar_intersecoes(
+                    p, opostos, arestas, lado, area_minima_m2
+                )
+                raise ExcessoIntersecoes(
                     f"Patch {lado} {p.data} rank {p.rank}: soma das "
                     "intersecoes maior que a propria area; revisar "
-                    "sobreposicoes em P1"
+                    "sobreposicoes em P1. "
+                    f"Excesso {diagnostico['excesso_soma_sobre_patch_m2']:.3f} m2; "
+                    f"area repetida {diagnostico['area_contada_repetidamente_m2']:.3f} m2; "
+                    f"{diagnostico['numero_pares_sobrepostos']} pares sobrepostos. "
+                    "Nenhuma geometria foi alterada.",
+                    diagnostico,
                 )
     return arestas, pais, filhos, contatos
 
@@ -384,9 +396,32 @@ def executar(caminho_p1: Path, pasta_saida: Path,
             area_minima_m2: float = 1.0) -> dict:
     patches = carregar_p1(caminho_p1)
     projecao, reparados = projetar_patches(patches)
-    linhas, vinculos, eventos, transicoes, resumo = analisar_linhagens(
-        patches, area_minima_m2
-    )
+    try:
+        linhas, vinculos, eventos, transicoes, resumo = analisar_linhagens(
+            patches, area_minima_m2
+        )
+    except ExcessoIntersecoes as exc:
+        # Guarda a evidência ao lado da etapa, mesmo quando o pipeline
+        # encerra com erro. Não gera CSVs ou resultados aparentemente válidos.
+        pasta_saida.mkdir(parents=True, exist_ok=True)
+        d = exc.diagnostico
+        nome = (f"diagnostico_topologia_{d['id_incendio']}_"
+                f"{d['data_patch']}_{d['lado_patch']}_r{d['rank_patch']}.json")
+        destino = pasta_saida / nome
+        evidencia = {
+            **d,
+            "projecao": projecao,
+            "geometrias_reparadas_apos_projecao": reparados,
+            "origem_p1": str(caminho_p1),
+            "sha256_p1": sha256(caminho_p1.read_bytes()).hexdigest(),
+        }
+        destino.write_text(
+            json.dumps(evidencia, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        raise ValueError(
+            f"{exc} Diagnostico salvo em: {destino}"
+        ) from exc
     resumo.update({
         "projecao": projecao,
         "geometrias_reparadas_apos_projecao": reparados,
