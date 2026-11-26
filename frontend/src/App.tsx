@@ -10,7 +10,7 @@ const MapPanel = lazy(() => import("./components/MapPanel").then(m => ({default:
 import { CatalogoPanel } from "./components/CatalogoPanel";
 import { JobsPanel } from "./components/JobsPanel";
 import {
-  carregarAnalise, carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
+  BASE_API, carregarAnalise, carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
   formatarNumero, listarEventos, nomeDia, numero, urlSerieCSV,
 } from "./services/api";
 import type { AnaliseEtapa4, Camada, Colecao, EventoListado, Linha, VisaoEvento } from "./types";
@@ -70,6 +70,18 @@ export default function App() {
   const [erroMapa, setErroMapa] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState("");
   const [tocando, setTocando] = useState(false);
+  const [preliminares, setPreliminares] = useState<{data:string;area_p1_atributo_km2:number|null;area_p2_atributo_km2:number|null;numero_patches:number}[]>([]);
+  const [etapasParciais, setEtapasParciais] = useState<Record<string,string>>({});
+  useEffect(() => {
+    setPreliminares([]); setEtapasParciais({});
+    if (id === null || resumo?.tem_series !== false) return;
+    const ctrl = new AbortController();
+    fetch(BASE_API + "/api/events/" + id + "/preliminares", {signal:ctrl.signal})
+      .then(r => {if (!r.ok) throw new Error("Preliminares indisponíveis"); return r.json();})
+      .then(r => {if(!ctrl.signal.aborted){setPreliminares(r.linhas);setEtapasParciais(r.etapas);}})
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, [id, resumo]);
   const [velocidade, setVelocidade] = useState(2);
   const cache = useRef(new Map<string, Colecao>());
 
@@ -214,11 +226,12 @@ export default function App() {
     () => transicoes.find((r) => r.data_atual === data) ?? null,
     [transicoes, data],
   );
-  const areaP1 = numero(linha, "area_total_laea_km2");
-  const areaP2 = numero(linha, "p2_area_laea_km2");
+  const preliminar = preliminares.find(r => r.data === data);
+  const areaP1 = numero(linha, "area_total_laea_km2") ?? preliminar?.area_p1_atributo_km2 ?? null;
+  const areaP2 = numero(linha, "p2_area_laea_km2") ?? preliminar?.area_p2_atributo_km2 ?? null;
   const dominancia = areaP1 !== null && areaP2 !== null && areaP1 > 0
     ? 100 * areaP2 / areaP1 : null;
-  const patches = numero(linha, "numero_patches");
+  const patches = numero(linha, "numero_patches") ?? preliminar?.numero_patches ?? null;
 
 
   function escolherId(evento: FormEvent<HTMLFormElement>) {
@@ -476,6 +489,7 @@ export default function App() {
                 </span>
               </div>
 
+              {!resumo.tem_series && <div role="status" className="map-warning">Análise científica ainda indisponível. Valores preliminares dos atributos GeoJSON (não LAEA). {Object.entries(etapasParciais).map(([k,v])=>k+": "+v).join(" · ")}</div>}
               <div className="kpi-grid">
                 <Kpi rotulo="Área acumulada (P1)"
                   valor={formatarNumero(areaP1) + (areaP1 !== null ? " km²" : "")}
