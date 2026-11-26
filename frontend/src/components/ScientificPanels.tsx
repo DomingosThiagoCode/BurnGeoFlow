@@ -1,7 +1,11 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { LineChart, type SerieGrafico } from "./LineChart";
 import { formatarNumero, numero } from "../services/api";
 import type { AnaliseEtapa4, Linha } from "../types";
+import {
+  type ContribuicaoDirecional, DIRECOES, distribuicaoDirecional,
+  indiceDirecional, intervaloSetor, filtrarIntervalo,
+} from "../utils/rose";
 
 export type AbaCientifica = "paisagem" | "expansao" | "movimento" | "direcoes" | "forma";
 
@@ -36,64 +40,96 @@ function Aviso({ children }: { children: ReactNode }) {
   return <p className="analysis-caution">{children}</p>;
 }
 
-type AnguloPonderado = { angulo: number; peso: number };
-const DIRECOES = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-  "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+type AnguloPonderado = ContribuicaoDirecional;
 
-function RosaDirecional({ titulo, dados, subtitulo }: {
-  titulo: string;
-  dados: AnguloPonderado[];
-  subtitulo: string;
+function RosaDirecional({
+  titulo, dados, subtitulo, unidade, escalaComum, selecionarData,
+}: {
+  titulo:string;
+  dados:AnguloPonderado[];
+  subtitulo:string;
+  unidade:"km"|"km²";
+  escalaComum?:number;
+  selecionarData:(data:string)=>void;
 }) {
-  const bins = Array.from({ length: 16 }, () => 0);
-  for (const item of dados) {
-    if (!Number.isFinite(item.angulo) || !Number.isFinite(item.peso) || item.peso <= 0) continue;
-    const indice = Math.floor((((item.angulo % 360) + 360 + 11.25) % 360) / 22.5);
-    bins[indice] += item.peso;
-  }
-  const maior = Math.max(0, ...bins);
-  const total = bins.reduce((s, v) => s + v, 0);
-  const cs = dados.reduce((s, v) => s + (v.peso > 0 ? v.peso * Math.cos(v.angulo * Math.PI / 180) : 0), 0);
-  const sn = dados.reduce((s, v) => s + (v.peso > 0 ? v.peso * Math.sin(v.angulo * Math.PI / 180) : 0), 0);
-  const media = total > 0 && Math.hypot(cs, sn) > 1e-8
-    ? (Math.atan2(sn, cs) * 180 / Math.PI + 360) % 360 : null;
-  const concentracao = total > 0 ? Math.hypot(cs, sn) / total : 0;
-  const raio = 75;
-  const ponto = (az: number, r: number) => {
-    const a = (az - 90) * Math.PI / 180;
-    return [110 + Math.cos(a) * r, 112 + Math.sin(a) * r];
+  const [hover,setHover]=useState<number|null>(null);
+  const [selecionado,setSelecionado]=useState<number|null>(null);
+  const [ampliado,setAmpliado]=useState(false);
+  const distribuicao=useMemo(()=>distribuicaoDirecional(dados),[dados]);
+  const {pesos,total,maximo,media,concentracao,validos}=distribuicao;
+  const maximoRadial = escalaComum && escalaComum>0 ? escalaComum : maximo;
+  const ativo = hover??selecionado;
+  const destaques = ativo===null?[]:
+    validos.filter(d=>indiceDirecional(d.angulo)===ativo)
+      .sort((a,b)=>a.data.localeCompare(b.data));
+  const pesoSetor = ativo===null?0:pesos[ativo];
+  const centro = ativo===null?null:ativo*22.5;
+  const raio=75;
+  const ponto = (az:number,r:number) => {
+    const a=(az-90)*Math.PI/180;
+    return [110+Math.cos(a)*r,112+Math.sin(a)*r];
   };
-  const setor = (i: number, r: number) => {
-    const a = ponto(i * 22.5 - 10.7, r);
-    const b = ponto(i * 22.5 + 10.7, r);
-    return "M 110 112 L " + a[0].toFixed(2) + " " + a[1].toFixed(2) +
-      " A " + r.toFixed(2) + " " + r.toFixed(2) + " 0 0 1 " +
-      b[0].toFixed(2) + " " + b[1].toFixed(2) + " Z";
+  const setor = (i:number,r:number) => {
+    const a=ponto(i*22.5-10.7,r);
+    const b=ponto(i*22.5+10.7,r);
+    return "M 110 112 L "+a[0].toFixed(2)+" "+a[1].toFixed(2)+
+      " A "+r.toFixed(2)+" "+r.toFixed(2)+" 0 0 1 "+
+      b[0].toFixed(2)+" "+b[1].toFixed(2)+" Z";
   };
-  return <section className="rose-card">
-    <h3>{titulo}</h3>
-    <p>{subtitulo}</p>
-    {total === 0 ? <div className="rose-empty">Sem azimutes válidos para esta série.</div> :
-      <svg viewBox="0 0 220 232" className="rose-svg" role="img"
-        aria-label={"Rosácea: " + titulo}>
-        {[0.25, 0.5, 0.75, 1].map(f =>
-          <circle key={f} cx="110" cy="112" r={raio*f}
-            fill="none" stroke="#e4e0d5" strokeWidth="1"/>)}
-        {[0, 45, 90, 135].map(a => {
-          const p = ponto(a, raio), q = ponto(a+180, raio);
+  const selecionar=(i:number)=>{
+    setSelecionado(prev=>prev===i?null:i);
+    const primeira=validos.filter(d=>indiceDirecional(d.angulo)===i)
+      .sort((a,b)=>a.data.localeCompare(b.data))[0];
+    if(primeira?.data) selecionarData(primeira.data);
+  };
+  return <section className={"rose-card "+(ampliado?"rose-card-expanded":"")}>
+    <div className="rose-heading">
+      <div><h3>{titulo}</h3><p>{subtitulo}</p></div>
+      <button type="button" className="secondary-button compact"
+        aria-label={(ampliado?"Reduzir":"Ampliar")+" rosácea "+titulo}
+        aria-pressed={ampliado} onClick={()=>setAmpliado(v=>!v)}>
+        {ampliado?"Reduzir":"Ampliar"}
+      </button>
+    </div>
+    {total===0?<div className="rose-empty">Sem azimutes válidos para este período.</div>:
+      <svg viewBox="0 0 220 232" className="rose-svg" role="group"
+        aria-label={"Rosácea interativa: "+titulo}>
+        {[0.25,0.5,0.75,1].map(fracao=>
+          <g key={fracao}>
+            <circle cx="110" cy="112" r={raio*fracao} fill="none"
+              stroke="#e4e0d5" strokeWidth="1"/>
+            <text x="117" y={108-raio*fracao} className="rose-tick">
+              {formatarNumero(maximoRadial*fracao,2)}
+            </text>
+          </g>)}
+        {[0,45,90,135].map(a=>{
+          const p=ponto(a,raio),q=ponto(a+180,raio);
           return <line key={a} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]}
             stroke="#d9d6c9" strokeWidth="1"/>;
         })}
-        {bins.map((valor, i) => {
-          if (valor <= 0) return null;
-          const rad = Math.max(2, raio * valor/maior);
-          return <path key={i} d={setor(i, rad)} fill="#35756d"
-            fillOpacity=".72" stroke="#fff" strokeWidth=".7">
-            <title>{DIRECOES[i]}: {formatarNumero(valor / total * 100, 1)}% do peso</title>
+        {pesos.map((valor,i)=>{
+          if(valor<=0)return null;
+          const rad=Math.max(2,raio*valor/Math.max(maximoRadial,valor));
+          return <path key={i} d={setor(i,rad)} role="button" tabIndex={0}
+            aria-label={DIRECOES[i]+", "+intervaloSetor(i)+", "+
+              formatarNumero(valor,2)+" "+unidade+", "+
+              formatarNumero(valor/total*100,1)+"%. Selecionar setor"}
+            aria-pressed={selecionado===i}
+            className={"rose-sector "+(ativo===i?"rose-sector-highlight":"")}
+            fill={ativo===i?"#ab4e38":"#35756d"}
+            fillOpacity={ativo!==null&&ativo!==i?0.38:0.78}
+            stroke="#fff" strokeWidth=".9"
+            onMouseEnter={()=>setHover(i)} onMouseLeave={()=>setHover(null)}
+            onFocus={()=>setHover(i)} onBlur={()=>setHover(null)}
+            onClick={()=>selecionar(i)}
+            onKeyDown={e=>{
+              if(e.key==="Enter"||e.key===" "){e.preventDefault();selecionar(i);}
+            }}>
+            <title>{DIRECOES[i]}: {formatarNumero(valor,2)} {unidade} ({formatarNumero(valor/total*100,1)}%)</title>
           </path>;
         })}
-        {media !== null && (() => {
-          const p = ponto(media, raio + 5);
+        {media!==null&&(()=>{
+          const p=ponto(media,raio+5);
           return <line x1="110" y1="112" x2={p[0]} y2={p[1]}
             stroke="#aa4b36" strokeWidth="2.6" strokeLinecap="round"/>;
         })()}
@@ -104,9 +140,29 @@ function RosaDirecional({ titulo, dados, subtitulo }: {
         <text x="17" y="116" textAnchor="middle">O</text>
       </svg>}
     <div className="rose-result">
-      <span>Direção média <strong>{media === null ? "indefinida" : formatarNumero(media, 1) + "°"}</strong></span>
-      <span>Concentração <strong>{total === 0 ? "—" : formatarNumero(concentracao, 2)}</strong></span>
+      <span>Direção média <strong>{media===null?"indefinida":formatarNumero(media,1)+"°"}</strong></span>
+      <span>Concentração <strong>{total===0?"—":formatarNumero(concentracao,2)}</strong></span>
+      <span>Escala radial <strong>{formatarNumero(maximoRadial,2)} {unidade}</strong></span>
     </div>
+    {ativo!==null&&<div className="rose-tooltip" role="status">
+      <strong>{DIRECOES[ativo]} · {intervaloSetor(ativo)}</strong>
+      <p>{formatarNumero(pesoSetor,3)} {unidade} · {total?formatarNumero(pesoSetor/total*100,1):0}% do peso</p>
+      {centro!==null&&<small>Setor centrado em {centro}° a partir do norte, sentido horário.</small>}
+    </div>}
+    {selecionado!==null&&<div className="rose-contributions">
+      <div className="rose-contrib-head">
+        <strong>Transições do setor {DIRECOES[selecionado]}</strong>
+        <button type="button" className="secondary-button compact"
+          onClick={()=>{setSelecionado(null);setHover(null);}}>Limpar seleção</button>
+      </div>
+      {destaques.length===0?<p>Sem contribuições neste período.</p>:
+        <ul>{destaques.slice(0,20).map((d,i)=><li key={d.data+":"+i}>
+          <button type="button" onClick={()=>selecionarData(d.data)}>
+            {d.data||"Data não informada"} · {formatarNumero(d.peso,3)} {unidade}
+          </button>
+        </li>)}</ul>}
+      {destaques.length>20&&<small>Exibindo 20 de {destaques.length} contribuições.</small>}
+    </div>}
   </section>;
 }
 
