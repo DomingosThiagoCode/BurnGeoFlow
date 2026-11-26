@@ -40,6 +40,16 @@ def testar() -> None:
             pasta = ROOT / "artifacts" / "story"
             pasta.mkdir(parents=True, exist_ok=True)
             page.screenshot(path=str(pasta / "01-hero-desktop.png"))
+            assert page.get_by_role("button", name="Cena anterior").is_disabled()
+            page.get_by_role("button", name="Próxima cena").click()
+            page.wait_for_function(
+                "() => document.querySelector('.story-visual').classList.contains('scene-1')"
+            )
+            page.get_by_role("button", name="Cena anterior").click()
+            page.wait_for_function(
+                "() => document.querySelector('.story-visual').classList.contains('scene-0')"
+            )
+            assert page.get_by_text("Versão dos quadros:", exact=False).count() >= 1
             page.evaluate("""() => {
               const el = document.querySelectorAll('.story-step')[2];
               window.scrollTo(0, scrollY + el.getBoundingClientRect().top + innerHeight * .6);
@@ -72,6 +82,9 @@ def testar() -> None:
             ) == "sticky"
             assert page.locator(".story-visual").bounding_box()["height"] > 250
             page.screenshot(path=str(pasta / "03-mobile.png"))
+            page.emulate_media(reduced_motion="reduce")
+            assert page.get_by_role("button", name="Reproduzir observações").is_disabled()
+            assert not errors, f"Erros JavaScript em modos responsivos: {errors}"
             browser.close()
     finally:
         server.shutdown()
