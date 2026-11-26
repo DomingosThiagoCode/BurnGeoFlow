@@ -31,6 +31,14 @@ class ErroMetodologia(ValueError):
         self.diagnostico = diagnostico or {}
 
 
+def _hash(path: Path) -> str:
+    h = sha256()
+    with path.open("rb") as f:
+        for bloco in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(bloco)
+    return h.hexdigest()
+
+
 def _salvar_json(path: Path, obj: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
@@ -85,9 +93,11 @@ def _carregar(p1_path: Path) -> tuple[int, dict[str, list], dict]:
     }
 
 
-def _preparar_componentes(originais: dict[str, list], transforms: dict) -> dict:
+def _preparar_componentes(originais: dict[str, list], transforms: dict,
+                          informar=None) -> dict:
     saida = {}
-    for dia, itens in originais.items():
+    total_datas = len(originais)
+    for indice_data, (dia, itens) in enumerate(originais.items(), start=1):
         patches = []
         for rank, geom in itens:
             geo = shapely.transform(
@@ -133,6 +143,10 @@ def _preparar_componentes(originais: dict[str, list], transforms: dict) -> dict:
             })
         novos.sort(key=lambda x: (-x["area_m2"], x["ranks_origem"]))
         saida[dia] = novos
+        if informar and (
+            indice_data == total_datas or indice_data == 1 or indice_data % 10 == 0
+        ):
+            informar(indice_data, total_datas, dia)
     return saida
 
 
@@ -196,15 +210,40 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         )
     pasta = Path(pasta_saida) / VERSAO
     pasta.mkdir(parents=True, exist_ok=True)
+    estado_path = pasta/"estado_preprocessamento.json"
+    codigo_sha = _hash(Path(__file__))
+    _salvar_json(estado_path, {
+        "id_incendio":incendio, "versao":VERSAO, "estado":"executando",
+        "etapa":"conectividade_p1", "datas_concluidas":0,
+        "datas_total":len(originais),
+    })
+    def progresso(indice, total, dia):
+        _salvar_json(estado_path, {
+            "id_incendio":incendio, "versao":VERSAO, "estado":"executando",
+            "etapa":"conectividade_p1", "datas_concluidas":indice,
+            "datas_total":total, "ultima_data":dia,
+        })
+        print(f"[V2] Conectividade P1 {indice}/{total} datas (até {dia})",
+              flush=True)
+
     try:
-        componentes = _preparar_componentes(originais, transforms)
+        componentes = _preparar_componentes(originais, transforms, progresso)
+        _salvar_json(estado_path, {
+            "id_incendio":incendio, "versao":VERSAO, "estado":"executando",
+            "etapa":"rastreamento_retro_p2", "datas_concluidas":len(componentes),
+            "datas_total":len(componentes),
+        })
         p2 = _retroceder(componentes)
     except ErroMetodologia as exc:
         _salvar_json(pasta / "diagnostico_bloqueio.json", {
             "id_incendio": incendio, "versao": VERSAO,
-            "sha256_p1_origem": sha256(p1_path.read_bytes()).hexdigest(),
+            "sha256_p1_origem": _hash(p1_path),
             "erro": str(exc), "detalhes": exc.diagnostico,
             "status": "bloqueado_revisao_topologica",
+        })
+        _salvar_json(estado_path, {
+            "id_incendio":incendio, "versao":VERSAO,
+            "estado":"bloqueado_topologia", "erro":str(exc),
         })
         raise
     if not p2:
@@ -259,7 +298,8 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         "id_incendio": incendio, "metodologia": VERSAO,
         "estado":"preprocessado_nao_integrado",
         "origem_p1":str(p1_path),
-        "sha256_p1_origem":sha256(p1_path.read_bytes()).hexdigest(),
+        "sha256_p1_origem":_hash(p1_path),
+        "codigo_sha256":codigo_sha,
         "datas_p1":len(componentes), "datas_p2":len(p2),
         "primeira_data_p2":p2[0]["data"],
         "ultima_data_p2":p2[-1]["data"],
@@ -268,11 +308,22 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
             "dos validadores e análises dependentes de P2 e homologação."
         ),
     }
-    _salvar_json(pasta/f"P1_componentes_{incendio}.geojson",{
+    p1_v2 = pasta/f"P1_componentes_{incendio}.geojson"
+    p2_v2 = pasta/f"P2_regiao_movel_{incendio}.geojson"
+    _salvar_json(p1_v2, {
         "type":"FeatureCollection","features":features_p1,
     })
-    _salvar_json(pasta/f"P2_regiao_movel_{incendio}.geojson",{
+    _salvar_json(p2_v2, {
         "type":"FeatureCollection","features":features_p2,
     })
+    manifesto.update({
+        "sha256_p1_v2":_hash(p1_v2),
+        "sha256_p2_v2":_hash(p2_v2),
+    })
     _salvar_json(pasta/"manifesto_metodologia.json",manifesto)
+    _salvar_json(estado_path, {
+        "id_incendio":incendio, "versao":VERSAO,
+        "estado":"preprocessado_nao_integrado",
+        "datas_p1":len(componentes), "datas_p2":len(p2),
+    })
     return manifesto
