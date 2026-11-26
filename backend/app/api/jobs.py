@@ -64,3 +64,14 @@ def logs(job_id: str, serv: JobService = Depends(servico)):
         return serv.log(job_id, limite=100)
     except (JobNaoEncontrado, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{job_id}/interromper", response_model=Execucao,
+             dependencies=[Depends(verificacao_mutacao)])
+def interromper(job_id: str, serv: JobService = Depends(servico)):
+    try:
+        return serv.interromper(job_id)
+    except (JobNaoEncontrado, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except JobConflito as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

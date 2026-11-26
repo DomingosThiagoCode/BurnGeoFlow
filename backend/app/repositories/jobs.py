@@ -186,6 +186,13 @@ class JobStore:
             if cursor.rowcount != 1:
                 raise JobConflito("Tarefa já finalizada")
 
+    def interromper(self, job_id: str, estado: str, pid: int | None) -> dict:
+        with self.conexao() as c:
+            c.execute("""UPDATE jobs SET status='interrupted', error=?, finished_at=?
+                         WHERE id=? AND status=? AND pid IS ?""",
+                      ("Interrompido pelo operador", utc(), job_id, estado, pid))
+        return self.obter(job_id)
+
     def reconciliar(self, job: dict, *, timeout_s: float = 120) -> dict:
         if job["status"] not in ESTADOS_ATIVOS:
             return job

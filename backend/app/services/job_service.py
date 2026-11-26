@@ -6,9 +6,13 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from threading import Lock
+import psutil
 
 from backend.app.core.config import ROOT
-from backend.app.repositories.jobs import JobStore
+from backend.app.repositories.jobs import JobStore, JobConflito
+
+_CANCEL_LOCK = Lock()
 
 
 class JobService:
@@ -51,6 +55,60 @@ class JobService:
         return [
             self.store.reconciliar(j) for j in self.store.listar(limite)
         ]
+
+    def interromper(self, job_id: str) -> dict:
+        with _CANCEL_LOCK:
+            job = self.obter(job_id)
+            if job["status"] == "queued":
+                job = self.store.interromper(job_id, "queued", None)
+            if job["status"] != "running":
+                return job
+            # Nunca sinalizar um PID arbitrário ou reciclado.
+            try:
+                proc = psutil.Process(job["pid"])
+                args = proc.cmdline()
+                if ("backend.app.jobs.worker" not in args or "--id" not in args
+                    or args[args.index("--id")+1:args.index("--id")+2] != [job_id]
+                    or "--database" not in args
+                    or args[args.index("--database")+1:args.index("--database")+2] != [str(self.store.db)]):
+                    raise JobConflito("PID não corresponde ao worker desta execução.")
+                # Congela o worker antes de capturar a árvore de descendentes.
+                suspensos = []
+                try:
+                    proc.suspend()
+                    suspensos.append(proc)
+                    # Suspender pais antes de inspecionar seus filhos impede novos
+                    # subprocessos durante a coleta.
+                    fila = [proc]
+                    while fila:
+                        pai = fila.pop()
+                        for filho in pai.children():
+                            try:
+                                filho.suspend()
+                                suspensos.append(filho)
+                                fila.append(filho)
+                            except psutil.NoSuchProcess:
+                                continue
+                    for alvo in reversed(suspensos):
+                        try:
+                            alvo.kill()
+                        except psutil.NoSuchProcess:
+                            pass
+                    _, vivos = psutil.wait_procs(suspensos, timeout=5)
+                    if vivos:
+                        raise JobConflito("Não foi possível confirmar o fim de todos os processos.")
+                finally:
+                    for alvo in reversed(suspensos):
+                        try:
+                            if alvo.is_running() and alvo.status() != psutil.STATUS_ZOMBIE:
+                                alvo.resume()
+                        except psutil.Error:
+                            pass
+            except psutil.NoSuchProcess as exc:
+                raise JobConflito("Worker desapareceu; atualize o estado antes de tentar novamente.") from exc
+            except psutil.Error as exc:
+                raise JobConflito(f"Não foi possível interromper com segurança: {exc}") from exc
+            return self.store.interromper(job_id, "running", job["pid"])
 
     def log(self, job_id: str, limite: int = 100) -> dict:
         job = self.obter(job_id)

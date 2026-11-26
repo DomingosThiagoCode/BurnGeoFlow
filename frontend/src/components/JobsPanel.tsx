@@ -3,10 +3,10 @@ import {
 } from "react";
 import {
   Activity, AlertCircle, CheckCircle2, ChevronDown, Clock3,
-  Database, LoaderCircle, Play, RefreshCw, Terminal,
+  Database, LoaderCircle, Play, RefreshCw, Terminal, Square,
 } from "lucide-react";
 import {
-  criarJob, listarJobs, logsJob, type ExecucaoJob, type OrigemJob,
+  criarJob, listarJobs, logsJob, interromperJob, type ExecucaoJob, type OrigemJob,
 } from "../services/jobs";
 
 type Props = {
@@ -34,6 +34,7 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
   const [linhas, setLinhas] = useState<string[]>([]);
   const [truncado, setTruncado] = useState(false);
   const [criando, setCriando] = useState(false);
+  const [interrompendo, setInterrompendo] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -119,7 +120,18 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
   }, [expanded, selecionado]);
 
   const atual = jobs.find(j => j.id === selecionado) ?? null;
-  const emExecucao = jobs.some(j => ESTADOS_ATIVOS.has(j.status));
+  const jobAtivo = jobs.find(j => ESTADOS_ATIVOS.has(j.status));
+  const emExecucao = Boolean(jobAtivo);
+  async function interromper() {
+    if (!jobAtivo || !window.confirm('Forçar interrupção do ID '+jobAtivo.incendio+'? Dados já gravados serão mantidos. Tarefas remotas do GEE podem continuar.')) return;
+    setInterrompendo(true); setErro(null); setAviso(null);
+    try {
+      const resultado = await interromperJob(jobAtivo.id);
+      setAviso(resultado.status === 'interrupted' ? 'Processamento local interrompido.' : 'A execução já mudou de estado: '+NOMES[resultado.status]);
+      await atualizar();
+    } catch(e) { setErro(e instanceof Error ? e.message : String(e)); }
+    finally { setInterrompendo(false); }
+  }
 
   async function iniciar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,6 +223,7 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
           </button>
         </form>
 
+        {jobAtivo && <button type="button" className="secondary-button" style={{color:"#a53827",borderColor:"#a53827",marginTop:12}} disabled={interrompendo} onClick={()=>void interromper()}><Square size={15}/> {interrompendo?"Interrompendo…":"Forçar interrupção"}</button>}
         <p className="jobs-warning">
           <AlertCircle size={15}/>
           Uma execução ativa por vez. A autenticação do GEE precisa estar

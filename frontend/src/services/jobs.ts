@@ -68,3 +68,7 @@ export function logsJob(jobId: string, signal?: AbortSignal) {
     "/api/jobs/" + encodeURIComponent(jobId) + "/logs", signal,
   );
 }
+
+export function interromperJob(jobId: string) {
+  return requisitar<ExecucaoJob>("/api/jobs/" + encodeURIComponent(jobId) + "/interromper", undefined, {method:"POST"});
+}
