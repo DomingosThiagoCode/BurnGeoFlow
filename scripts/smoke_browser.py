@@ -83,7 +83,13 @@ def responder_api(route):
                  "eventos":[{"id":EVENTO,"ano":2020,"registros_na_aoi":947,
                  "registros_totais":None,"datas_distintas":57,"primeira_data":DATAS[0],
                  "ultima_data":DATAS[-1],"dias_periodo":3,"lacunas":0,
-                 "local":{"p1":True,"p2":True,"serie":True}}]}
+                 "local":{"p1":True,"p2":True,"serie":True}}] +
+                 [{"id":24000000+i,"ano":2020,"registros_na_aoi":900-i*50,
+                   "registros_totais":None,"datas_distintas":50-i,
+                   "primeira_data":DATAS[0],"ultima_data":DATAS[-1],
+                   "dias_periodo":3,"lacunas":0,
+                   "local":{"p1":False,"p2":False,"serie":False}}
+                  for i in range(1,8)]}
     elif caminho == "/api/jobs":
         if route.request.method == "POST":
             pedido = route.request.post_data_json
@@ -202,22 +208,37 @@ def testar() -> None:
                 "Mapa foi carregado antes da ação do usuário"
             )
             assert not errors, f"Falhas JavaScript na página inicial: {errors}"
-            catalogo = page.get_by_role("button", name="Explorar incêndios")
-            catalogo.click()
+            barra = page.locator(".atlas-rail-links")
+            barra.get_by_role("button", name="Explorar incêndios").click()
+            page.get_by_role("heading", name="Catálogo GlobFire").wait_for()
             page.get_by_label("Bioma", exact=True).select_option("Pantanal")
             page.get_by_label("Ano", exact=True).select_option("2020")
             page.get_by_role("button", name="Buscar incêndios").click()
-            page.locator(".catalog-table").get_by_text(str(EVENTO) + " / 2020", exact=True).wait_for()
-            # A seleção alternativa precisa usar a mesma API, sem carregar P1/P2.
+            page.locator(".catalog-table").get_by_text(str(EVENTO)+" / 2020", exact=True).wait_for()
+            assert page.locator(".catalog-table tbody tr").count()==5
+            page.get_by_role("button", name="Próxima página").click()
+            page.get_by_text("Página 2 de 2").wait_for()
+            assert page.locator(".catalog-table tbody tr").count()==3
+            page.get_by_label("Buscar ID").fill(str(EVENTO))
+            page.get_by_text("Página 1 de 1").wait_for()
+            assert page.locator(".catalog-table tbody tr").count()==1
+            page.get_by_label("Buscar ID").fill("")
+            page.get_by_label("Ordenar").select_option("id")
+            page.get_by_text("Página 1 de 2").wait_for()
+            page.get_by_label("Ordenar").select_option("registros_na_aoi")
             page.get_by_label("Área de pesquisa").select_option("uf")
             page.get_by_label("Estado").select_option("MS")
             page.get_by_role("button", name="Buscar incêndios").click()
-            page.locator(".catalog-table").get_by_text(str(EVENTO) + " / 2020", exact=True).wait_for()
+            page.locator(".catalog-table").get_by_text(str(EVENTO)+" / 2020", exact=True).wait_for()
             page.once("dialog", lambda dialog: dialog.accept())
             page.get_by_role("button", name="Processar ID").first.click()
             page.get_by_text("Execução criada. Acompanhe no painel de processamento.").wait_for()
-            catalogo.click()
-            assert not errors, f"Falhas JavaScript no catálogo: {errors}"
+            barra.get_by_role("button", name="Processamento").click()
+            page.get_by_role("heading", name="Processamento de eventos").wait_for()
+            page.get_by_label("ID GlobFire").wait_for()
+            assert not errors, f"Falhas JavaScript no catálogo/jobs: {errors}"
+            barra.get_by_role("button", name="Visão geral").click()
+            page.get_by_role("heading", name="Explorador de incêndios").wait_for()
             page.get_by_role(
                 "button", name="Abrir mapa do evento",
             ).click()
@@ -266,6 +287,15 @@ def testar() -> None:
             page.get_by_role("tab", name="Direções").click()
             page.get_by_role("heading", name="Direções e rosáceas").wait_for()
             assert page.locator(".rose-card").count() == 7
+            rosa = page.locator(".rose-card").first
+            rosa.locator("path.rose-sector").first.click()
+            rosa.get_by_text("Transições do setor", exact=False).wait_for()
+            rosa.get_by_role("button", name="Limpar seleção").click()
+            rosa.get_by_role("button", name="Ampliar rosácea TR · Centroide").click()
+            assert "rose-card-expanded" in (rosa.get_attribute("class") or "")
+            page.get_by_label("A partir de").select_option(DATAS[-1])
+            page.get_by_text("Sem azimutes válidos para este período.").first.wait_for()
+            page.get_by_role("button", name="Limpar período").click()
             page.evaluate("window.scrollTo(0, 0)")
             page.wait_for_timeout(150)
             page.screenshot(path=str(evidencias / "02-rosaceas-desktop.png"), full_page=True)
