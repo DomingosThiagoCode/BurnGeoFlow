@@ -114,10 +114,22 @@ Para selecionar um ancestral do P2, exigir área de interseção positiva entre 
 
 **Pendências:** tolerâncias numéricas, critérios quantitativos de reparo e investigação do issue #44 continuam em aberto; não aumentar tolerâncias indiscriminadamente para ocultar inconsistências. Validar a separação entre os produtos científicos e visuais.
 
+## D-009 — Objeto de estudo: evolução geométrica da área queimada acumulada
+
+**Estado:** decisão conceitual aprovada; implementação, revisão terminológica e validação pendentes.
+
+O objeto observado é a área queimada acumulada (burned area) representada pelos perímetros do GlobFire, não o fogo físico, a frente ativa ou a dinâmica de combustão. Preservar os indicadores TR/IGT como descritores geométricos, adaptando sua interpretação ao fenômeno acumulativo.
+
+Deslocamentos de centroides e extremos representam mudanças de posição de elementos geométricos; taxas de deslocamento representam essas mudanças por unidade de tempo, não velocidade de propagação do fogo. Direções descrevem tendências da evolução geométrica, não necessariamente a direção física de propagação. Fusões e representatividade devem contextualizar a interpretação conforme D-005 e D-006.
+
+**Justificativa:** uma região queimada acumulada cresce por incorporação de áreas e não se desloca materialmente como um furacão. O valor científico dos indicadores para caracterizar e comparar padrões espaço-temporais de queimadas é questão a investigar, e não conclusão já demonstrada. Não inferir causalidade, velocidade de frente ativa ou condições ambientais apenas a partir das geometrias.
+
+**Pendências:** justificar a utilidade e selecionar os indicadores, testar padrões em eventos distintos, verificar robustez e avaliar eventual relação com variáveis externas em etapa futura. Revisar nomes, unidades, legendas e textos da interface para evitar interpretação física indevida.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Tolerância numérica e desempate residual.
 - Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
-- Interpretação e seleção de indicadores TR/IGT.
+- Utilidade científica, seleção e interpretação específica dos indicadores TR/IGT.
 - Segmentação temporal/BIC, validação e generalização.
