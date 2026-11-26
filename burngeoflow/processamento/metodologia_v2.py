@@ -20,11 +20,6 @@ from shapely.geometry import mapping, shape
 from burngeoflow.processamento.conectividade import grupos_conectados
 
 VERSAO = "p1-contato-v2_p2-retro-v2"
-# Este é o limiar diagnóstico legado, NÃO uma tolerância científica nova
-# para unir polígonos sobrepostos.
-LIMIAR_SOBREPOSICAO_DIAGNOSTICO_M2 = 1.0
-
-
 class ErroMetodologia(ValueError):
     def __init__(self, mensagem: str, diagnostico: dict | None = None):
         super().__init__(mensagem)
@@ -94,7 +89,7 @@ def _carregar(p1_path: Path) -> tuple[int, dict[str, list], dict]:
 
 
 def _preparar_componentes(originais: dict[str, list], transforms: dict,
-                          informar=None) -> dict:
+                          informar=None, auditoria=None) -> dict:
     saida = {}
     total_datas = len(originais)
     for indice_data, (dia, itens) in enumerate(originais.items(), start=1):
@@ -114,32 +109,32 @@ def _preparar_componentes(originais: dict[str, list], transforms: dict,
         novos = []
         for grupo in componentes:
             membros = [patches[j] for j in grupo]
-            # D-002: juntar por contato, mas não absorver sobreposição areal
-            # significativa sem investigação topológica (#44).
-            indice = shapely.STRtree([g for _, g in membros])
-            for i, (_, g) in enumerate(membros):
-                for j in indice.query(g, predicate="intersects"):
-                    j = int(j)
-                    if j <= i:
-                        continue
-                    area = g.intersection(membros[j][1]).area
-                    if area > LIMIAR_SOBREPOSICAO_DIAGNOSTICO_M2:
-                        raise ErroMetodologia(
-                            f"{dia}: sobreposição intradata entre ranks "
-                            f"{membros[i][0]} e {membros[j][0]}: {area:.6f} m²; "
-                            "não unir automaticamente, investigar topologia.",
-                            {"data": dia, "ranks": [membros[i][0], membros[j][0]],
-                             "sobreposicao_laea_m2": area},
-                        )
+            # D-002: cada grupo conectado é a cobertura da UNIÃO dos
+            # membros. Uma interseção areal é contada uma única vez, sem
+            # escolher um rank "dono", alterar P1 bruto nem usar buffer.
+            # Não aplicar limiar derivado da resolução MODIS (D-013).
             geo = shapely.union_all([g for _, g in membros])
             if geo.geom_type not in ("Polygon", "MultiPolygon") or not geo.is_valid:
                 raise ErroMetodologia(
                     f"{dia}: união por contato produziu {geo.geom_type} inválido."
                 )
+            soma_original_m2 = sum(g.area for _, g in membros)
+            area_duplicada_m2 = soma_original_m2 - geo.area
+            # Guardar o resíduo assinado, inclusive arredondamento numérico.
+            # Somente indicar overlap positivo; sem corrigir área por epsilon.
+            if auditoria is not None and area_duplicada_m2 > 0:
+                auditoria.append({
+                    "data": dia, "ranks_origem": sorted(rank for rank, _ in membros),
+                    "area_somada_m2": soma_original_m2,
+                    "area_uniao_m2": geo.area,
+                    "area_contada_repetidamente_m2": area_duplicada_m2,
+                    "interpretacao": "sobreposicao_ou_precisao_numerica_a_investigar",
+                })
             novos.append({
                 "geometria": geo,
                 "ranks_origem": sorted(rank for rank, _ in membros),
                 "area_m2": geo.area,
+                "residuo_soma_menos_uniao_m2": area_duplicada_m2,
             })
         novos.sort(key=lambda x: (-x["area_m2"], x["ranks_origem"]))
         saida[dia] = novos
@@ -252,8 +247,11 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         print(f"[V2] Conectividade P1 {indice}/{total} datas (até {dia})",
               flush=True)
 
+    auditoria_cobertura = []
     try:
-        componentes = _preparar_componentes(originais, transforms, progresso)
+        componentes = _preparar_componentes(
+            originais, transforms, progresso, auditoria_cobertura
+        )
         _salvar_json(estado_path, {
             "id_incendio":incendio, "versao":VERSAO, "estado":"executando",
             "etapa":"rastreamento_retro_p2", "datas_concluidas":len(componentes),
@@ -291,6 +289,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
                     "numero_componentes": len(lista),
                     "area_total_km2": totais[dia],
                     "ranks_origem": c["ranks_origem"],
+                    "residuo_soma_menos_uniao_m2": c["residuo_soma_menos_uniao_m2"],
                     "metodologia": VERSAO,
                     "area_atributo_fonte": "LAEA_local",
                 },
@@ -316,6 +315,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
                 "delta_area_total_km2":0.0 if anterior is None else total-anterior[2],
                 "representatividade_pct":100*a/total if total else None,
                 "metodo_continuidade":item["metodo"],
+                "residuo_soma_menos_uniao_m2": c["residuo_soma_menos_uniao_m2"],
                 "metodologia":VERSAO, "area_atributo_fonte":"LAEA_local",
             },
         })
@@ -330,6 +330,11 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         "primeira_data_p2":p2[0]["data"],
         "ultima_data_p2":p2[-1]["data"],
         "desempates_p2": desempates,
+        "politica_cobertura_intradata": "uniao_sem_duplicacao_com_ranks_origem",
+        "componentes_com_residuo_positivo": len(auditoria_cobertura),
+        "residuo_positivo_total_m2": sum(
+            x["area_contada_repetidamente_m2"] for x in auditoria_cobertura
+        ),
         "observacao":(
             "Pré-processamento geométrico experimental; requer adaptação "
             "dos validadores e análises dependentes de P2 e homologação."
@@ -346,6 +351,13 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
     manifesto.update({
         "sha256_p1_v2":_hash(p1_v2),
         "sha256_p2_v2":_hash(p2_v2),
+    })
+    _salvar_json(pasta/"auditoria_cobertura_p1.json", {
+        "id_incendio": incendio,
+        "metodologia": VERSAO,
+        "criterio": "area_da_uniao_sem_duplicacao",
+        "requer_revisao_qualitativa": bool(auditoria_cobertura),
+        "componentes": auditoria_cobertura,
     })
     _salvar_json(pasta/"manifesto_metodologia.json",manifesto)
     _salvar_json(estado_path, {
