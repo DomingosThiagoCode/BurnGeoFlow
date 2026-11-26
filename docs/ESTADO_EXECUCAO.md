@@ -143,3 +143,15 @@ Números acima são **histórico documentado**, não garantia de que arquivos ai
 - Separar no relatório: `Implementado na branch`, `CI aprovado`, `Integrado na main`, `Homologado em dados reais`, `Validado cientificamente`. Esses estados NÃO são equivalentes.
 - Nunca falsificar testes concluídos, status de tarefas do GEE ou existência de dados locais.
 - Atualizar este documento **apenas em marcos** (merge, erro real diagnosticado, mudança de escopo/estado), conciliando com GitHub, e evitar commits de status a cada execução de CI.
+
+## Evidências preservadas da integração local
+
+| Medição em 24340828 | Resultado |
+| --- | --- |
+| Execução legada isolada | 35,449 s, pico de RSS de 129.444 KiB |
+| Retomada legada | 8 de 8 etapas reutilizadas |
+| Pré-processamento experimental | 978 feições P1 legadas, 369 componentes P1 v2, 57 datas em P1 e P2 |
+| Maior diferença de área diária em LAEA | 1,25056 × 10⁻¹² km² entre a união do P1 legado e o total publicado no P1 v2 |
+| Partição D-005 | 56 transições, erro máximo de 1,49012 × 10⁻⁷ m² e área máxima de P2 anterior fora de P1 igual a 0 m² |
+| SHA-256 P1 v2 | `386aee3aac89c43873ff26faa851d8d80fb961fff1b9056d62f8e89ce672d0da` |
+| SHA-256 P2 v2 | `21f7e61547c1b661eb27fd23e559e28e98cd8fc1080633930d6a09cde8b57b79` |
