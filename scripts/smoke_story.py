@@ -83,7 +83,12 @@ def testar() -> None:
             assert page.locator(".story-visual").bounding_box()["height"] > 250
             page.screenshot(path=str(pasta / "03-mobile.png"))
             page.emulate_media(reduced_motion="reduce")
-            assert page.get_by_role("button", name="Reproduzir observações").is_disabled()
+            page.wait_for_function("""
+              () => {
+                const botao = document.querySelector('button[aria-label="Reproduzir observações"]');
+                return botao !== null && botao.disabled === true;
+              }
+            """, timeout=10000)
             assert not errors, f"Erros JavaScript em modos responsivos: {errors}"
             browser.close()
     finally:
