@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Search, ChevronDown, Globe2 } from "lucide-react";
+import { Search, ChevronDown, Globe2, ChevronLeft, ChevronRight } from "lucide-react";
 import { BASE_API } from "../services/api";
 import { criarJob } from "../services/jobs";
 
@@ -27,9 +27,10 @@ export function CatalogoPanel() {
   const [busy,setBusy]=useState(false);
   const [msg,setMsg]=useState("");
   const [busca,setBusca]=useState("");
+  const [pagina,setPagina]=useState(1);
   const [ordem,setOrdem]=useState("registros_na_aoi");
   async function consultar(atualizar:boolean) {
-    setBusy(true);setMsg("");setResultado(null);
+    setBusy(true);setMsg("");setResultado(null);setPagina(1);setBusca("");
     try {
       let area:Record<string,unknown>={regiao};
       if(modo==="arquivo"){
@@ -56,7 +57,12 @@ export function CatalogoPanel() {
     try{await criarJob({id_incendio:e.id,ano:e.ano,origem:"auto"});setMsg("Execução criada. Acompanhe no painel de processamento.");}
     catch(err){setMsg(String(err));}finally{setBusy(false);}
   }
-  const linhas=(resultado?.eventos??[]).filter(e=>String(e.id).includes(busca)).sort((a,b)=>ordem==="id"?a.id-b.id:ordem==="datas_distintas"?b.datas_distintas-a.datas_distintas:b.registros_na_aoi-a.registros_na_aoi);
+  const linhas=(resultado?.eventos??[]).filter(e=>String(e.id).includes(busca)).sort((a,b)=>ordem==="id"?a.id-b.id:ordem==="datas_distintas"?b.datas_distintas-a.datas_distintas:ordem==="dias_periodo"?b.dias_periodo-a.dias_periodo:b.registros_na_aoi-a.registros_na_aoi);
+  const tamanhoPagina=5;
+  const totalPaginas=Math.max(1,Math.ceil(linhas.length/tamanhoPagina));
+  const paginaAtual=Math.min(pagina,totalPaginas);
+  const deslocamento=(paginaAtual-1)*tamanhoPagina;
+  const visiveis=linhas.slice(deslocamento,deslocamento+tamanhoPagina);
   return <section className="jobs-panel">
     <button type="button" className="jobs-head" aria-expanded={aberto} onClick={()=>setAberto(!aberto)}>
       <div className="jobs-head-icon"><Globe2 size={20}/></div>
@@ -92,11 +98,21 @@ export function CatalogoPanel() {
       {resultado&&<>
         <p>Origem: {resultado.origem} | Consulta: {resultado.consultado_utc} | Janela: {resultado.inicio_efetivo} a {resultado.fim_efetivo}</p>
         <p>Os registros encontrados correspondem à região e ao período escolhidos. Consulte o total do evento separadamente.</p>
-        <label>Buscar ID <input value={busca} onChange={e=>setBusca(e.target.value)}/></label>
-        <label>Ordenar <select value={ordem} onChange={e=>setOrdem(e.target.value)}><option value="registros_na_aoi">Registros na AOI</option><option value="datas_distintas">Datas</option><option value="id">ID</option></select></label>
+        <div className="catalog-fields">
+          <div className="jobs-form-field"><label htmlFor="catalog-filter-id">Buscar ID</label><input id="catalog-filter-id" value={busca} onChange={e=>{setBusca(e.target.value);setPagina(1);}} placeholder="Filtrar resultados"/></div>
+          <div className="jobs-form-field"><label htmlFor="catalog-sort">Ordenar</label><select id="catalog-sort" value={ordem} onChange={e=>{setOrdem(e.target.value);setPagina(1);}}><option value="registros_na_aoi">Mais registros na região</option><option value="datas_distintas">Mais datas observadas</option><option value="dias_periodo">Maior duração observada</option><option value="id">ID crescente</option></select></div>
+        </div>
+        <p className="catalog-note" role="status">{linhas.length.toLocaleString("pt-BR")} de {resultado.eventos.length.toLocaleString("pt-BR")} eventos · {linhas.length?deslocamento+1:0}–{Math.min(deslocamento+tamanhoPagina,linhas.length)} exibidos</p>
         {!linhas.length?<p>Nenhum evento encontrado.</p>:<div style={{overflowX:"auto"}}><table className="catalog-table"><thead><tr>{["ID / ano","Registros na região","Total ID/ano","Datas / lacunas","Primeira / última","Dias","Local","Ações"].map(t=><th key={t}>{t}</th>)}</tr></thead><tbody>
-          {linhas.map(e=><tr key={e.ano+":"+e.id}><td>{e.id} / {e.ano}</td><td>{e.registros_na_aoi}</td><td>{e.registros_totais??"Não consultado"}</td><td>{e.datas_distintas} / {e.lacunas}</td><td>{e.primeira_data} / {e.ultima_data}</td><td>{e.dias_periodo}</td><td>{e.local.serie?"Análise disponível":e.local.p1&&e.local.p2?"P1/P2":e.local.p1?"P1":e.local.p2?"P2":"Não localizado"}</td><td><button className="secondary-button" disabled={busy} onClick={()=>void total(e)}>Ver total</button> <button className="secondary-button" disabled={busy} onClick={()=>void processar(e)}>Processar ID</button></td></tr>)}
+          {visiveis.map(e=><tr key={e.ano+":"+e.id}><td>{e.id} / {e.ano}</td><td>{e.registros_na_aoi}</td><td>{e.registros_totais??"Não consultado"}</td><td>{e.datas_distintas} / {e.lacunas}</td><td>{e.primeira_data} / {e.ultima_data}</td><td>{e.dias_periodo}</td><td>{e.local.serie?"Análise disponível":e.local.p1&&e.local.p2?"P1/P2":e.local.p1?"P1":e.local.p2?"P2":"Não localizado"}</td><td><button className="secondary-button" disabled={busy} title="Quantidade de registros do ID completo no ano, sem recorte espacial ou temporal da consulta" onClick={()=>void total(e)}>Total de registros</button> <button className="secondary-button" disabled={busy} onClick={()=>void processar(e)}>Processar ID</button></td></tr>)}
         </tbody></table></div>}
+        {linhas.length>0&&<nav className="catalog-pagination" aria-label="Paginação dos incêndios">
+          <button className="secondary-button" type="button" disabled={paginaAtual===1} onClick={()=>setPagina(1)}>Primeira</button>
+          <button className="secondary-button" type="button" aria-label="Página anterior" disabled={paginaAtual===1} onClick={()=>setPagina(paginaAtual-1)}><ChevronLeft size={16}/></button>
+          <span aria-live="polite">Página {paginaAtual} de {totalPaginas}</span>
+          <button className="secondary-button" type="button" aria-label="Próxima página" disabled={paginaAtual===totalPaginas} onClick={()=>setPagina(paginaAtual+1)}><ChevronRight size={16}/></button>
+          <button className="secondary-button" type="button" disabled={paginaAtual===totalPaginas} onClick={()=>setPagina(totalPaginas)}>Última</button>
+        </nav>}
       </>}
     </div>}
   </section>;
