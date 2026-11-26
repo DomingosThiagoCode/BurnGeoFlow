@@ -720,3 +720,26 @@ tbody tr:hover { background:#efede5; }
   .pipeline-inspector { padding: 12px; }
   .pipeline-line { align-items: flex-start; }
 }
+
+/* Issue #40: catálogo independente do restante do atlas */
+.catalog-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 0 2px;
+}
+.catalog-pagination > span {
+  margin: 0 9px;
+  font: 700 12px var(--type-ui, sans-serif);
+  color: var(--forest, #29493d);
+}
+.catalog-pagination .secondary-button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+@media (max-width:600px) {
+  .catalog-pagination { justify-content: center; }
+  .catalog-pagination .secondary-button { padding: 8px 9px; }
+}
