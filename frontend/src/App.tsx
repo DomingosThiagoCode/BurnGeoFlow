@@ -3,6 +3,7 @@ import {
   Activity, AlertCircle, ArrowDownToLine, CheckCircle2,
   ChevronLeft, ChevronRight, Database, Layers, LoaderCircle,
   Menu, Pause, Play, RefreshCw, Search, X,
+  LayoutDashboard, ChartColumn, Flame, ListFilter, Waypoints, Compass, Shapes,
 } from "lucide-react";
 import { ScientificPanels, type AbaCientifica } from "./components/ScientificPanels";
 // Só importa MapLibre e WebGL quando o usuário solicita o mapa.
@@ -24,6 +25,20 @@ const ABAS = [
   { id: "forma", label: "Forma" },
 ] as const;
 type Aba = "geral" | AbaCientifica;
+type Vista = "atlas" | "catalogo" | "jobs";
+const ABAS_VALIDAS = new Set<Aba>(["geral","paisagem","expansao","movimento","direcoes","forma"]);
+function rotaInicial(): { vista: Vista; aba: Aba } {
+  if (typeof window === "undefined") return {vista:"atlas",aba:"geral"};
+  const hash = window.location.hash.slice(1);
+  if (hash === "catalogo") return {vista:"catalogo",aba:"geral"};
+  if (hash === "processamento") return {vista:"jobs",aba:"geral"};
+  if (hash.startsWith("analise/")) {
+    const candidato = hash.slice("analise/".length) as Aba;
+    if (ABAS_VALIDAS.has(candidato)) return {vista:"atlas",aba:candidato};
+  }
+  return {vista:"atlas",aba:"geral"};
+}
+
 
 function textoErro(erro: unknown): string {
   return erro instanceof Error ? erro.message : "Falha inesperada";
@@ -50,7 +65,31 @@ export default function App() {
   const [buscaId, setBuscaId] = useState("");
   const [buscando, setBuscando] = useState(true);
   const [painelAberto, setPainelAberto] = useState(false);
-  const [aba, setAba] = useState<Aba>("geral");
+  const [vista, setVista] = useState<Vista>(() => rotaInicial().vista);
+  const [aba, setAba] = useState<Aba>(() => rotaInicial().aba);
+  const [jobAtivo, setJobAtivo] = useState(false);
+  const aoStatusJob = useCallback((ativo:boolean)=>setJobAtivo(ativo),[]);
+  useEffect(() => {
+    const sincronizar = () => {
+      const rota = rotaInicial();
+      setVista(rota.vista);
+      setAba(rota.aba);
+      setPainelAberto(false);
+    };
+    window.addEventListener("hashchange", sincronizar);
+    return () => window.removeEventListener("hashchange", sincronizar);
+  }, []);
+  const navegar = (destino:Vista, abaDestino:Aba="geral") => {
+    setVista(destino); setAba(abaDestino); setPainelAberto(false);
+    setTocando(false);
+    if (destino!=="atlas" || abaDestino!=="geral") {
+      setMapaAtivo(false); setP1(null); setP2(null);
+    }
+    const hash = destino==="atlas" ? (abaDestino==="geral" ? "atlas" : "analise/"+abaDestino)
+      : destino==="jobs" ? "processamento" : "catalogo";
+    window.location.hash = hash;
+    window.scrollTo({top:0,behavior:"instant"});
+  };
   const [analise, setAnalise] = useState<AnaliseEtapa4 | null>(null);
   const [carregandoAnalise, setCarregandoAnalise] = useState(false);
   const [erroAnalise, setErroAnalise] = useState<string | null>(null);
@@ -320,109 +359,38 @@ export default function App() {
       </header>
 
       <div className="page-layout">
-        <aside className={"sidebar " + (painelAberto ? "sidebar-open" : "")}>
-          <div className="sidebar-group">
-            <div className="section-heading">
-              <span>GERENCIAMENTO</span>
-              <Database size={15}/>
-            </div>
-            <label htmlFor="event-select" className="form-label">Incêndio ativo</label>
-            <select id="event-select" className="field"
-              value={id !== null && lista.some(v => v.id_incendio === id) ? id : ""}
-              onChange={e => {
-                const n = Number(e.target.value);
-                if (n > 0) setId(n);
-              }}>
-              {id !== null && !lista.some(v => v.id_incendio === id) &&
-                <option value="">ID {id} (não listado)</option>}
-              {lista.length === 0 && <option value="">Nenhum evento local</option>}
-              {lista.map(v => <option key={v.id_incendio} value={v.id_incendio}>
-                Evento {v.id_incendio}
-              </option>)}
-            </select>
-            <form className="find-event" onSubmit={escolherId}>
-              <label htmlFor="event-id" className="form-label">Consultar outro ID</label>
-              <div className="inline-field">
-                <input id="event-id" className="field" type="text"
-                  inputMode="numeric" placeholder="Digite um ID"
-                  value={buscaId} onChange={e => setBuscaId(e.target.value)}/>
-                <button type="submit" className="field-action"
-                  aria-label="Consultar ID"><Search size={17}/></button>
-              </div>
-            </form>
-          </div>
-
-          <div className="sidebar-group">
-            <div className="section-heading">
-              <span>NAVEGAÇÃO TEMPORAL</span>
-              <Activity size={15}/>
-            </div>
-            <div className="selected-day">
-              <span>DATA SELECIONADA</span>
-              <strong>{data ? nomeDia(data) : "Sem data"}</strong>
-              <small>{resumo ? (indice+1) + " de " + resumo.total_datas + " observações" : "Selecione um evento"}</small>
-            </div>
-            <label className="form-label" htmlFor="date-range">Linha do tempo</label>
-            <input id="date-range" className="date-slider" type="range"
-              min={0} max={Math.max(0,(resumo?.datas.length ?? 1)-1)}
-              value={Math.max(0,indice)} disabled={!resumo?.datas.length}
-              onChange={e => { setData(resumo?.datas[Number(e.target.value)] ?? ""); setTocando(false); }}/>
-            <div className="range-labels">
-              <span>{resumo?.periodo_inicio?.slice(5) ?? "..."}</span>
-              <span>{resumo?.periodo_fim?.slice(5) ?? "..."}</span>
-            </div>
-            <div className="transport-controls">
-              <button type="button" className="square-btn" aria-label="Data anterior"
-                onClick={() => { navegaPara(-1); setTocando(false); }}
-                disabled={indice <= 0}><ChevronLeft size={18}/></button>
-              <button type="button" className="play-btn"
-                disabled={!resumo?.datas.length || indice === (resumo?.datas.length ?? 0)-1}
-                onClick={() => setTocando(v => !v)}>
-                {tocando ? <Pause size={16}/> : <Play size={16}/>}
-                {tocando ? "Pausar" : "Reproduzir"}
-              </button>
-              <button type="button" className="square-btn" aria-label="Próxima data"
-                disabled={!resumo || indice >= resumo.datas.length-1}
-                onClick={() => { navegaPara(1); setTocando(false); }}>
-                <ChevronRight size={18}/>
-              </button>
-            </div>
-            <label className="form-label" htmlFor="playback-speed" style={{display:"block", marginTop:16}}>Velocidade de reprodução</label>
-            <select id="playback-speed" className="field" style={{width:"100%"}} value={velocidade} onChange={e => setVelocidade(Number(e.target.value))}>
-              <option value={0.5}>0,5× · lenta</option>
-              <option value={1}>1× · normal</option>
-              <option value={2}>2× · rápida</option>
-              <option value={4}>4× · muito rápida</option>
-              <option value={8}>8× · máxima</option>
-            </select>
-          </div>
-
-          <div className="sidebar-group">
-            <div className="section-heading"><span>CAMADAS</span><Layers size={15}/></div>
-            <label className="layer-toggle">
-              <span><i className="swatch swatch-p1"/> P1 · Componentes</span>
-              <input type="checkbox" checked={p1Ativo}
-                onChange={e=>setP1Ativo(e.target.checked)}/>
-            </label>
-            <label className="layer-toggle">
-              <span><i className="swatch swatch-p2"/> P2 · Região móvel</span>
-              <input type="checkbox" checked={p2Ativo}
-                onChange={e=>setP2Ativo(e.target.checked)}/>
-            </label>
-            <label className="layer-toggle">
-              <span>Mapa-base OSM</span>
-              <input type="checkbox" checked={mapaBase}
-                onChange={e=>setMapaBase(e.target.checked)}/>
-            </label>
-          </div>
-
-          <div className="sidebar-group sidebar-note">
-            <strong>Processar outro incêndio?</strong>
-            <p>Use o painel de processamento para consultar o Earth Engine,
-              reutilizar o cache e acompanhar as análises sem executar comandos manuais.</p>
-            <a className="text-button" href="#processamento"
-              onClick={() => setPainelAberto(false)}>Ir para processamento</a>
-          </div>
+        <aside className={"sidebar atlas-rail " + (painelAberto ? "sidebar-open" : "")} aria-label="Navegação do BurnGeoFlow">
+          <nav className="atlas-rail-links" aria-label="Módulos">
+            <button type="button" title="Visão geral" aria-label="Visão geral"
+              aria-current={vista==="atlas"&&aba==="geral"?"page":undefined}
+              className={vista==="atlas"&&aba==="geral"?"rail-active":""}
+              onClick={()=>navegar("atlas","geral")}><LayoutDashboard size={21}/><span>Visão geral</span></button>
+            <div className="rail-category" aria-hidden="true"><span>ANÁLISES</span></div>
+            {ABAS.filter(item=>item.id!=="geral").map((item,index)=>{
+              const Icon=[ChartColumn,Flame,Waypoints,Compass,Shapes][index];
+              return <button key={item.id} type="button" title={item.label} aria-label={item.label}
+                aria-current={vista==="atlas"&&aba===item.id?"page":undefined}
+                className={vista==="atlas"&&aba===item.id?"rail-active":""}
+                onClick={()=>navegar("atlas",item.id)}>
+                <Icon size={20}/><span>{item.label}</span>
+              </button>;
+            })}
+            <div className="rail-category" aria-hidden="true"><span>PLATAFORMA</span></div>
+            <button type="button" title="Explorar incêndios" aria-label="Explorar incêndios"
+              aria-current={vista==="catalogo"?"page":undefined}
+              className={vista==="catalogo"?"rail-active":""}
+              onClick={()=>navegar("catalogo")}><ListFilter size={21}/><span>Explorar incêndios</span></button>
+            <button type="button" title="Processamento" aria-label="Processamento"
+              aria-current={vista==="jobs"?"page":undefined}
+              className={vista==="jobs"?"rail-active":""}
+              onClick={()=>navegar("jobs")}>
+              <Database size={21}/><span>Processamento {jobAtivo?"●":""}</span>
+              {jobAtivo&&<i className="rail-running" aria-label="Execução ativa"/>}
+            </button>
+            <a href="/apresentacao/" title="Página inicial" aria-label="Página inicial">
+              <Flame size={20}/><span>Apresentação</span>
+            </a>
+          </nav>
         </aside>
 
         {painelAberto && <button className="sidebar-scrim"
@@ -431,7 +399,7 @@ export default function App() {
         <main className="main-content">
           <div className="workspace-heading">
             <div className="workspace-copy">
-              <h1>Explorador de incêndios</h1>
+              <h1>{vista==="catalogo"?"Catálogo GlobFire":vista==="jobs"?"Processamento de eventos":"Explorador de incêndios"}</h1>
             </div>
             <div className="workspace-actions">
               <span className="workspace-stamp">GLOBFIRE V2 <b>·</b> DADOS HISTÓRICOS</span>
@@ -441,10 +409,15 @@ export default function App() {
             </div>
           </div>
 
-          <div id="processamento" className="jobs-anchor">
-            <CatalogoPanel />
-            <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} />
+          <div className="workspace-module" hidden={vista!=="catalogo"}>
+            <p className="module-description">Descubra IDs por região, período e registros sem executar o processamento geométrico.</p>
+            <CatalogoPanel abertoInicial />
           </div>
+          <div id="processamento" className="workspace-module" hidden={vista!=="jobs"}>
+            <p className="module-description">Consulte checkpoints, inicie ou acompanhe execuções. O pipeline v2 experimental permanece separado.</p>
+            <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} abertoInicial onStatusAtivo={aoStatusJob}/>
+          </div>
+          {vista==="atlas" && <>
 
           {mensagem && <div className="message-box" role="status">
             <span>{mensagem}</span><button aria-label="Fechar mensagem"
@@ -499,14 +472,7 @@ export default function App() {
                   id={"aba-" + item.id} aria-controls={"painel-" + item.id}
                   aria-selected={aba === item.id}
                   className={"analysis-tab " + (aba === item.id ? "analysis-tab-active" : "")}
-                  onClick={() => {
-                    setAba(item.id);
-                    if (item.id !== "geral") {
-                      setMapaAtivo(false);
-                      setP1(null);
-                      setP2(null);
-                    }
-                  }}>{item.label}</button>)}
+                  onClick={() => navegar("atlas",item.id)}>{item.label}</button>)}
                 {resumo.tem_series && <a className="analysis-tab-export"
                   href={urlSerieCSV(id)} download>
                   <ArrowDownToLine size={15}/> CSV temporal
@@ -515,6 +481,8 @@ export default function App() {
               <div role="tabpanel" className="analysis-tab-panel"
                 id={"painel-" + aba} aria-labelledby={"aba-" + aba}>
               {aba === "geral" && <>
+              <div className="atlas-overview-grid">
+                <div className="atlas-overview-primary">
               <section className="panel map-panel">
                 <div className="panel-heading">
                   <div>
@@ -621,6 +589,113 @@ export default function App() {
                   </p>
                 </div>
               </div>
+                </div>
+                <aside className="atlas-floating-controls" aria-label="Gerenciar evento, tempo e camadas">
+          <div className="sidebar-group">
+            <div className="section-heading">
+              <span>GERENCIAMENTO</span>
+              <Database size={15}/>
+            </div>
+            <label htmlFor="event-select" className="form-label">Incêndio ativo</label>
+            <select id="event-select" className="field"
+              value={id !== null && lista.some(v => v.id_incendio === id) ? id : ""}
+              onChange={e => {
+                const n = Number(e.target.value);
+                if (n > 0) setId(n);
+              }}>
+              {id !== null && !lista.some(v => v.id_incendio === id) &&
+                <option value="">ID {id} (não listado)</option>}
+              {lista.length === 0 && <option value="">Nenhum evento local</option>}
+              {lista.map(v => <option key={v.id_incendio} value={v.id_incendio}>
+                Evento {v.id_incendio}
+              </option>)}
+            </select>
+            <form className="find-event" onSubmit={escolherId}>
+              <label htmlFor="event-id" className="form-label">Consultar outro ID</label>
+              <div className="inline-field">
+                <input id="event-id" className="field" type="text"
+                  inputMode="numeric" placeholder="Digite um ID"
+                  value={buscaId} onChange={e => setBuscaId(e.target.value)}/>
+                <button type="submit" className="field-action"
+                  aria-label="Consultar ID"><Search size={17}/></button>
+              </div>
+            </form>
+          </div>
+
+          <div className="sidebar-group">
+            <div className="section-heading">
+              <span>NAVEGAÇÃO TEMPORAL</span>
+              <Activity size={15}/>
+            </div>
+            <div className="selected-day">
+              <span>DATA SELECIONADA</span>
+              <strong>{data ? nomeDia(data) : "Sem data"}</strong>
+              <small>{resumo ? (indice+1) + " de " + resumo.total_datas + " observações" : "Selecione um evento"}</small>
+            </div>
+            <label className="form-label" htmlFor="date-range">Linha do tempo</label>
+            <input id="date-range" className="date-slider" type="range"
+              min={0} max={Math.max(0,(resumo?.datas.length ?? 1)-1)}
+              value={Math.max(0,indice)} disabled={!resumo?.datas.length}
+              onChange={e => { setData(resumo?.datas[Number(e.target.value)] ?? ""); setTocando(false); }}/>
+            <div className="range-labels">
+              <span>{resumo?.periodo_inicio?.slice(5) ?? "..."}</span>
+              <span>{resumo?.periodo_fim?.slice(5) ?? "..."}</span>
+            </div>
+            <div className="transport-controls">
+              <button type="button" className="square-btn" aria-label="Data anterior"
+                onClick={() => { navegaPara(-1); setTocando(false); }}
+                disabled={indice <= 0}><ChevronLeft size={18}/></button>
+              <button type="button" className="play-btn"
+                disabled={!resumo?.datas.length || indice === (resumo?.datas.length ?? 0)-1}
+                onClick={() => setTocando(v => !v)}>
+                {tocando ? <Pause size={16}/> : <Play size={16}/>}
+                {tocando ? "Pausar" : "Reproduzir"}
+              </button>
+              <button type="button" className="square-btn" aria-label="Próxima data"
+                disabled={!resumo || indice >= resumo.datas.length-1}
+                onClick={() => { navegaPara(1); setTocando(false); }}>
+                <ChevronRight size={18}/>
+              </button>
+            </div>
+            <label className="form-label" htmlFor="playback-speed" style={{display:"block", marginTop:16}}>Velocidade de reprodução</label>
+            <select id="playback-speed" className="field" style={{width:"100%"}} value={velocidade} onChange={e => setVelocidade(Number(e.target.value))}>
+              <option value={0.5}>0,5× · lenta</option>
+              <option value={1}>1× · normal</option>
+              <option value={2}>2× · rápida</option>
+              <option value={4}>4× · muito rápida</option>
+              <option value={8}>8× · máxima</option>
+            </select>
+          </div>
+
+          <div className="sidebar-group">
+            <div className="section-heading"><span>CAMADAS</span><Layers size={15}/></div>
+            <label className="layer-toggle">
+              <span><i className="swatch swatch-p1"/> P1 · Componentes</span>
+              <input type="checkbox" checked={p1Ativo}
+                onChange={e=>setP1Ativo(e.target.checked)}/>
+            </label>
+            <label className="layer-toggle">
+              <span><i className="swatch swatch-p2"/> P2 · Região móvel</span>
+              <input type="checkbox" checked={p2Ativo}
+                onChange={e=>setP2Ativo(e.target.checked)}/>
+            </label>
+            <label className="layer-toggle">
+              <span>Mapa-base OSM</span>
+              <input type="checkbox" checked={mapaBase}
+                onChange={e=>setMapaBase(e.target.checked)}/>
+            </label>
+          </div>
+
+          <div className="sidebar-group sidebar-note">
+            <strong>Processar outro incêndio?</strong>
+            <p>Use o painel de processamento para consultar o Earth Engine,
+              reutilizar o cache e acompanhar as análises sem executar comandos manuais.</p>
+            <a className="text-button" href="#processamento"
+              onClick={e => {e.preventDefault();navegar("jobs");}}>Ir para processamento</a>
+          </div>
+
+                </aside>
+              </div>
               </>}
               {aba !== "geral" && <ScientificPanels
                 aba={aba} serie={serie} transicoes={transicoes}
@@ -630,6 +705,7 @@ export default function App() {
               </div>
             </>
           )}
+          </>}
           <footer className="footer">
             <span>BurnGeoFlow / Atlas cartográfico · Não representa monitoramento de fogo ativo</span>
             <span>Armazenamento local · GEE GlobFire v2</span>
