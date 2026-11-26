@@ -7,31 +7,48 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from stat import S_ISREG
 
 from executar_pipeline import definir_etapas, assinatura_codigo, digest
 from burngeoflow.processamento.metodologia_v2 import VERSAO
 
 
 def _ler_json(path: Path) -> tuple[dict, str | None]:
-    if not path.is_file():
-        return {}, None
     try:
         obj = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(obj, dict):
             raise ValueError("objeto JSON esperado")
         return obj, None
+    except FileNotFoundError:
+        return {}, None
     except (OSError, ValueError) as exc:
         return {}, f"{type(exc).__name__}: {exc}"
 
 
 def _arquivo(path: Path) -> dict:
-    existe = path.is_file()
+    try:
+        info = path.stat()
+    except OSError:
+        info = None
+    tamanho = info.st_size if info is not None and S_ISREG(info.st_mode) else None
     return {
-        "existe": existe,
-        "bytes": path.stat().st_size if existe else None,
-        "estado": "disponivel" if existe and path.stat().st_size > 0
-                  else "vazio" if existe else "ausente",
+        "existe": tamanho is not None,
+        "bytes": tamanho,
+        "estado": "ausente" if tamanho is None else "disponivel" if tamanho else "vazio",
     }
+
+
+def _hash_confere(path: Path, esperado: object) -> bool:
+    try:
+        return digest(path) == esperado
+    except OSError:
+        # Um produto pode desaparecer entre o stat e a abertura para leitura.
+        return False
+
+
+def _sha256_valido(valor: object) -> bool:
+    return (isinstance(valor, str) and len(valor) == 64
+            and all(c in "0123456789abcdef" for c in valor))
 
 
 def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
@@ -85,34 +102,28 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
     elif progresso_v2.get("estado") == "bloqueado_topologia":
         metadados_v2["estado"] = "bloqueado_topologia"
         metadados_v2["erro"] = progresso_v2.get("erro")
-    elif erro_v2:
+    elif erro_v2 or erro_progresso:
         metadados_v2["estado"] = "erro_manifesto"
     elif manifesto_v2:
         if manifesto_v2.get("metodologia") != VERSAO:
             metadados_v2["estado"] = "versao_incompativel"
-        elif not all(_arquivo(p)["estado"] == "disponivel" for p in arqs_v2):
+        elif not all(f["estado"] == "disponivel"
+                     for f in metadados_v2["arquivos"].values()):
             metadados_v2["estado"] = "artefato_perdido"
         elif not fontes["p1_local"]["existe"]:
             metadados_v2["estado"] = "origem_ausente"
         else:
-            origem_manifesto = manifesto_v2.get("sha256_p1_origem")
-            codigo_sha = manifesto_v2.get("codigo_sha256")
-            codigo_atual = digest(
-                Path(__file__).resolve().parents[3] /
-                "burngeoflow" / "processamento" / "metodologia_v2.py"
-            )
-            if origem_manifesto != digest(originais[0]):
-                metadados_v2["estado"] = "origem_alterada"
-            elif codigo_sha != codigo_atual:
-                metadados_v2["estado"] = "codigo_v2_alterado"
-            elif not all(manifesto_v2.get(k) for k in (
-                "sha256_p1_v2","sha256_p2_v2"
-            )):
+            chaves = ("sha256_p1_origem", "codigo_sha256", "sha256_p1_v2", "sha256_p2_v2")
+            codigo = (Path(__file__).resolve().parents[3] /
+                      "burngeoflow" / "processamento" / "metodologia_v2.py")
+            if not all(_sha256_valido(manifesto_v2.get(chave)) for chave in chaves):
                 metadados_v2["estado"] = "proveniencia_incompleta"
-            elif any(
-                manifesto_v2.get(k) != digest(p)
-                for k,p in zip(("sha256_p1_v2","sha256_p2_v2"),arqs_v2)
-            ):
+            elif not _hash_confere(originais[0], manifesto_v2["sha256_p1_origem"]):
+                metadados_v2["estado"] = "origem_alterada"
+            elif not _hash_confere(codigo, manifesto_v2["codigo_sha256"]):
+                metadados_v2["estado"] = "codigo_v2_alterado"
+            elif any(not _hash_confere(path, manifesto_v2[chave])
+                     for chave, path in zip(chaves[2:], arqs_v2)):
                 metadados_v2["estado"] = "artefato_modificado"
             else:
                 metadados_v2["estado"] = "preprocessado_nao_integrado"
@@ -132,7 +143,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
     entrada_confere = local_ok and bool(hashes)
     if entrada_confere:
         entrada_confere = all(
-            hashes.get(chave) == digest(path)
+            _hash_confere(path, hashes.get(chave))
             for chave, path in zip(("p1","p2"), originais)
         )
 
@@ -144,7 +155,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
             entrada = {}
         original = entrada.get("status")
         faltam = [str(p.relative_to(raiz)) for p in etapa.artefatos
-                  if not p.is_file() or p.stat().st_size == 0]
+                  if _arquivo(p)["estado"] != "disponivel"]
         assinatura_anterior = entrada.get("codigo_sha256")
         codigo_compativel = (assinatura_anterior is not None
                              and assinatura_anterior == assinatura_codigo(etapa.nome))

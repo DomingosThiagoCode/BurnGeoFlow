@@ -83,11 +83,37 @@ class TestEstadoPipeline(unittest.TestCase):
                 "sha256_p2_v2":digest(pasta/"P2_regiao_movel_24340828.geojson"),
                 "datas_p1":57,"datas_p2":37,
                 "primeira_data_p2":"2020-08-27"}
-            (pasta/"manifesto_metodologia.json").write_text(json.dumps(md),"utf-8")
+            manifesto = pasta / "manifesto_metodologia.json"
+            manifesto.write_text(json.dumps(md), "utf-8")
             out=inspecionar_pipeline(24340828,base)
             self.assertEqual(out["preprocessamento_v2"]["estado"],
                              "preprocessado_nao_integrado")
             self.assertFalse(out["pronto_para_reprocessamento_integral_v2"])
+            progresso = pasta / "estado_preprocessamento.json"
+            progresso.write_text("{", "utf-8")
+            out = inspecionar_pipeline(24340828, base)
+            self.assertEqual(out["preprocessamento_v2"]["estado"], "erro_manifesto")
+            progresso.unlink()
+
+            for chave in ("sha256_p1_origem", "codigo_sha256", "sha256_p1_v2", "sha256_p2_v2"):
+                with self.subTest(chave=chave):
+                    manifesto.write_text(json.dumps({**md, chave: None}), "utf-8")
+                    out = inspecionar_pipeline(24340828, base)
+                    self.assertEqual(
+                        out["preprocessamento_v2"]["estado"], "proveniencia_incompleta"
+                    )
+            manifesto.write_text(json.dumps(md), "utf-8")
+
+            def digest_com_artefato_desaparecido(path):
+                if path == pasta / "P2_regiao_movel_24340828.geojson":
+                    raise FileNotFoundError(path)
+                return digest(path)
+
+            with patch("backend.app.services.estado_pipeline.digest",
+                       side_effect=digest_com_artefato_desaparecido):
+                out = inspecionar_pipeline(24340828, base)
+                self.assertEqual(out["preprocessamento_v2"]["estado"], "artefato_modificado")
+
             (pasta/"P2_regiao_movel_24340828.geojson").write_text("corrompido","utf-8")
             out=inspecionar_pipeline(24340828,base)
             self.assertEqual(out["preprocessamento_v2"]["estado"],
