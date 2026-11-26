@@ -9,7 +9,7 @@ resultados cientificamente consistentes.
 
 | Produto | Antes (legado) | Agora (decisão aprovada) | Implementação |
 | --- | --- | --- | --- |
-| P1 | Componentes exportados pelo GEE | Agrupamento transitivo de polígonos por vértice ou borda sem buffer, sem adicionar área (D-002) | Pré-processador v2, sujeito a bloqueio por sobreposição |
+| P1 | Componentes exportados pelo GEE | Agrupamento transitivo de polígonos por vértice ou borda sem buffer, sem adicionar área (D-002) | Pré-processador v2 com união da cobertura e relatório de área duplicada; ainda bloqueia geometrias inválidas |
 | P2 | Maior na data inicial, seguido para a frente por sobreposição/proximidade | Maior na data final, rastreado para trás pela maior interseção de área (D-001/D-007); sem saltos por proximidade (D-003) | Pré-processador v2 |
 | Empate P2 | Heurística legada | Interseção, área, distância (D-004); empate residual não resolvido exige decisão | Empates estritamente iguais seguem os critérios; empate residual bloqueia |
 | Datas | P2 forçado a ter todas as datas de P1 | P2 pode ter menos datas, e início posterior | Geração v2 implementada; validadores e métricas posteriores **pendentes** |
@@ -67,13 +67,18 @@ python executar_pipeline.py --id 24340828 --origem local --preparar-metodologia-
 python executar_pipeline.py --id 24194371 --origem local --preparar-metodologia-v2
 ```
 
-**Não rodar estes comandos como prova de validade científica** até a análise
-das sobreposições (issue #44) e aprovação do método; o 24194371 pode bloquear
-por inconsistência intradata, e esse bloqueio é intencional.
+**Estes comandos geram produtos experimentais, não indicadores homologados.**
+A união P1 v2 evita a dupla contagem de áreas sobrepostas, registra o resíduo
+assinado e preserva todos os ranks de origem no relatório
+`auditoria_cobertura_p1.json`. Não existe tolerância de 1 m² como critério
+de aceitação automática. O P1 pode continuar bloqueando em caso de geometria
+inválida após reprojeção, empate integral sem política ou inconsistência
+não resolvida. A etapa #44 continua investigando causas, efeitos e correções.
 
 Os resultados experimentais são gravados em
 `execucoes/<ID>/dados/estudo_caso_<ID>/derivados_v2/<versao>/`,
-separados do legado. Um bloqueio salva `diagnostico_bloqueio.json` e
+separados do legado. A auditoria de cobertura possui SHA-256 no manifesto e é verificada pelo painel.
+Um bloqueio por geometria inválida salva `diagnostico_bloqueio.json` e
 não cria manifesto de sucesso.
 
 ## 3. O que precisa ser concluído antes do reprocessamento integral
@@ -106,8 +111,11 @@ A interface não afirma que esses resultados cumprem a nova metodologia.
 - Não reutilizar um passo se SHA de código/entrada divergir, se a assinatura
   estiver ausente, se qualquer artefato obrigatório desaparecer ou se
   uma etapa anterior foi reexecutada.
-- Falhas geométricas bloqueiam os produtos dependentes, sem atribuir causa
-  a partir de um único número e sem descartes automáticos.
+- Sobreposições intradata de P1 são tratadas pela união dos componentes
+  conectados, com conservação da cobertura e auditoria da dupla contagem.
+  Geometrias inválidas, perdas de área e alterações de conectividade não
+  são reparadas ou descartadas automaticamente; continuam bloqueando
+  os produtos dependentes quando impedirem um cálculo geométrico válido.
 - O painel não apresenta porcentagens fictícias de progresso remoto GEE.
 
 **Resumo operacional:** primeiro atualizar método e contratos científicos;
