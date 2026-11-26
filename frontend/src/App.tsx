@@ -304,8 +304,8 @@ export default function App() {
           </div>
         </a>
         <div className="header-context">
-          <span>OBSERVATÓRIO CARTOGRÁFICO</span>
-          <strong>SÉRIES TEMPORAIS / REGIÕES MÓVEIS</strong>
+          <span>ANÁLISE DE INCÊNDIOS</span>
+          <strong>MAPAS E INDICADORES</strong>
         </div>
         <div className="header-actions">
           <span className={"connection " + (existeErro ? "connection-error" : "")}>
@@ -321,11 +321,6 @@ export default function App() {
 
       <div className="page-layout">
         <aside className={"sidebar " + (painelAberto ? "sidebar-open" : "")}>
-          <div className="sidebar-intro">
-            <span>CADERNO DE CAMPO · CONTROLES</span>
-            <strong>Navegue pelo<br/>território.</strong>
-            <p>Selecione o evento e percorra suas observações no tempo.</p>
-          </div>
           <div className="sidebar-group">
             <div className="section-heading">
               <span>GERENCIAMENTO</span>
@@ -436,13 +431,7 @@ export default function App() {
         <main className="main-content">
           <div className="workspace-heading">
             <div className="workspace-copy">
-              <div className="edition-line">
-                <span className="eyebrow">CADERNO CARTOGRÁFICO / Nº 01</span>
-                <span className="edition-line-rule" aria-hidden="true"/>
-                <span className="edition-meta">ANÁLISE ESPAÇO-TEMPORAL</span>
-              </div>
-              <h1>O território <em>depois do fogo.</em></h1>
-              <p>Uma leitura das áreas queimadas, de seus componentes e das transformações da paisagem ao longo do tempo.</p>
+              <h1>Explorador de incêndios</h1>
             </div>
             <div className="workspace-actions">
               <span className="workspace-stamp">GLOBFIRE V2 <b>·</b> DADOS HISTÓRICOS</span>
@@ -529,7 +518,7 @@ export default function App() {
               <section className="panel map-panel">
                 <div className="panel-heading">
                   <div>
-                    <span className="eyebrow">01 / GEOMETRIA ACUMULADA</span>
+                    <span className="eyebrow">ÁREAS QUEIMADAS</span>
                     <h2>Mapa temporal do evento</h2>
                   </div>
                   <span className="panel-date">{data ? nomeDia(data) : ""}</span>
@@ -593,7 +582,7 @@ export default function App() {
               <section className="panel details-panel">
                 <div className="panel-heading">
                   <div>
-                    <span className="eyebrow">02 / INVENTÁRIO DOS PATCHES</span>
+                    <span className="eyebrow">COMPONENTES</span>
                     <h2>Patches da data selecionada</h2>
                   </div>
                   <span className="subtle-pill">
