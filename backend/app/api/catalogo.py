@@ -6,13 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from backend.app.api.jobs import verificacao_mutacao
 from burngeoflow.aquisicao.catalogo import catalogo, total_evento
+from burngeoflow.aquisicao.limites_ibge import UFS, resolver_uf_ou_brasil
 
 router = APIRouter(prefix="/api/catalogo", tags=["catalogo"])
 
 class Consulta(BaseModel):
     geometria: dict | None = None
     origem: str = Field(default="", max_length=500)
-    regiao: str | None = None
+    regiao: str | None = Field(default=None, max_length=80)
     inicio: str
     fim: str
     margem: int = Field(default=0, ge=0, le=365)
@@ -99,6 +100,17 @@ def resolver_regiao(nome, pasta):
     temp.replace(arquivo)
     return dados
 
+@router.get("/regioes")
+def regioes_disponiveis():
+    """Lista oficial de AOIs suportadas, sem consulta remota."""
+    return {
+        "biomas": sorted(BIOMAS),
+        "pais": "Brasil",
+        "ufs": [{"codigo": codigo, "nome": nome} for codigo, nome in
+                sorted(UFS.items(), key=lambda par: par[1])],
+    }
+
+
 @router.post("", dependencies=[Depends(verificacao_mutacao)])
 def consultar(req: Consulta, request: Request):
     repo = request.app.state.repositorio
@@ -108,7 +120,17 @@ def consultar(req: Consulta, request: Request):
             if req.geometria is not None:
                 raise ValueError("Escolha região ou arquivo, não ambos.")
             try:
-                pedido.update(resolver_regiao(req.regiao, repo.base / "catalogo_globfire" / "limites"))
+                if req.regiao in BIOMAS:
+                    area = resolver_regiao(
+                        req.regiao, repo.base / "catalogo_globfire" / "limites"
+                    )
+                elif req.regiao == "Brasil" or req.regiao.startswith("UF:"):
+                    area = resolver_uf_ou_brasil(
+                        req.regiao, repo.base / "catalogo_globfire" / "limites"
+                    )
+                else:
+                    raise ValueError("Área desconhecida: selecione um bioma, Brasil ou uma UF.")
+                pedido.update(area)
             except RuntimeError as exc:
                 raise HTTPException(503, str(exc)) from exc
         elif req.geometria is None:
