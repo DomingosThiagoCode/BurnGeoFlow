@@ -12,7 +12,7 @@ type Props = {
   onChange: (geometria: PoligonoAOI | null) => void;
 };
 
-const COLLECTION_VAZIA = { type: "FeatureCollection", features: [] };
+const COLLECTION_VAZIA = { type: "FeatureCollection" as const, features: [] };
 
 function geojsonPontos(pontos: number[][]) {
   return {
