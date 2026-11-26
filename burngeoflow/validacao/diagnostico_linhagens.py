@@ -5,8 +5,6 @@ geometrias, rank, vínculos ou o resultado do processamento científico.
 """
 from __future__ import annotations
 
-from math import isfinite
-
 import shapely
 
 from burngeoflow.analises.paisagem import Patch
@@ -35,9 +33,6 @@ def diagnosticar_intersecoes(
     """
     if lado not in ("anterior", "atual"):
         raise ValueError("Lado da transição inválido.")
-    indices = {
-        (a if lado == "anterior" else b): [] for a, b, _ in arestas
-    }
     pares = [
         (b if lado == "anterior" else a, float(area))
         for a, b, area in arestas
