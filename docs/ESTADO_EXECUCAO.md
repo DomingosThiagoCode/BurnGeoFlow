@@ -5,6 +5,23 @@
 > **Regra:** `main` ≠ PR aberto ≠ experimento validado ≠ conclusão científica.
 > **Ponto de entrada para agentes:** [AGENTS.md](../AGENTS.md), [COORDENACAO_AGENTES.md](COORDENACAO_AGENTES.md), [METODOLOGIA.md](METODOLOGIA.md) e [ROTEIRO.md](ROTEIRO.md).
 
+## Retomada de 26/11/2026 — auditoria externa do estado remoto
+
+**Consulta GitHub em 26/11/2026:** `main` = `a2aeda556b8a`; `agente/integracao-e2` = [`148471eaf913`](https://github.com/DomingosThiagoCode/BurnGeoFlow/commit/148471eaf913ede216e6c06d7dee4198398c1588), 53 commits à frente da `main` (sem commits para trás). O último commit é predominantemente documental; a CI sobre `148471e` foi [aprovada](https://github.com/DomingosThiagoCode/BurnGeoFlow/actions/runs/45839298458).
+
+O commit abreviado `947a82c` foi consultado diretamente pela API GitHub e retornou **422: No commit found for SHA**. Não consta como publicado nas refs consultadas. Isso **não prova perda local**; antes de escrever nova política para partição/densificação/D-005, procurar `git cat-file -t 947a82c` e `git reflog --all` no workspace original do Codex, caso exista.
+
+**PRs vivas:** [#49](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/49) (catálogo), [#51](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/51) (diagnóstico #44), [#52](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/52) (v2 experimental) e [#53](https://github.com/DomingosThiagoCode/BurnGeoFlow/pull/53) (aquisição/proveniência); todas **DRAFT, abertas, não mescladas**. A PR #52 está em `d1b34db`; a branch `agente/integracao-e2` contém trabalho integrado e **divergiu** dela (31 commits à frente / 5 atrás). Não fazer cherry-pick às cegas nem abrir PR concorrente antes de comparar os contratos e testes.
+
+**Evidência versus conclusão:** o relatório remoto de #44 documenta o overlap 3/83 de 1,190236657 m² **já no P1 bruto exportado pelo GEE**; como esse P1 já passou por geração remota de componentes, não atribuir a causa a DailyPerimeters sem intermediários. A projeção LAEA por cordas produz invalidade adicional em alguns polígonos WGS84 válidos. As densificações focais de 2,5 µm documentadas são experimentais e **não são tolerância de produção**. Registros antigos neste arquivo que dizem faltar o P1 de 24194371 são históricos anteriores à extração do RAR5 e foram superados pelas evidências posteriores.
+
+**D-005:** a função `calcular_balanco_expansao_p2` e seus testes estão publicados na integração, mas ainda **não alimentam automaticamente a cadeia v2 completa**. O calendário próprio do P2 foi parcialmente suportado pelo validador; as etapas posteriores e a regressão integral permanecem pendentes.
+
+**Novo experimento não destrutivo (esta branch):** `burngeoflow/validacao/particao_faces_experimental.py`, `tests/test_particao_faces_experimental.py` e `docs/ENSAIO_PARTICAO_FACES_D013_D014.md`. Mede cobertura de faces, área repetida por multiplicidade e resíduos de conservação em polígonos válidos no mesmo CRS métrico, sem alterar dados, tolerâncias, P1/P2, TR/IGT ou fazer atribuição exclusiva. Os casos testados são sintéticos; **não afirmar diagnóstico real ou correção**. A branch de base `agente/integracao-e2` foi mantida intocada para preservar trabalho potencialmente ainda local dos agentes.
+
+**Bloqueios de decisão:** política de face compartilhada (união com proveniência múltipla versus partição atributiva), referência semântica de bordas WGS84, calibração quantitativa de erros numéricos/geométricos, nós compartilhados em densificação e reparos admissíveis, empate residual D-004. Enquanto não houver aprovação e testes em dados reais, não liberar reprocessamento integral dos dois IDs e não fazer merge na `main`.
+
+
 ## Marco multiagente de 26/11/2026
 
 O checkout `/workspace/BurnGeoFlow` permaneceu limpo em `work` (`2e0dba6`). O protocolo e o estado foram lidos em `origin/main` (`a2aeda5`). Os dois agentes usaram branches, worktrees e ambientes isolados. As seções abaixo preservam o inventário anterior ao marco.
