@@ -231,9 +231,11 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
         {jobAtivo && <button type="button" className="secondary-button" style={{color:"#a53827",borderColor:"#a53827",marginTop:12}} disabled={interrompendo} onClick={()=>void interromper()}><Square size={15}/> {interrompendo?"Interrompendo…":"Forçar interrupção"}</button>}
         <p className="jobs-warning">
           <AlertCircle size={15}/>
-          Uma execução ativa por vez. A autenticação do GEE precisa estar
-          configurada previamente no computador. Os logs não fornecem um
-          percentual confiável do processamento remoto.
+          <span><strong>Atenção: o botão Executar ainda utiliza o pipeline científico legado</strong>
+          (P1 sem conectividade por vértice e P2 progressivo). Não equivale à
+          metodologia nova. Use Inspecionar arquivos antes de reprocessar.
+          Uma execução ativa por vez; o GEE exige autenticação e não fornece
+          percentual confiável das tarefas remotas.</span>
         </p>
         {erro && <div className="job-error" role="alert">{erro}</div>}
         {aviso && <div className="job-success" role="status">{aviso}</div>}
