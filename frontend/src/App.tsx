@@ -69,6 +69,7 @@ export default function App() {
   const [erroMapa, setErroMapa] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState("");
   const [tocando, setTocando] = useState(false);
+  const [velocidade, setVelocidade] = useState(2);
   const cache = useRef(new Map<string, Colecao>());
 
   const atualizarLista = useCallback(() => {
@@ -200,9 +201,9 @@ export default function App() {
         }
         return resumo.datas[indice+1];
       });
-    }, 1300);
+    }, 1300 / velocidade);
     return () => window.clearInterval(timer);
-  }, [tocando, resumo, data]);
+  }, [tocando, resumo, data, velocidade]);
 
   const indice = resumo ? resumo.datas.indexOf(data) : -1;
   const linha = useMemo(
@@ -377,6 +378,14 @@ export default function App() {
                 <ChevronRight size={18}/>
               </button>
             </div>
+            <label className="form-label" htmlFor="playback-speed" style={{display:"block", marginTop:16}}>Velocidade de reprodução</label>
+            <select id="playback-speed" className="field" style={{width:"100%"}} value={velocidade} onChange={e => setVelocidade(Number(e.target.value))}>
+              <option value={0.5}>0,5× · lenta</option>
+              <option value={1}>1× · normal</option>
+              <option value={2}>2× · rápida</option>
+              <option value={4}>4× · muito rápida</option>
+              <option value={8}>8× · máxima</option>
+            </select>
           </div>
 
           <div className="sidebar-group">
