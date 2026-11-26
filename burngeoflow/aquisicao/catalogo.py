@@ -14,7 +14,7 @@ def janela(inicio, fim, margem):
     """Período ISO de no máximo 366 dias, com margem e anos adjacentes."""
     if not isinstance(inicio, str) or not isinstance(fim, str):
         raise ValueError("As datas devem usar o formato YYYY-MM-DD.")
-    if not all(re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", v) for v in (inicio, fim)):
+    if not all(re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) for v in (inicio, fim)):
         raise ValueError("As datas devem usar o formato YYYY-MM-DD.")
     try:
         a, b = date.fromisoformat(inicio), date.fromisoformat(fim)
@@ -24,8 +24,8 @@ def janela(inicio, fim, margem):
         raise ValueError("A margem deve estar entre 0 e 365 dias.")
     if a > b:
         raise ValueError("A primeira data deve ser anterior à última.")
-    if (b - a).days > 366:
-        raise ValueError("Escolha um período de no máximo 367 dias corridos.")
+    if (b - a).days > 365:
+        raise ValueError("Escolha um período de no máximo 366 dias corridos.")
     if a.year < ANO_MINIMO or b.year > ANO_MAXIMO:
         raise ValueError("Período deve estar entre 2001 e 2020.")
     x = max(date(ANO_MINIMO, 1, 1), a - timedelta(days=margem))
