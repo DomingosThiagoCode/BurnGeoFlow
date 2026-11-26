@@ -150,11 +150,14 @@ def _preparar_componentes(originais: dict[str, list], transforms: dict,
     return saida
 
 
-def _retroceder(componentes: dict, desempate_critico: bool = True) -> list[dict]:
+def _retroceder(
+    componentes: dict, desempate_critico: bool = True
+) -> tuple[list[dict], list[dict]]:
     datas = sorted(componentes)
     atual = componentes[datas[-1]][0]
     selecionados = [(datas[-1], 0, atual, "dominante_final")]
-    for dia in reversed(datas[:-1]):
+    desempates = []
+    for dia, data_posterior in zip(reversed(datas[:-1]), reversed(datas[1:])):
         candidatos = []
         for rank, candidato in enumerate(componentes[dia]):
             inter = candidato["geometria"].intersection(atual["geometria"]).area
@@ -173,21 +176,44 @@ def _retroceder(componentes: dict, desempate_critico: bool = True) -> list[dict]
             -c["intersecao_m2"], -c["area_m2"], c["distancia_centroides_m"],
             c["rank"],
         ))
-        if desempate_critico and len(candidatos) > 1:
-            primeiro, segundo = candidatos[:2]
-            if (
-                primeiro["intersecao_m2"] == segundo["intersecao_m2"]
-                and primeiro["area_m2"] == segundo["area_m2"]
-                and primeiro["distancia_centroides_m"] ==
-                    segundo["distancia_centroides_m"]
-            ):
+        primeiro = candidatos[0]
+        empatados = [
+            c for c in candidatos if c["intersecao_m2"] == primeiro["intersecao_m2"]
+        ]
+        if len(empatados) > 1:
+            segundo = empatados[1]
+            if primeiro["area_m2"] != segundo["area_m2"]:
+                criterio = "maior_area_total"
+            elif primeiro["distancia_centroides_m"] != segundo["distancia_centroides_m"]:
+                criterio = "menor_distancia_centroides"
+            else:
+                criterio = "empate_integral" if desempate_critico else "menor_rank"
+            desempates.append({
+                "data": dia,
+                "data_posterior": data_posterior,
+                "criterio": criterio,
+                "rank_escolhido": (
+                    None if criterio == "empate_integral" else primeiro["rank"] + 1
+                ),
+                "candidatos": [
+                    {
+                        "rank": candidato["rank"] + 1,
+                        "intersecao_m2": candidato["intersecao_m2"],
+                        "area_total_m2": candidato["area_m2"],
+                        "distancia_centroides_m": candidato["distancia_centroides_m"],
+                    }
+                    for candidato in empatados
+                ],
+            })
+            if criterio == "empate_integral":
+                ranks = [primeiro["rank"] + 1, segundo["rank"] + 1]
                 raise ErroMetodologia(
                     f"{dia}: empate integral de ancestralidade entre "
-                    f"ranks {primeiro['rank']+1}/{segundo['rank']+1}. "
+                    f"ranks {ranks[0]}/{ranks[1]}. "
                     "Critério residual ainda não aprovado (D-004/D-013).",
-                    {"data":dia,"ranks":[primeiro["rank"]+1,segundo["rank"]+1]},
+                    {"data": dia, "ranks": ranks, "desempates_p2": desempates},
                 )
-        escolhido = candidatos[0]
+        escolhido = primeiro
         atual = escolhido["item"]
         selecionados.append((dia, escolhido["rank"], atual, "maior_intersecao_retro"))
     selecionados.reverse()
@@ -197,7 +223,7 @@ def _retroceder(componentes: dict, desempate_critico: bool = True) -> list[dict]
             "data": dia, "rank": idx+1, "item": componente,
             "metodo": metodo,
         })
-    return saida
+    return saida, desempates
 
 
 def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = None) -> dict:
@@ -233,7 +259,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
             "etapa":"rastreamento_retro_p2", "datas_concluidas":len(componentes),
             "datas_total":len(componentes),
         })
-        p2 = _retroceder(componentes)
+        p2, desempates = _retroceder(componentes)
     except ErroMetodologia as exc:
         _salvar_json(pasta / "diagnostico_bloqueio.json", {
             "id_incendio": incendio, "versao": VERSAO,
@@ -303,6 +329,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         "datas_p1":len(componentes), "datas_p2":len(p2),
         "primeira_data_p2":p2[0]["data"],
         "ultima_data_p2":p2[-1]["data"],
+        "desempates_p2": desempates,
         "observacao":(
             "Pré-processamento geométrico experimental; requer adaptação "
             "dos validadores e análises dependentes de P2 e homologação."
