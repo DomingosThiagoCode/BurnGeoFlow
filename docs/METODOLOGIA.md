@@ -200,10 +200,23 @@ Os casos sintéticos devem respeitar, quando pertinentes, a natureza acumulativa
 
 **Pendências:** definir amplitudes de perturbação, métricas de erro, procedimentos de comparação, controle de escala/duração/representatividade e critérios de aceitação antes da avaliação confirmatória. Correlacionar séries com cuidado quanto a tendências comuns e dependência temporal. Registrar resultados negativos e separar testes de implementação da avaliação de utilidade científica.
 
+## D-016 — Validação em eventos distintos após estabilização do pipeline
+
+**Estado:** estratégia conceitual aprovada; seleção de amostra, implementação e avaliação pendentes.
+
+Selecionar eventos GlobFire com diferentes dimensões, durações, formas, fragmentação e frequência de fusões. Distinguir casos de desenvolvimento (diagnóstico, calibração e aperfeiçoamento) de casos de validação (aplicação da metodologia consolidada, sem ajuste oportunista aos resultados). Documentar critérios de seleção antes da avaliação confirmatória. Os eventos 24340828 e 24194371 já utilizados para desenvolvimento não devem ser tratados como validação independente.
+
+**Pré-requisito:** estabilizar aquisição, seleção P1/P2 conforme D-001 a D-008, processamento integral, auditoria, reprodutibilidade e desempenho em um conjunto pequeno de casos. Investigar falhas conhecidas (#34, #44) e validar resultados científicos antes de ampliar o número de IDs. Um catálogo extenso não comprova capacidade de aquisição ou processamento em massa. Não iniciar campanha de milhares de eventos enquanto houver falhas fundamentais.
+
+Inicialmente, a avaliação pode ser interna ao GlobFire, explicitando as limitações do MODIS e dos perímetros derivados. A validação externa com outros sensores permanece como etapa posterior, sem afirmar precisão física ou validade universal.
+
+**Pendências:** definir tamanho e composição da amostra, critérios de inclusão, protocolo confirmatório, tratamento de falhas e dados ausentes, e requisitos operacionais para ampliação progressiva.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Calibração das tolerâncias e especificação do desempate residual (D-013).
 - Investigação do issue #44 e critérios quantitativos de aceitação dos reparos (D-014).
 - Detalhamento quantitativo do protocolo de avaliação D-011/D-015.
-- Especificação estatística da segmentação D-012; validação e generalização.
+- Especificação estatística da segmentação D-012.
+- Protocolo de seleção e validação de eventos D-016, após estabilização do pipeline.
