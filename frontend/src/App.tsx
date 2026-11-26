@@ -289,7 +289,7 @@ export default function App() {
   return (
     <div className="application">
       <header className="global-header">
-        <div className="brand">
+        <a className="brand" href="/apresentacao/" aria-label="BurnGeoFlow — página inicial" title="Voltar à página inicial" style={{textDecoration:"none", color:"inherit", cursor:"pointer"}}>
           <span className="brand-icon" aria-hidden="true">
             <svg viewBox="0 0 58 58" fill="none" focusable="false">
               <path d="M8 31c7-15 15-2 24-14 7-9 12-4 18-12" />
@@ -302,7 +302,7 @@ export default function App() {
             <strong>Burn<span>Geo</span>Flow</strong>
             <small>ATLAS DE ÁREAS QUEIMADAS</small>
           </div>
-        </div>
+        </a>
         <div className="header-context">
           <span>OBSERVATÓRIO CARTOGRÁFICO</span>
           <strong>SÉRIES TEMPORAIS / REGIÕES MÓVEIS</strong>
