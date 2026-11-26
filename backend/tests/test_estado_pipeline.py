@@ -75,12 +75,18 @@ class TestEstadoPipeline(unittest.TestCase):
             pasta.mkdir(parents=True)
             for tipo in ("P1_componentes","P2_regiao_movel"):
                 (pasta/f"{tipo}_24340828.geojson").write_text("gerado","utf-8")
+            (pasta/"auditoria_cobertura_p1.json").write_text(
+                '{"componentes":[]}', "utf-8"
+            )
             codigo=(Path(__file__).resolve().parents[2] /
                     "burngeoflow"/"processamento"/"metodologia_v2.py")
             md={"metodologia":VERSAO,"sha256_p1_origem":digest(p1),
                 "codigo_sha256":digest(codigo),
                 "sha256_p1_v2":digest(pasta/"P1_componentes_24340828.geojson"),
                 "sha256_p2_v2":digest(pasta/"P2_regiao_movel_24340828.geojson"),
+                "sha256_auditoria_cobertura_p1":digest(
+                    pasta/"auditoria_cobertura_p1.json"
+                ),
                 "datas_p1":57,"datas_p2":37,
                 "primeira_data_p2":"2020-08-27"}
             manifesto = pasta / "manifesto_metodologia.json"
@@ -95,7 +101,11 @@ class TestEstadoPipeline(unittest.TestCase):
             self.assertEqual(out["preprocessamento_v2"]["estado"], "erro_manifesto")
             progresso.unlink()
 
-            for chave in ("sha256_p1_origem", "codigo_sha256", "sha256_p1_v2", "sha256_p2_v2"):
+            for chave in (
+                "sha256_p1_origem", "codigo_sha256",
+                "sha256_p1_v2", "sha256_p2_v2",
+                "sha256_auditoria_cobertura_p1"
+            ):
                 with self.subTest(chave=chave):
                     manifesto.write_text(json.dumps({**md, chave: None}), "utf-8")
                     out = inspecionar_pipeline(24340828, base)
@@ -114,6 +124,13 @@ class TestEstadoPipeline(unittest.TestCase):
                 out = inspecionar_pipeline(24340828, base)
                 self.assertEqual(out["preprocessamento_v2"]["estado"], "artefato_modificado")
 
+            (pasta/"auditoria_cobertura_p1.json").unlink()
+            out=inspecionar_pipeline(24340828,base)
+            self.assertEqual(out["preprocessamento_v2"]["estado"],
+                             "artefato_perdido")
+            (pasta/"auditoria_cobertura_p1.json").write_text(
+                '{"componentes":[]}',"utf-8"
+            )
             (pasta/"P2_regiao_movel_24340828.geojson").write_text("corrompido","utf-8")
             out=inspecionar_pipeline(24340828,base)
             self.assertEqual(out["preprocessamento_v2"]["estado"],
