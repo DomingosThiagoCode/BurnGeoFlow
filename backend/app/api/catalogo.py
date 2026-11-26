@@ -2,8 +2,6 @@ import json
 from urllib.parse import urlencode
 from urllib.request import urlopen
 from tempfile import NamedTemporaryFile
-from shapely.geometry import shape, mapping
-from shapely.ops import unary_union
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from backend.app.api.jobs import verificacao_mutacao
@@ -24,6 +22,8 @@ BIOMAS = {"Pantanal", "Amazônia", "Cerrado", "Caatinga", "Mata Atlântica", "Pa
 BIOMAS_URL = "https://pamgia.ibama.gov.br/server/rest/services/01_Publicacoes_Bases/biomas_ibge_250k_2019/FeatureServer/2/query"
 
 def resolver_regiao(nome, pasta):
+    from shapely.geometry import shape, mapping
+    from shapely.ops import unary_union
     if nome not in BIOMAS:
         raise ValueError("Selecione um bioma brasileiro disponível.")
     pasta.mkdir(parents=True, exist_ok=True)
