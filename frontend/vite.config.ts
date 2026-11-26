@@ -1,6 +1,9 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+// Caminho file:// convertido para URL local, inclusive em Windows, sem exigir @types/node.
+const pagina = (relative: string) => decodeURIComponent(new URL(relative, import.meta.url).pathname)
+  .replace(/^\/([A-Za-z]:\/)/, "$1");
 
 export default defineConfig({
   plugins: [react()],
@@ -16,8 +19,8 @@ export default defineConfig({
       // Entradas separadas. O atlas científico permanece em /;
       // a narrativa fica em /apresentacao/.
       input: {
-        atlas: fileURLToPath(new URL("./index.html", import.meta.url)),
-        apresentacao: fileURLToPath(new URL("./apresentacao/index.html", import.meta.url)),
+        atlas: pagina("./index.html"),
+        apresentacao: pagina("./apresentacao/index.html"),
       },
     },
   },
