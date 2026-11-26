@@ -10,7 +10,6 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
-from math import isclose
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -187,10 +186,14 @@ def _retroceder(componentes: dict, desempate_critico: bool = True) -> list[dict]
     return saida
 
 
-def reconstruir(p1_path: Path, pasta_saida: Path) -> dict:
+def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = None) -> dict:
     """Gera cópias experimentais versionadas; nunca sobrescreve o P1 antigo."""
     p1_path = Path(p1_path)
     incendio, originais, transforms = _carregar(p1_path)
+    if id_esperado is not None and incendio != id_esperado:
+        raise ErroMetodologia(
+            f"P1 local contém ID {incendio}, mas foi solicitado {id_esperado}."
+        )
     pasta = Path(pasta_saida) / VERSAO
     pasta.mkdir(parents=True, exist_ok=True)
     try:
