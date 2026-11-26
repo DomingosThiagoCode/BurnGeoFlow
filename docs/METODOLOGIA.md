@@ -185,10 +185,25 @@ Não adotar limiar fixo arbitrário nem usar a resolução nominal de 500 m como
 
 **Pendências:** justificar critérios de aceitação dos reparos, calibrar tolerâncias e testar casos sintéticos e reais. Validar dependências entre produtos antes de reutilizar resultados parciais. Não suprimir exceções ou aumentar tolerâncias apenas para completar o pipeline.
 
+## D-015 — Avaliação por geometrias sintéticas e eventos reais
+
+**Estado:** abordagem conceitual aprovada; protocolo quantitativo e execução pendentes.
+
+Combinar duas frentes complementares para avaliar os cinco critérios da D-011:
+
+- Casos sintéticos controlados, com comportamento geométrico conhecido: expansão uniforme, expansão direcional, fusão de componentes e perturbações geométricas plausíveis. Comparar respostas dos indicadores com expectativas formuladas previamente, incluindo casos sem mudança e situações de degeneração matemática quando pertinentes.
+- Eventos reais com características distintas: examinar a interpretação das séries à luz das geometrias, relações com métricas básicas do P1, redundância entre indicadores, sensibilidade e robustez, e capacidade de diferenciar padrões de evolução.
+
+Os casos sintéticos devem respeitar, quando pertinentes, a natureza acumulativa da área queimada, as regras de seleção do P2 e a escala dos dados. Perturbações de robustez são cenários de teste, não substituições da geometria científica de referência (D-008).
+
+**Justificativa:** testes controlados permitem verificar respostas esperadas sem depender exclusivamente da interpretação dos incêndios reais. Eventos reais permitem investigar aplicabilidade prática, mas não demonstram sozinhos causalidade física ou validade universal.
+
+**Pendências:** definir amplitudes de perturbação, métricas de erro, procedimentos de comparação, controle de escala/duração/representatividade e critérios de aceitação antes da avaliação confirmatória. Correlacionar séries com cuidado quanto a tendências comuns e dependência temporal. Registrar resultados negativos e separar testes de implementação da avaliação de utilidade científica.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Calibração das tolerâncias e especificação do desempate residual (D-013).
 - Investigação do issue #44 e critérios quantitativos de aceitação dos reparos (D-014).
-- Operacionalização quantitativa e validação dos cinco critérios da D-011.
+- Detalhamento quantitativo do protocolo de avaliação D-011/D-015.
 - Especificação estatística da segmentação D-012; validação e generalização.
