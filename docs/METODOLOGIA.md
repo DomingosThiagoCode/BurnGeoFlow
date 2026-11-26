@@ -26,7 +26,7 @@ Este documento registra as decisões acordadas da pesquisa, independentemente da
 
 **Evidência da necessidade da revisão:** evento 24194371, 128 datas, área final total 17.908,2595 km² e P2 progressivo final 26,4019 km², conforme aquisição reportada. A implementação atual de aquisição em `burngeoflow/aquisicao/earth_engine.py` usa o maior componente inicial e rastreamento progressivo; portanto diverge desta decisão. O P2 retrospectivo ainda precisa ser implementado e testado, incluindo no caso original 24340828. Resultados dependentes de P2 antigo devem ser identificados como tal e recalculados após a revisão, preservando proveniência.
 
-**Ainda em discussão:** regra de empate, tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
+**Ainda em discussão:** tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
 
 ## D-002 — Conectividade por borda ou vértice no P1
 
@@ -50,10 +50,20 @@ Não criar saltos espaciais por proximidade para prolongar artificialmente o P2.
 
 **Implicações:** não preencher datas anteriores com geometrias fictícias ou zeros; distinguir ausência de P2 de ausência de incêndio. Adequar validação, interface, indicadores e integração às datas efetivamente disponíveis. Registrar motivo de encerramento, data inicial do P2 e diagnóstico de eventuais inconsistências. Não interpretar falhas geométricas como nascimento confirmado. O tratamento específico de contato exclusivamente pontual entre observações sem área de interseção permanece por decidir, distinguindo a conectividade intradata D-002 da ancestralidade temporal.
 
+## D-004 — Desempate entre ancestrais do P2
+
+**Estado:** decisão conceitual aprovada; implementação e validação pendentes.
+
+A seleção retrospectiva usa a maior área de interseção como critério principal (D-001). Em caso de empate entre candidatos elegíveis, priorizar a maior área total do componente anterior. Persistindo o empate, priorizar a menor distância entre os centroides do candidato e do componente posterior rastreado.
+
+**Justificativa:** manter uma regra simples para casos potencialmente raros, sem introduzir uma otimização global ou análise adicional do histórico de crescimento apenas para desempatar.
+
+**Rastreabilidade:** registrar candidatos empatados, áreas de interseção e totais, distâncias e critério aplicado. A tolerância numérica para identificar empates e o critério residual para igualdade em todos os critérios ainda devem ser especificados na implementação e documentados. A regra não autoriza saltos sem continuidade espacial (D-003).
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
-- Empates e contato exclusivamente pontual entre datas no rastreamento.
+- Contato exclusivamente pontual entre datas no rastreamento; tolerância numérica e desempate residual.
 - Fusões e distinção entre incorporação e expansão.
 - Regularização, tolerâncias e auditoria topológica (issue #44).
 - Representatividade, interpretação e seleção de indicadores TR/IGT.
