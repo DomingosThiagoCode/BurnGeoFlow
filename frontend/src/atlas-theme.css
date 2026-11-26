@@ -638,3 +638,7 @@ tbody tr:hover { background:#efede5; }
 .catalog-table .secondary-button { margin:3px 0; white-space:nowrap; }
 .workspace-heading .workspace-copy h1 { font-size:clamp(1.65rem,3vw,2.5rem); line-height:1.15; margin:0; }
 .workspace-heading { padding-top:12px; padding-bottom:16px; }
+
+.catalog-pagination { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; margin:16px 0 4px; }
+.catalog-pagination span { font-size:.83rem; font-weight:600; padding:0 8px; }
+.catalog-pagination .secondary-button:disabled { opacity:.4; cursor:not-allowed; }
