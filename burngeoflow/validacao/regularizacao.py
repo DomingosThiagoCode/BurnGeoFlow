@@ -13,6 +13,9 @@ import json
 from math import pi, sqrt
 from pathlib import Path
 import statistics
+import sys
+from time import monotonic
+import ijson
 
 import pyproj
 import shapely
@@ -41,10 +44,19 @@ def estatistica(valores: list[float]) -> dict:
     }
 
 
-def centro_projecao(geoms: list) -> tuple:
-    xs = [g.bounds for g in geoms]
-    lon0 = (min(a[0] for a in xs) + max(a[2] for a in xs)) / 2
-    lat0 = (min(a[1] for a in xs) + max(a[3] for a in xs)) / 2
+def feicoes(caminho):
+    with caminho.open("rb") as arquivo:
+        yield from ijson.items(arquivo, "features.item", use_float=True)
+
+
+def centro_projecao(geoms) -> tuple:
+    oeste = sul = float("inf")
+    leste = norte = float("-inf")
+    for g in geoms:
+        a,b,c,d = g.bounds
+        oeste,sul,leste,norte = min(oeste,a),min(sul,b),max(leste,c),max(norte,d)
+    lon0 = (oeste + leste) / 2
+    lat0 = (sul + norte) / 2
     crs = pyproj.CRS.from_proj4(
         f"+proj=laea +lat_0={lat0:.10f} +lon_0={lon0:.10f} "
         "+datum=WGS84 +units=m +no_defs"
@@ -53,79 +65,90 @@ def centro_projecao(geoms: list) -> tuple:
 
 
 def processar(caminho: Path, conversor, fator_area: float | None = None) -> list:
-    with caminho.open(encoding="utf-8") as arquivo:
-        features = json.load(arquivo)["features"]
     out = []
-    for indice, f in enumerate(features):
-        prop = f["properties"]
-        original_geo = shape(f["geometry"])
-        # O ponto principal do experimento e testar a ordem das operacoes:
-        # regularizar em coordenadas geografica vs projetar primeiro.
-        geo_variantes = {
-            "original": original_geo,
-            "make_valid": shapely.make_valid(original_geo),
-            "buffer_0": original_geo.buffer(0),
-        }
-        variantes = {}
-        reparo_pos_projecao = {}
-        for nome, geom in geo_variantes.items():
-            projetada = shapely.transform(geom, conversor.transform,
-                                         interleaved=False)
-            reparo_pos_projecao[nome] = nome != "original" and not projetada.is_valid
-            if reparo_pos_projecao[nome]:
-                # Diagnostico de dupla regularizacao requerido pela reprojecao.
-                projetada = shapely.make_valid(projetada)
-            variantes[nome] = projetada
-        variantes["make_valid_apos_projecao"] = shapely.make_valid(variantes["original"])
-        regularizada = variantes["make_valid"]
-        buffer_zero = variantes["buffer_0"]
-        original = variantes["original"]
-        info = {
-            "indice": indice,
-            "data": prop["data"],
-            "rank": int(prop.get("rank_global", prop.get("rank", -1))),
-            "area_atributo_km2": float(prop["area_km2"]),
-            "original_valida": original_geo.is_valid,
-            "original_projetada_valida": original.is_valid,
-            "variantes": {},
-        }
-        for nome, geom in variantes.items():
-            area = geom.area / 1e6
-            perimetro = geom.length / 1000
-            info["variantes"][nome] = {
-                "valida": (geo_variantes[nome].is_valid
-                           if nome in geo_variantes else geom.is_valid),
-                "valida_projetada": geom.is_valid,
-                "reparo_adicional_apos_projecao": reparo_pos_projecao.get(nome, False),
-                "vazia": geom.is_empty,
-                "tipo": geom.geom_type,
-                "n_partes": partes_poligonais(geom),
-                "area_km2": area,
-                "perimetro_km": perimetro,
-                "shape_index": perimetro / (2 * sqrt(pi * area)) if area > 0 else None,
+    inicio = monotonic()
+    for indice, f in enumerate(feicoes(caminho)):
+        if indice % 25 == 0:
+            print(f"[REGULARIZAR] {caminho.name}: feição {indice+1}, {monotonic()-inicio:.1f}s", file=sys.stderr, flush=True)
+        operacao = "leitura da feição"
+        try:
+            prop = f["properties"]
+            original_geo = shape(f["geometry"])
+            # O ponto principal do experimento e testar a ordem das operacoes:
+            # regularizar em coordenadas geografica vs projetar primeiro.
+            operacao = "make_valid/buffer(0) em WGS84"
+            geo_variantes = {
+                "original": original_geo,
+                "make_valid": shapely.make_valid(original_geo),
+                "buffer_0": original_geo.buffer(0),
             }
-            if fator_area:
-                refer = info["area_atributo_km2"] * fator_area
-                info["variantes"][nome]["erro_area_ajustado_pct"] = (
-                    100 * (area / refer - 1) if refer else None
+            variantes = {}
+            reparo_pos_projecao = {}
+            for nome, geom in geo_variantes.items():
+                operacao = f"projeção/regularização {nome}"
+                projetada = shapely.transform(geom, conversor.transform,
+                                             interleaved=False)
+                reparo_pos_projecao[nome] = nome != "original" and not projetada.is_valid
+                if reparo_pos_projecao[nome]:
+                    # Diagnostico de dupla regularizacao requerido pela reprojecao.
+                    projetada = shapely.make_valid(projetada)
+                variantes[nome] = projetada
+            operacao = "make_valid após projeção"
+            variantes["make_valid_apos_projecao"] = shapely.make_valid(variantes["original"])
+            regularizada = variantes["make_valid"]
+            buffer_zero = variantes["buffer_0"]
+            original = variantes["original"]
+            info = {
+                "indice": indice,
+                "data": prop["data"],
+                "rank": int(prop.get("rank_global", prop.get("rank", -1))),
+                "area_atributo_km2": float(prop["area_km2"]),
+                "original_valida": original_geo.is_valid,
+                "original_projetada_valida": original.is_valid,
+                "variantes": {},
+            }
+            operacao = "indicadores geométricos"
+            for nome, geom in variantes.items():
+                area = geom.area / 1e6
+                perimetro = geom.length / 1000
+                info["variantes"][nome] = {
+                    "valida": (geo_variantes[nome].is_valid
+                               if nome in geo_variantes else geom.is_valid),
+                    "valida_projetada": geom.is_valid,
+                    "reparo_adicional_apos_projecao": reparo_pos_projecao.get(nome, False),
+                    "vazia": geom.is_empty,
+                    "tipo": geom.geom_type,
+                    "n_partes": partes_poligonais(geom),
+                    "area_km2": area,
+                    "perimetro_km": perimetro,
+                    "shape_index": perimetro / (2 * sqrt(pi * area)) if area > 0 else None,
+                }
+                if fator_area:
+                    refer = info["area_atributo_km2"] * fator_area
+                    info["variantes"][nome]["erro_area_ajustado_pct"] = (
+                        100 * (area / refer - 1) if refer else None
+                    )
+            if original_geo.is_valid:
+                # O proprio experimento confere que variantes nao mudam validos.
+                info["original_mantida"] = True
+            else:
+                area_mv = regularizada.area
+                info["perda_buffer_versus_make_valid_pct"] = (
+                    100 * (area_mv - buffer_zero.area) / area_mv if area_mv else None
                 )
-        if original_geo.is_valid:
-            # O proprio experimento confere que variantes nao mudam validos.
-            info["original_mantida"] = True
-        else:
-            area_mv = regularizada.area
-            info["perda_buffer_versus_make_valid_pct"] = (
-                100 * (area_mv - buffer_zero.area) / area_mv if area_mv else None
-            )
-            info["distancia_centroides_original_make_valid_m"] = (
-                original.centroid.distance(regularizada.centroid)
-            )
-            info["fracao_diferenca_buffer_make_valid"] = (
-                regularizada.symmetric_difference(buffer_zero).area /
-                regularizada.union(buffer_zero).area
-                if regularizada.union(buffer_zero).area else 0.0
-            )
-        out.append(info)
+                info["distancia_centroides_original_make_valid_m"] = (
+                    original.centroid.distance(regularizada.centroid)
+                )
+                operacao = "união/diferença simétrica das variantes"
+                area_uniao = regularizada.union(buffer_zero).area
+                info["fracao_diferenca_buffer_make_valid"] = (
+                    regularizada.symmetric_difference(buffer_zero).area / area_uniao
+                    if area_uniao else 0.0
+                )
+            out.append(info)
+        except (shapely.errors.GEOSException, MemoryError) as exc:
+            props = f.get("properties", {})
+            raise RuntimeError(f"{caminho.name} feição {indice+1}, data={props.get('data')}, rank={props.get('rank_global', props.get('rank'))}, operação={operacao}: {exc}") from exc
     return out
 
 
@@ -246,32 +269,30 @@ def agregar(feicoes: list, fator: float) -> dict:
 
 
 def comparar(p1_path: Path, p2_path: Path) -> dict:
-    with p1_path.open(encoding="utf-8") as arquivo:
-        f1 = json.load(arquivo)["features"]
-    geoms1 = [shape(x["geometry"]) for x in f1]
-    conversor, centro = centro_projecao(geoms1)
-    with p2_path.open(encoding="utf-8") as arquivo:
-        geoms2 = [shape(x["geometry"]) for x in json.load(arquivo)["features"]]
+    conversor, centro = centro_projecao(shape(f["geometry"]) for f in feicoes(p1_path))
     proj_utm = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:32721", always_xy=True)
     proj_global = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:6933", always_xy=True)
 
-    def invalidos_por_crs(geoms: list) -> dict:
-        return {
-            "origem_lonlat": sum(not g.is_valid for g in geoms),
-            "laea_local": sum(not shapely.transform(
-                g, conversor.transform, interleaved=False).is_valid for g in geoms),
-            "utm_21s_epsg32721": sum(not shapely.transform(
-                g, proj_utm.transform, interleaved=False).is_valid for g in geoms),
-            "cea_global_epsg6933": sum(not shapely.transform(
-                g, proj_global.transform, interleaved=False).is_valid for g in geoms),
-        }
-    # A comparacao sistematica entre esferas/elipsoides nao e uma medida de
-    # erro real: normalizamos pelo fator mediano observado em feicoes validas.
-    p1_tmp = processar(p1_path, conversor)
+    def invalidos_por_crs(caminho):
+        totais = dict.fromkeys(("origem_lonlat", "laea_local", "utm_21s_epsg32721", "cea_global_epsg6933"), 0)
+        for f in feicoes(caminho):
+            g = shape(f["geometry"])
+            totais["origem_lonlat"] += not g.is_valid
+            for nome, proj in (("laea_local", conversor), ("utm_21s_epsg32721", proj_utm), ("cea_global_epsg6933", proj_global)):
+                totais[nome] += not shapely.transform(g, proj.transform, interleaved=False).is_valid
+        return totais
+
+    # Reutiliza métricas escalares do P1; a calibração não exige repetir GEOS.
+    p1 = processar(p1_path, conversor)
     fatores = [x["variantes"]["original"]["area_km2"] / x["area_atributo_km2"]
-               for x in p1_tmp if x["original_valida"] and x["area_atributo_km2"] > 0]
+               for x in p1 if x["original_valida"] and x["area_atributo_km2"] > 0]
+    if not fatores:
+        raise ValueError("Sem feições P1 válidas para calibrar a área.")
     fator = statistics.median(fatores)
-    p1 = processar(p1_path, conversor, fator)
+    for x in p1:
+        refer = x["area_atributo_km2"] * fator
+        for v in x["variantes"].values():
+            v["erro_area_ajustado_pct"] = 100 * (v["area_km2"] / refer - 1) if refer else None
     p2 = processar(p2_path, conversor, fator)
     return {
         "objetivo": "Sensibilidade de medidas geometricas ao metodo de regularizacao",
@@ -281,8 +302,8 @@ def comparar(p1_path: Path, p2_path: Path) -> dict:
         "crs_metricas": "LAEA local sobre WGS84",
         "centro_lonlat": [round(x, 8) for x in centro],
         "validade_por_crs": {
-            "p1": invalidos_por_crs(geoms1),
-            "p2": invalidos_por_crs(geoms2),
+            "p1": invalidos_por_crs(p1_path),
+            "p2": invalidos_por_crs(p2_path),
         },
         "p1": agregar(p1, fator),
         "p2": agregar(p2, fator),

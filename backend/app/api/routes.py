@@ -38,6 +38,11 @@ def resumo(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.resumo(incendio)
 
 
+@router.get("/events/{incendio}/preliminares")
+def preliminares(incendio: int, r: RepositorioEventos = Depends(repo)):
+    return r.preliminares(incendio)
+
+
 @router.get("/events/{incendio}/series")
 def serie(incendio: int, r: RepositorioEventos = Depends(repo)):
     return r.series(incendio)

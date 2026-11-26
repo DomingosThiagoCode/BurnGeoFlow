@@ -6,12 +6,13 @@ Não representa necessariamente passagem física do fogo.
 from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
+from shapely import STRtree
 
 def grupos_conectados(geometrias: Sequence[Any]) -> list[list[int]]:
     """Lista índices de feições conectadas por interseção geométrica.
 
     intersects() inclui contatos por vértice e borda.
-    Referência O(n²); otimização espacial pertence à etapa 7.3.
+    Índice espacial para reduzir comparações de pares disjuntos.
     """
     n = len(geometrias)
     pais = list(range(n))
@@ -27,9 +28,11 @@ def grupos_conectados(geometrias: Sequence[Any]) -> list[list[int]]:
     for i, geom in enumerate(geometrias):
         if geom is None or geom.is_empty:
             raise ValueError(f"Geometria vazia ou ausente no índice {i}.")
-        for j in range(i):
-            if geom.intersects(geometrias[j]):
-                unir(i, j)
+    arvore = STRtree(geometrias)
+    for i, geom in enumerate(geometrias):
+        for j in arvore.query(geom, predicate="intersects"):
+            if int(j) < i:
+                unir(i, int(j))
     grupos: dict[int, list[int]] = {}
     for i in range(n):
         grupos.setdefault(raiz(i), []).append(i)

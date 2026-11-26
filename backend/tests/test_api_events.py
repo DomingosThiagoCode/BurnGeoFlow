@@ -151,6 +151,19 @@ class TesteAPI(unittest.TestCase):
             )
             self.assertTrue((pasta / f"P1_componentes_{ID}.geojson").is_file())
 
+    def test_preliminares_sem_csv(self):
+        with TemporaryDirectory() as d:
+            raiz = Path(d)
+            dados_teste(raiz, resumido=False)
+            with TestClient(criar_app(dados_dir=raiz)) as c:
+                r = c.get(f"/api/events/{ID}/preliminares")
+                self.assertEqual(r.status_code, 200)
+                linhas = r.json()["linhas"]
+                self.assertEqual(len(linhas), 3)
+                self.assertEqual(linhas[0]["numero_patches"], 2)
+                self.assertIsNone(linhas[0]["area_p1_atributo_km2"])
+                self.assertEqual(c.get(f"/api/events/{ID}/series").json(), [])
+
     def test_404_422_e_origins(self):
         with TemporaryDirectory() as d:
             raiz = Path(d)

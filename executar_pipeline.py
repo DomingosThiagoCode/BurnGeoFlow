@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from threading import Thread
 
 ROOT = Path(__file__).resolve().parent
 
@@ -217,10 +218,28 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
             arquivo.parent.mkdir(parents=True, exist_ok=True)
             if arquivo.is_file():
                 arquivo.unlink()  # Evita aceitar arquivo antigo se a etapa nao escrever novo.
-        resultado = subprocess.run(
-            etapa.comando, cwd=ROOT, capture_output=True,
-            text=True, encoding="utf-8", errors="replace", check=False
-        )
+        # stdout continua separado (algumas etapas produzem JSON).
+        if etapa.nome == "regularizar_diagnostico":
+            stderr_linhas = []
+            with subprocess.Popen(etapa.comando, cwd=ROOT, stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE, text=True,
+                                  encoding="utf-8", errors="replace") as proc:
+                def acompanhar():
+                    for linha in proc.stderr:
+                        stderr_linhas.append(linha)
+                        print(linha.rstrip(), flush=True)
+                leitor = Thread(target=acompanhar)
+                leitor.start()
+                stdout = proc.stdout.read()
+                leitor.join()
+                codigo = proc.wait()
+            resultado = subprocess.CompletedProcess(etapa.comando, codigo, stdout,
+                                                    "".join(stderr_linhas))
+        else:
+            resultado = subprocess.run(
+                etapa.comando, cwd=ROOT, capture_output=True,
+                text=True, encoding="utf-8", errors="replace", check=False
+            )
         (logs / f"{etapa.nome}.log").write_text(
             "COMANDO: " + " ".join(etapa.comando) +
             "\n\nSTDOUT:\n" + resultado.stdout +
