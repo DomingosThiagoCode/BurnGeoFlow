@@ -7,6 +7,7 @@ import {
 import { ScientificPanels, type AbaCientifica } from "./components/ScientificPanels";
 // Só importa MapLibre e WebGL quando o usuário solicita o mapa.
 const MapPanel = lazy(() => import("./components/MapPanel").then(m => ({default: m.MapPanel})));
+import { CatalogoPanel } from "./components/CatalogoPanel";
 import { JobsPanel } from "./components/JobsPanel";
 import {
   carregarAnalise, carregarGeometria, carregarResumo, carregarSerie, carregarTransicoes,
@@ -430,6 +431,7 @@ export default function App() {
           </div>
 
           <div id="processamento" className="jobs-anchor">
+            <CatalogoPanel />
             <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} />
           </div>
 
