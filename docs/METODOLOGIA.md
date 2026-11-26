@@ -138,10 +138,25 @@ Avaliar inicialmente o conjunto de indicadores originais TR/IGT documentados nas
 
 **Pendências:** estabelecer critérios verificáveis de utilidade, robustez e informação adicional; distinguir análise exploratória de validação em outros eventos; documentar resultados negativos e justificar qualquer seleção final de indicadores.
 
+## D-011 — Critérios de avaliação científica dos indicadores
+
+**Estado:** cinco critérios conceituais aprovados; operacionalização e validação pendentes.
+
+Avaliar os indicadores TR/IGT segundo:
+1. Interpretabilidade: significado geométrico claro, unidades e limites de interpretação.
+2. Redundância: informação adicional em relação às métricas básicas do P1 e aos demais indicadores; correlação é evidência exploratória, não prova isolada de redundância.
+3. Sensibilidade: resposta a mudanças geométricas relevantes, verificável em casos controlados.
+4. Robustez: estabilidade frente a perturbações plausíveis, precisão dos dados, reparos e escolhas metodológicas.
+5. Capacidade de diferenciação: distinguir padrões de evolução geométrica em eventos distintos, sem confundir efeito do tamanho, duração ou representatividade com diferenças de comportamento.
+
+**Justificativa:** a seleção final deve decorrer da avaliação científica, não da aparência dos gráficos nem da expectativa de resultado positivo (D-010). Registrar resultados negativos, limitações e situações de aplicabilidade parcial.
+
+**Pendências:** definir procedimentos quantitativos, casos sintéticos e reais, critérios de comparação, controles e evidências mínimas para cada dimensão. Não estabelecer limiares arbitrários nem tratar os cinco critérios como testes já executados.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Tolerância numérica e desempate residual.
 - Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
-- Critérios verificáveis de utilidade científica, robustez e validação dos indicadores TR/IGT.
+- Operacionalização quantitativa e validação dos cinco critérios da D-011.
 - Segmentação temporal/BIC, validação e generalização.
