@@ -15,6 +15,7 @@ interface Props {
   transicoes: Linha[];
   dia: string;
   selecionarData: (dia: string) => void;
+  mostrarSegmento: (ponto: string, dataAtual: string) => void;
   analise: AnaliseEtapa4 | null;
   carregando: boolean;
   erro: string | null;
@@ -44,6 +45,7 @@ type AnguloPonderado = ContribuicaoDirecional;
 
 function RosaDirecional({
   titulo, dados, subtitulo, unidade, escalaComum, selecionarData,
+  ponto, mostrarSegmento,
 }: {
   titulo:string;
   dados:AnguloPonderado[];
@@ -51,6 +53,8 @@ function RosaDirecional({
   unidade:"km"|"km²";
   escalaComum?:number;
   selecionarData:(data:string)=>void;
+  ponto?:string;
+  mostrarSegmento?:(ponto:string, dataAtual:string)=>void;
 }) {
   const [hover,setHover]=useState<number|null>(null);
   const [selecionado,setSelecionado]=useState<number|null>(null);
@@ -162,6 +166,11 @@ function RosaDirecional({
           </button>
         </li>)}</ul>}
       {destaques.length>20&&<small>Exibindo 20 de {destaques.length} contribuições.</small>}
+      {ponto&&mostrarSegmento&&destaques[0]?.data&&
+        <button type="button" className="secondary-button rose-map-link"
+          onClick={()=>mostrarSegmento(ponto,destaques[0].data)}>
+          Ver deslocamento selecionado no mapa
+        </button>}
     </div>}
   </section>;
 }
@@ -215,7 +224,7 @@ function CincoTrajetorias({ pontos, dia }: { pontos: Linha[]; dia: string }) {
   </section>;
 }
 
-export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, analise, carregando, erro }: Props) {
+export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, mostrarSegmento, analise, carregando, erro }: Props) {
   const [inicioFiltro,setInicioFiltro]=useState("");
   const [fimFiltro,setFimFiltro]=useState("");
   const datas = useMemo(() => serie.map(r => r.data ?? ""), [serie]);
@@ -376,8 +385,9 @@ export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, 
       </div>
       <div className="rose-grid">
         <RosaDirecional key={"tr:"+inicioFiltro+":"+fimFiltro}
-          titulo="TR · Centroide" dados={tr} unidade="km"
+          titulo="TR · Centroide" dados={tr} unidade="km" ponto="centroide"
           escalaComum={escalaKm} selecionarData={selecionarData}
+          mostrarSegmento={mostrarSegmento}
           subtitulo="Ponderação: distância do centroide (km)"/>
         <RosaDirecional key={"igt:"+inicioFiltro+":"+fimFiltro}
           titulo="IGT · Incremento P2" dados={igt} unidade="km²"
@@ -389,12 +399,13 @@ export function ScientificPanels({ aba, serie, transicoes, dia, selecionarData, 
         <div className="rose-grid">
           {feixes.map(t=><RosaDirecional
             key={t.id+":"+inicioFiltro+":"+fimFiltro}
-            titulo={t.rotulo} dados={t.dados} unidade="km"
+            titulo={t.rotulo} dados={t.dados} unidade="km" ponto={t.id}
             escalaComum={escalaKm} selecionarData={selecionarData}
+            mostrarSegmento={mostrarSegmento}
             subtitulo="Ponderação: distância geodésica (km)"/>)}
         </div>
       </>:<div className="empty-chart">As rosáceas dos cinco extremos requerem os arquivos da Etapa 4.</div>}
-      <Aviso>Os setores descrevem variações geométricas. A seleção atualiza a data do atlas, mas não desenha segmentos que não estejam georreferenciados no mapa. Não infira vento ou propagação de fogo ativo.</Aviso>
+      <Aviso>Os setores descrevem variações geométricas. Para TR, abra o deslocamento de uma transição no mapa quando os dois pontos geográficos existirem. IGT não é representado por uma seta de movimento. Não infira vento ou propagação de fogo ativo.</Aviso>
     </>;
   }
 
