@@ -58,11 +58,43 @@ gravado na pasta `diagnosticos/24194371/`. O comando pode exigir
 processamento vetorial considerável para as 30.795 feições, mas **não
 cria tasks remotas no Earth Engine**.
 
-O arquivo serve para confrontar (i) interseções isoladas, (ii) união
-sem dupla contagem, (iii) sobreposições de feições P1 da mesma data,
-(iv) Geometrias WGS84 originais e (v) dados de regularização e reparos
-já registrados. A correção definitiva só deve ocorrer após essa
-classificação e testes de regressão para os dois IDs de desenvolvimento.
+Use o P1 legado **completo** para preservar a projeção LAEA calculada
+a partir da extensão de todo o evento. O P2 e o manifesto da aquisição
+sozinhos não contêm os componentes necessários. O manifesto,
+a auditoria, os relatórios de regularização e as exportações brutas
+já existentes são fontes complementares para verificar a proveniência
+e confrontar alterações geométricas, quando disponíveis.
+
+## Como investigar a origem da sobreposição
+
+Quando o diagnóstico corresponder a 2020-09-10 no lado anterior,
+use `data_oposta` como a data sucessora observada e escolha um par de
+`amostra_pares_sobrepostos[*].ranks_opostos`. O par pertence à data
+sucessora. Comece pela auditoria intradata e compare os dois componentes
+em WGS84 original e em LAEA antes e depois do reparo:
+
+```powershell
+$p1 = "CAMINHO_DO_P1_COMPONENTES_24194371.geojson"
+$saida = "diagnosticos/24194371"
+$d = Get-Content -Raw "$saida/diagnostico_topologia_24194371_2020-09-10_anterior_r97.json" | ConvertFrom-Json
+$data = $d.data_oposta
+python -m burngeoflow.validacao.sobreposicoes --id 24194371 --p1 "$p1" --data "$data" --saida "$saida/auditoria_intradata_$data.json"
+
+foreach ($par in $d.amostra_pares_sobrepostos) {
+    $a = $par.ranks_opostos[0]
+    $b = $par.ranks_opostos[1]
+    python -m burngeoflow.validacao.sobreposicoes --id 24194371 --p1 "$p1" --data "$data" --verificar-origem --principal $a --outros $b --saida "$saida/origem_${data}_${a}_${b}.json"
+}
+```
+
+Compare o SHA-256 do P1 nos relatórios de linhagens e de origem, e
+confira o caminho da entrada e a definição LAEA na auditoria intradata. A sobreposição intradata ajuda a explicar
+a área contada mais de uma vez quando também estiver presente dentro do
+patch investigado. Se uma geometria for inválida num estado intermediário,
+a verificação pode não distinguir reprojeção e reparo. Confronte
+a classificação com a regularização e os dados brutos, se disponíveis,
+antes de propor uma correção. Preserve a precisão original, os limiares,
+a entrada e os produtos anteriores para a regressão dos dois casos.
 
 ## Cobertura automatizada
 
