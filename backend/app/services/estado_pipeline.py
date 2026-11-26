@@ -80,6 +80,7 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
     arqs_v2 = [
         v2_base/f"P1_componentes_{id_incendio}.geojson",
         v2_base/f"P2_regiao_movel_{id_incendio}.geojson",
+        v2_base/"auditoria_cobertura_p1.json",
     ]
     diagnostico, _ = _ler_json(v2_base/"diagnostico_bloqueio.json")
     progresso_v2, erro_progresso = _ler_json(
@@ -91,7 +92,11 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
         "primeira_data_p2": manifesto_v2.get("primeira_data_p2"),
         "datas_p1": manifesto_v2.get("datas_p1"),
         "datas_p2": manifesto_v2.get("datas_p2"),
-        "arquivos": {"p1":_arquivo(arqs_v2[0]), "p2":_arquivo(arqs_v2[1])},
+        "arquivos": {
+            "p1":_arquivo(arqs_v2[0]),
+            "p2":_arquivo(arqs_v2[1]),
+            "auditoria_p1":_arquivo(arqs_v2[2]),
+        },
         "erro": erro_v2 or erro_progresso,
         "progresso": progresso_v2,
     }
@@ -113,7 +118,11 @@ def inspecionar_pipeline(id_incendio: int, base: Path) -> dict:
         elif not fontes["p1_local"]["existe"]:
             metadados_v2["estado"] = "origem_ausente"
         else:
-            chaves = ("sha256_p1_origem", "codigo_sha256", "sha256_p1_v2", "sha256_p2_v2")
+            chaves = (
+                "sha256_p1_origem", "codigo_sha256",
+                "sha256_p1_v2", "sha256_p2_v2",
+                "sha256_auditoria_cobertura_p1",
+            )
             codigo = (Path(__file__).resolve().parents[3] /
                       "burngeoflow" / "processamento" / "metodologia_v2.py")
             if not all(_sha256_valido(manifesto_v2.get(chave)) for chave in chaves):
