@@ -173,10 +173,22 @@ Não adotar limiar fixo arbitrário nem usar a resolução nominal de 500 m como
 
 **Limite:** discrepâncias cuja origem não possa ser demonstrada devem ser sinalizadas para investigação; tolerâncias não podem mascarar inconsistências reais ou substituir a auditoria do P1 (issue #44).
 
+## D-014 — Política de reparação e inconsistências topológicas
+
+**Estado:** política conceitual aprovada; critérios quantitativos, implementação e validação pendentes.
+
+1. Preservar geometrias válidas e topologicamente consistentes como referência científica.
+2. Reparar geometrias inválidas somente quando o procedimento for justificável e rastreável, preservando os dados brutos e registrando método, alterações geométricas, área, perímetro, conectividade e efeitos sobre os indicadores (D-008 e D-013).
+3. Diante de inconsistência significativa ou sem explicação, interromper a análise afetada, emitir diagnóstico contextual e não produzir resultados artificialmente corrigidos. Preservar e disponibilizar resultados de etapas independentes cuja validade esteja demonstrada; marcar produtos dependentes como indisponíveis ou comprometidos.
+
+**Caso de investigação:** evento 24194371, patch de 10/09/2020 rank 97, falha na soma das interseções na etapa de linhagens (issue #44). Comparar soma e união das interseções, áreas originais e processadas, sobreposições entre componentes e efeitos de reparação/reprojeção. Não presumir dupla contagem sem verificar os dados.
+
+**Pendências:** justificar critérios de aceitação dos reparos, calibrar tolerâncias e testar casos sintéticos e reais. Validar dependências entre produtos antes de reutilizar resultados parciais. Não suprimir exceções ou aumentar tolerâncias apenas para completar o pipeline.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Calibração das tolerâncias e especificação do desempate residual (D-013).
-- Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
+- Investigação do issue #44 e critérios quantitativos de aceitação dos reparos (D-014).
 - Operacionalização quantitativa e validação dos cinco critérios da D-011.
 - Especificação estatística da segmentação D-012; validação e generalização.
