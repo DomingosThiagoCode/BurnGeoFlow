@@ -312,7 +312,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
                     "numero_componentes": len(lista),
                     "area_total_km2": totais[dia],
                     "ranks_origem": c["ranks_origem"],
-                    "residuo_soma_menos_uniao_m2": c["residuo_soma_menos_uniao_m2"],
+                    "residuo_soma_menos_uniao_m2": c.get("residuo_soma_menos_uniao_m2", 0.0),
                     "metodologia": VERSAO,
                     "area_atributo_fonte": "LAEA_local",
                 },
@@ -338,7 +338,7 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
                 "delta_area_total_km2":0.0 if anterior is None else total-anterior[2],
                 "representatividade_pct":100*a/total if total else None,
                 "metodo_continuidade":item["metodo"],
-                "residuo_soma_menos_uniao_m2": c["residuo_soma_menos_uniao_m2"],
+                "residuo_soma_menos_uniao_m2": c.get("residuo_soma_menos_uniao_m2", 0.0),
                 "metodologia":VERSAO, "area_atributo_fonte":"LAEA_local",
             },
         })
