@@ -22,12 +22,13 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "frontend" / "dist"
 EVENTO = 24340828
+OUTRO_EVENTO = 24194371
 DATAS = ["2020-09-10", "2020-09-11", "2020-09-12"]
 
 
-def resumo():
+def resumo(evento=EVENTO):
     return {
-        "id_incendio": EVENTO,
+        "id_incendio": evento,
         "datas": DATAS,
         "periodo_inicio": DATAS[0],
         "periodo_fim": DATAS[-1],
@@ -65,8 +66,9 @@ def camada(dia, layer):
 def responder_api(route):
     uri = urlparse(route.request.url)
     caminho = uri.path
+    evento = int(caminho.split("/")[3]) if caminho.startswith("/api/events/") else EVENTO
     if caminho == "/api/events":
-        dados = [{"id_incendio": EVENTO}]
+        dados = [{"id_incendio": EVENTO}, {"id_incendio": OUTRO_EVENTO}]
     elif caminho == "/api/catalogo/regioes":
         dados = {"biomas":["Pantanal","Amazônia","Cerrado","Caatinga","Mata Atlântica","Pampa"],
                  "pais":"Brasil",
@@ -104,11 +106,11 @@ def responder_api(route):
         else:
             dados = []
     elif caminho.endswith("/overview"):
-        dados = resumo()
+        dados = resumo(evento)
     elif caminho.endswith("/series"):
         dados = [{
-            "id_incendio": str(EVENTO), "data": d,
-            "area_total_laea_km2": str(i + 10),
+            "id_incendio": str(evento), "data": d,
+            "area_total_laea_km2": str(i + 10 + (100 if evento == OUTRO_EVENTO else 0)),
             "p2_area_laea_km2": str(i + 8),
             "numero_patches": "1",
             "dominancia_cobertura_p2_pct": "80",
@@ -120,20 +122,20 @@ def responder_api(route):
         dados = {
             "disponivel": True,
             "pontos": [{
-                "id_incendio": str(EVENTO), "data": d, "ponto": nome,
+                "id_incendio": str(evento), "data": d, "ponto": nome,
                 "x_laea_m": str(1000 + i * 200 + j * 40),
                 "y_laea_m": str(2000 + i * 100 + j * 70),
                 "longitude": str(-56.3 + i*.015 + j*.002),
                 "latitude": str(-17.0 + i*.008 + j*.002),
             } for i, d in enumerate(DATAS) for j, nome in enumerate(nomes)],
             "segmentos": [{
-                "id_incendio": str(EVENTO),
+                "id_incendio": str(evento),
                 "data_anterior": DATAS[i-1], "data_atual": DATAS[i],
                 "ponto": nome, "azimute_geodesico_graus": str(50+j*25),
                 "distancia_geodesica_km": "1.5",
             } for i in range(1, len(DATAS)) for j, nome in enumerate(nomes)],
             "indicadores": [{
-                "id_incendio": str(EVENTO),
+                "id_incendio": str(evento),
                 "data_anterior": DATAS[i-1], "data_atual": DATAS[i],
                 "deslocamento_centroide_km": "1.5",
                 "avanco_norte_km": "0.5", "avanco_sul_km": "0.1",
@@ -145,7 +147,7 @@ def responder_api(route):
         }
     elif caminho.endswith("/transitions"):
         dados = [{
-            "id_incendio": str(EVENTO),
+            "id_incendio": str(evento),
             "data_anterior": DATAS[i-1],
             "data_atual": DATAS[i],
             "dias_intervalo": "1",
@@ -312,8 +314,45 @@ def testar() -> None:
             page.get_by_role("tab", name="Forma").click()
             page.get_by_role("heading", name="Forma e deformação").wait_for()
             assert page.locator(".chart-panel").count() == 4
+            # Trocar o incêndio em cada módulo, sem voltar à visão geral.
+            for aba, titulo in (
+                ("Paisagem", "Paisagem e componentes"),
+                ("Expansão", "Expansão e incorporação geométrica"),
+                ("Movimento", "Cinco trajetórias representativas"),
+                ("Direções", "Direções e rosáceas"),
+                ("Forma", "Forma e deformação"),
+            ):
+                page.get_by_role("tab", name=aba).click()
+                page.get_by_role("heading", name=titulo).wait_for()
+                hash_anterior = page.evaluate("window.location.hash")
+                seletor = page.get_by_label("Incêndio ativo", exact=True)
+                assert seletor.count() == 1 and seletor.is_visible()
+                with page.expect_response(
+                    lambda resp: f"/api/events/{OUTRO_EVENTO}/series" in resp.url
+                    and resp.status == 200
+                ):
+                    seletor.select_option(str(OUTRO_EVENTO))
+                page.locator(".event-identifier").get_by_text(
+                    f"Evento {OUTRO_EVENTO}", exact=True
+                ).wait_for()
+                page.get_by_role("heading", name=titulo).wait_for()
+                assert "112" in page.locator(".kpi-card").first.inner_text()
+                assert page.evaluate("window.location.hash") == hash_anterior
+                if aba in ("Movimento", "Direções", "Forma"):
+                    assert any(f"/api/events/{OUTRO_EVENTO}/analysis" in url for url in assets)
+                # Testa também o campo de consulta manual e o retorno ao ID original.
+                page.get_by_label("Consultar outro ID").fill(str(EVENTO))
+                page.get_by_role("button", name="Consultar ID", exact=True).click()
+                page.locator(".event-identifier").get_by_text(
+                    f"Evento {EVENTO}", exact=True
+                ).wait_for()
+                page.get_by_role("heading", name=titulo).wait_for()
+                assert "112" not in page.locator(".kpi-card").first.inner_text()
+                assert page.evaluate("window.location.hash") == hash_anterior
             assert not errors, f"Falhas JavaScript nas novas abas: {errors}"
             page.set_viewport_size({"width": 390, "height": 840})
+            assert page.get_by_label("Incêndio ativo", exact=True).is_visible()
+            assert page.get_by_label("Consultar outro ID").is_visible()
             assert page.locator(".sidebar").evaluate(
                 "el => getComputedStyle(el).position"
             ) == "fixed", "No mobile o menu deve continuar sendo um drawer"

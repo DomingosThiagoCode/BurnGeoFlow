@@ -114,7 +114,7 @@ export default function App() {
   const [etapasParciais, setEtapasParciais] = useState<Record<string,string>>({});
   useEffect(() => {
     setPreliminares([]); setEtapasParciais({});
-    if (id === null || resumo?.tem_series !== false) return;
+    if (id === null || resumo?.id_incendio !== id || resumo.tem_series !== false) return;
     const ctrl = new AbortController();
     fetch(BASE_API + "/api/events/" + id + "/preliminares", {signal:ctrl.signal})
       .then(r => {if (!r.ok) throw new Error("Preliminares indisponíveis"); return r.json();})
@@ -155,6 +155,7 @@ export default function App() {
     setSerie([]);
     setTransicoes([]);
     setAnalise(null);
+    setCarregandoAnalise(false);
     setErroAnalise(null);
     setDestaqueTR(null);
     setP1(null);
@@ -185,7 +186,8 @@ export default function App() {
   }, [id, revisao]);
 
   useEffect(() => {
-    if (id === null || (aba !== "movimento" && aba !== "direcoes" && aba !== "forma")
+    if (id === null || vista !== "atlas" || carregandoEvento || resumo?.id_incendio !== id
+        || (aba !== "movimento" && aba !== "direcoes" && aba !== "forma")
         || analise !== null) return;
     const ctrl = new AbortController();
     setCarregandoAnalise(true);
@@ -197,7 +199,7 @@ export default function App() {
       })
       .finally(() => { if (!ctrl.signal.aborted) setCarregandoAnalise(false); });
     return () => ctrl.abort();
-  }, [id, aba, analise]);
+  }, [id, vista, aba, analise, resumo, carregandoEvento, revisao]);
 
   const obterCamada = useCallback(async (
     identificador: number, dia: string, camada: Camada,
@@ -445,6 +447,33 @@ export default function App() {
             <JobsPanel eventoId={id} onConcluiu={aoConcluirJob} abertoInicial onStatusAtivo={aoStatusJob}/>
           </div>
           {vista==="atlas" && <>
+          <section className="atlas-event-toolbar" aria-label="Gerenciamento do incêndio">
+            <div className="atlas-event-current">
+              <label htmlFor="event-select" className="form-label">Incêndio ativo</label>
+              <select id="event-select" className="field" value={id ?? ""}
+                onChange={e => {
+                  const n = Number(e.target.value);
+                  if (n > 0) { setId(n); setMensagem(""); }
+                }}>
+                {id === null && <option value="">Selecione um evento local</option>}
+                {id !== null && !lista.some(v => v.id_incendio === id) &&
+                  <option value={id}>ID {id} (não listado)</option>}
+                {lista.map(v => <option key={v.id_incendio} value={v.id_incendio}>
+                  Evento {v.id_incendio}
+                </option>)}
+              </select>
+            </div>
+            <form className="find-event" onSubmit={escolherId}>
+              <label htmlFor="event-id" className="form-label">Consultar outro ID</label>
+              <div className="inline-field">
+                <input id="event-id" className="field" type="text"
+                  inputMode="numeric" placeholder="Digite um ID"
+                  value={buscaId} onChange={e => setBuscaId(e.target.value)}/>
+                <button type="submit" className="field-action"
+                  aria-label="Consultar ID"><Search size={17}/></button>
+              </div>
+            </form>
+          </section>
 
           {mensagem && <div className="message-box" role="status">
             <span>{mensagem}</span><button aria-label="Fechar mensagem"
@@ -465,7 +494,7 @@ export default function App() {
             </div>
           )}
 
-          {resumo && id !== null && (
+          {resumo && id !== null && resumo.id_incendio === id && (
             <>
               <div className="section-title-row">
                 <div className="event-identifier">
@@ -619,38 +648,7 @@ export default function App() {
                 </div>
               </div>
                 </div>
-                <aside className="atlas-floating-controls" aria-label="Gerenciar evento, tempo e camadas">
-          <div className="sidebar-group">
-            <div className="section-heading">
-              <span>GERENCIAMENTO</span>
-              <Database size={15}/>
-            </div>
-            <label htmlFor="event-select" className="form-label">Incêndio ativo</label>
-            <select id="event-select" className="field"
-              value={id !== null && lista.some(v => v.id_incendio === id) ? id : ""}
-              onChange={e => {
-                const n = Number(e.target.value);
-                if (n > 0) setId(n);
-              }}>
-              {id !== null && !lista.some(v => v.id_incendio === id) &&
-                <option value="">ID {id} (não listado)</option>}
-              {lista.length === 0 && <option value="">Nenhum evento local</option>}
-              {lista.map(v => <option key={v.id_incendio} value={v.id_incendio}>
-                Evento {v.id_incendio}
-              </option>)}
-            </select>
-            <form className="find-event" onSubmit={escolherId}>
-              <label htmlFor="event-id" className="form-label">Consultar outro ID</label>
-              <div className="inline-field">
-                <input id="event-id" className="field" type="text"
-                  inputMode="numeric" placeholder="Digite um ID"
-                  value={buscaId} onChange={e => setBuscaId(e.target.value)}/>
-                <button type="submit" className="field-action"
-                  aria-label="Consultar ID"><Search size={17}/></button>
-              </div>
-            </form>
-          </div>
-
+                <aside className="atlas-floating-controls" aria-label="Gerenciar tempo e camadas">
           <div className="sidebar-group">
             <div className="section-heading">
               <span>NAVEGAÇÃO TEMPORAL</span>
@@ -726,7 +724,7 @@ export default function App() {
                 </aside>
               </div>
               </>}
-              {aba !== "geral" && <ScientificPanels
+              {aba !== "geral" && <ScientificPanels key={id + ":" + revisao}
                 aba={aba} serie={serie} transicoes={transicoes}
                 dia={data} selecionarData={setData}
                 mostrarSegmento={abrirSegmento}
