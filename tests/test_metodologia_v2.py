@@ -80,6 +80,12 @@ class TestMetodologiaV2(unittest.TestCase):
             p2=json.loads((folder/"P2_regiao_movel_24340828.geojson").read_text())
             self.assertEqual(len(p1["features"]),5)
             self.assertEqual(len(p2["features"]),3)
+            balanco=json.loads((folder/"balanco_expansao_p2.json").read_text())
+            self.assertEqual(len(balanco["transicoes"]),2)
+            self.assertEqual(resultado["transicoes_balanco_d005"],2)
+            self.assertTrue(all(x["dias_intervalo"]==1 for x in balanco["transicoes"]))
+            self.assertTrue(all(x["erro_particao_expansao_m2"]>=0
+                                for x in balanco["transicoes"]))
             d1=[e for e in p1["features"] if e["properties"]["data"]=="2020-01-01"]
             self.assertEqual(len(d1),2)  # contato somente por vértice agrupa
             self.assertIn([1,3],[e["properties"]["ranks_origem"] for e in d1])
@@ -98,6 +104,11 @@ class TestMetodologiaV2(unittest.TestCase):
             self.assertEqual(r["datas_p1"],2)
             self.assertEqual(r["datas_p2"],1)
             self.assertEqual(r["primeira_data_p2"],"2020-01-02")
+            self.assertEqual(r["transicoes_balanco_d005"],0)
+            balanco=json.loads(
+                (root/"derivados"/VERSAO/"balanco_expansao_p2.json").read_text()
+            )
+            self.assertEqual(balanco["transicoes"],[])
 
     def test_sobreposicao_intradata_conserva_cobertura_e_registra_evidencia(self):
         # Dois patches que se sobrepõem são um único componente D-002.
