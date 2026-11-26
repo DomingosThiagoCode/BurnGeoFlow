@@ -69,13 +69,13 @@ function RosaDirecional({
   const pesoSetor = ativo===null?0:pesos[ativo];
   const centro = ativo===null?null:ativo*22.5;
   const raio=75;
-  const ponto = (az:number,r:number) => {
+  const coordenadaPolar = (az:number,r:number) => {
     const a=(az-90)*Math.PI/180;
     return [110+Math.cos(a)*r,112+Math.sin(a)*r];
   };
   const setor = (i:number,r:number) => {
-    const a=ponto(i*22.5-10.7,r);
-    const b=ponto(i*22.5+10.7,r);
+    const a=coordenadaPolar(i*22.5-10.7,r);
+    const b=coordenadaPolar(i*22.5+10.7,r);
     return "M 110 112 L "+a[0].toFixed(2)+" "+a[1].toFixed(2)+
       " A "+r.toFixed(2)+" "+r.toFixed(2)+" 0 0 1 "+
       b[0].toFixed(2)+" "+b[1].toFixed(2)+" Z";
@@ -107,7 +107,7 @@ function RosaDirecional({
             </text>
           </g>)}
         {[0,45,90,135].map(a=>{
-          const p=ponto(a,raio),q=ponto(a+180,raio);
+          const p=coordenadaPolar(a,raio),q=ponto(a+180,raio);
           return <line key={a} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]}
             stroke="#d9d6c9" strokeWidth="1"/>;
         })}
@@ -133,7 +133,7 @@ function RosaDirecional({
           </path>;
         })}
         {media!==null&&(()=>{
-          const p=ponto(media,raio+5);
+          const p=coordenadaPolar(media,raio+5);
           return <line x1="110" y1="112" x2={p[0]} y2={p[1]}
             stroke="#aa4b36" strokeWidth="2.6" strokeLinecap="round"/>;
         })()}
