@@ -26,7 +26,7 @@ Este documento registra as decisões acordadas da pesquisa, independentemente da
 
 **Evidência da necessidade da revisão:** evento 24194371, 128 datas, área final total 17.908,2595 km² e P2 progressivo final 26,4019 km², conforme aquisição reportada. A implementação atual de aquisição em `burngeoflow/aquisicao/earth_engine.py` usa o maior componente inicial e rastreamento progressivo; portanto diverge desta decisão. O P2 retrospectivo ainda precisa ser implementado e testado, incluindo no caso original 24340828. Resultados dependentes de P2 antigo devem ser identificados como tal e recalculados após a revisão, preservando proveniência.
 
-**Ainda em discussão:** regra de empate, ausência de sobreposição (não autorizar salto automático sem decisão), tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
+**Ainda em discussão:** regra de empate, tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
 
 ## D-002 — Conectividade por borda ou vértice no P1
 
@@ -40,10 +40,20 @@ Polígonos que compartilham uma borda ou um vértice pertencem ao mesmo patch. P
 
 **Validação pendente:** casos sintéticos de toque pontual, borda compartilhada, cadeias de contatos e separação; casos reais 24194371 e 24340828. Tolerâncias de precisão, reparos e sobreposições reais permanecem em discussão (issue #44). Não confundir agrupamento por contato com correção de sobreposições.
 
+## D-003 — Ausência de continuidade espacial no rastreamento retrospectivo
+
+**Estado:** decisão conceitual aprovada; implementação e validação pendentes.
+
+Não criar saltos espaciais por proximidade para prolongar artificialmente o P2. Quando o componente rastreado não possuir ancestral espacial na observação anterior, após verificar a consistência geométrica e temporal dos dados, encerrar o rastreamento retrospectivo. O P2 começa na primeira data da linhagem reconstruída e pode ter menos observações que P1.
+
+**Justificativa:** a região que se torna dominante ao final pode ter surgido depois do início do incêndio. A proximidade de outro patch não demonstra ancestralidade. A duração distinta de P1 e P2 não constitui, por si só, erro.
+
+**Implicações:** não preencher datas anteriores com geometrias fictícias ou zeros; distinguir ausência de P2 de ausência de incêndio. Adequar validação, interface, indicadores e integração às datas efetivamente disponíveis. Registrar motivo de encerramento, data inicial do P2 e diagnóstico de eventuais inconsistências. Não interpretar falhas geométricas como nascimento confirmado. O tratamento específico de contato exclusivamente pontual entre observações sem área de interseção permanece por decidir, distinguindo a conectividade intradata D-002 da ancestralidade temporal.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
-- Empates e ausência de sobreposição no rastreamento.
+- Empates e contato exclusivamente pontual entre datas no rastreamento.
 - Fusões e distinção entre incorporação e expansão.
 - Regularização, tolerâncias e auditoria topológica (issue #44).
 - Representatividade, interpretação e seleção de indicadores TR/IGT.
