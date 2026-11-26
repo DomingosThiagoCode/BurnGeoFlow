@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from hashlib import sha256
+from hashlib import file_digest
 import json
 import os
 from pathlib import Path
@@ -396,6 +396,11 @@ def salvar_bruto(pasta: Path, id_incendio: int, nome: str, fc: dict) -> Path:
     return destino
 
 
+def identificar_geojson(caminho: Path) -> dict[str, str]:
+    with caminho.open("rb") as arquivo:
+        return {"arquivo": caminho.name, "sha256": file_digest(arquivo, "sha256").hexdigest()}
+
+
 def preparar_e_publicar(
     pasta: Path, id_incendio: int, bruto_p1: dict, bruto_p2: dict,
     informar: Callable[[str], None] = informar_terminal,
@@ -407,6 +412,11 @@ def preparar_e_publicar(
     if not p2_bruto.exists():
         salvar_bruto(pasta, id_incendio, 'P2', bruto_p2)
     diagnostico = {
+        'versao_proveniencia': 1,
+        'geojsons_brutos': {
+            'P1': identificar_geojson(p1_bruto),
+            'P2': identificar_geojson(p2_bruto),
+        },
         'P1': diagnosticar(bruto_p1, 'P1'),
         'P2': diagnosticar(bruto_p2, 'P2'),
         'status': 'em_analise',
@@ -442,6 +452,10 @@ def preparar_e_publicar(
         ) from exc
     diagnostico['status'] = 'validado'
     diagnostico['verificacao'] = resumo
+    diagnostico['geojsons_publicados'] = {
+        'P1': identificar_geojson(caminho1),
+        'P2': identificar_geojson(caminho2),
+    }
     salvar_json_atomico(diagnostico_path, diagnostico)
     return caminho1, caminho2, resumo, auditoria
 
@@ -731,16 +745,15 @@ def adquirir(
         "validacao_estrutura": resumo,
         "validacao_independente": False,
         "metodo": "acumulado_union__p2_overlap_e_distancia_fallback",
+        "assinatura_aquisicao": assinatura_base,
         "brutos_gee": str(raiz_brutos),
+        "diagnostico_geometrias": str(diagnostico_path),
         "modificacoes_geometricas": {
             "colecoes_convertidas": len(auditoria["geometrias_convertidas"]),
             "feicoes_sem_area": len(auditoria["sem_area_excluidos"]),
         },
     }
-    (pasta / f"aquisicao_{id_incendio}.json").write_text(
-        json.dumps(metadados, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    salvar_json_atomico(pasta / f"aquisicao_{id_incendio}.json", metadados)
     # Limpeza não é pré-requisito para o resultado local ser válido.
     # Somente assets explicitamente criados por esta execução são removidos.
     if assets_batch is not None and checkpoint_batch is not None:
