@@ -26,9 +26,9 @@ class TestLimitesIBGE(unittest.TestCase):
             w.field("SIGLA_UF", "C", size=2)
             w.field("CD_UF", "C", size=2)
             w.field("NM_UF", "C", size=40)
-            w.poly([[[-44, -23], [-43, -23], [-43, -22], [-44, -22], [-44, -23]]])
+            w.poly([[[-44, -23], [-44, -22], [-43, -22], [-43, -23], [-44, -23]]])
             w.record("RJ", "33", "Rio de Janeiro")
-            w.poly([[[-56, -20], [-55, -20], [-55, -19], [-56, -19], [-56, -20]]])
+            w.poly([[[-56, -20], [-56, -19], [-55, -19], [-55, -20], [-56, -20]]])
             w.record("MS", "50", "Mato Grosso do Sul")
         nome.with_suffix(".prj").write_text(
             CRS.from_epsg(4674).to_wkt(), encoding="utf-8"
@@ -49,7 +49,10 @@ class TestLimitesIBGE(unittest.TestCase):
                 ms = resolver_uf_ou_brasil("UF:MS", pasta)
                 br = resolver_uf_ou_brasil("Brasil", pasta)
                 rj_cache = resolver_uf_ou_brasil("UF:RJ", pasta)
-            self.assertEqual(rj, rj_cache)
+            self.assertEqual(rj["origem"], rj_cache["origem"])
+            self.assertTrue(shape(rj["geometria"]).equals(
+                shape(rj_cache["geometria"])
+            ))
             self.assertIn("IBGE Malha Territorial 2024", rj["origem"])
             self.assertAlmostEqual(shape(rj["geometria"]).area, 1, places=4)
             self.assertAlmostEqual(shape(ms["geometria"]).area, 1, places=4)
