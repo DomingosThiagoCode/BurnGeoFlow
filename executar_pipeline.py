@@ -186,6 +186,8 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
     )
     manifesto = {
         "software": "BurnGeoFlow", "versao": "7.1.0",
+        "metodologia_aplicada": "p1_legado_p2_progressivo",
+        "compativel_metodologia_nova": False,
         "id_incendio": id_, "origem": origem,
         "entradas_sha256": hashes, "inicio_utc": agora(),
         "ressalva": "Auditoria geométrica interna, não validação física por sensores.",
@@ -194,14 +196,20 @@ def executar(id_: int, *, saida: Path, p1: Path | None = None, p2: Path | None =
     salvar_json(manifesto_path, manifesto)
     logs = raiz / "logs"
     logs.mkdir(parents=True, exist_ok=True)
+    print(
+        "[AVISO] Este é o pipeline legado (P1 não conectado por contato, "
+        "P2 progressivo). A nova metodologia D-001/D-002 permanece "
+        "em integração. Resultados deste fluxo não equivalem à v2.",
+        flush=True,
+    )
     predecessora_reexecutada = False
     for etapa in definir_etapas(id_, raiz, a, b):
         estado = manifesto["etapas"].get(etapa.nome, {})
         assinatura_atual = assinatura_codigo(etapa.nome)
         assinatura_anterior = estado.get("codigo_sha256")
-        codigo_compativel = assinatura_anterior in (None, assinatura_atual)
-        # Registros antigos não tinham assinatura de código. Preservamos o
-        # reuso retrocompatível, mas novas execuções gravam a assinatura.
+        # Registros sem assinatura não provam correspondência de código.
+        # Evitar aceitar artefatos antigos como reproduzíveis por existência.
+        codigo_compativel = assinatura_anterior == assinatura_atual
         # Uma etapa posterior nunca pode reutilizar dados quando qualquer
         # predecessora foi reexecutada na execução atual.
         pode_reutilizar = (
