@@ -323,12 +323,44 @@ def main(argv: list[str] | None = None) -> int:
                     help="Baixa o caso de referência 24340828 sem usar GEE")
     ap.add_argument("--refazer", action="store_true",
                     help="Refaz etapas científicas, mesmo que já concluídas")
+    ap.add_argument("--preparar-metodologia-v2", action="store_true",
+                    help="Gerar P1 conectado/P2 retrospectivo em pasta versionada, "
+                         "sem GEE e sem executar etapas dependentes ainda legadas")
     args = ap.parse_args(argv)
     raiz = (args.saida or ROOT / "execucoes" / str(args.id)).resolve()
 
     try:
         if args.id <= 0:
             raise ErroPipeline("ID GlobFire deve ser positivo.")
+        if args.preparar_metodologia_v2:
+            if args.origem not in ("auto", "local") or args.baixar_exemplo or args.somente_aquisicao:
+                raise ErroPipeline(
+                    "--preparar-metodologia-v2 utiliza apenas P1 local, "
+                    "sem aquisição GEE nem download de exemplo."
+                )
+            if args.p2 is not None:
+                raise ErroPipeline(
+                    "Modo v2 usa somente P1 original. Não informe --p2."
+                )
+            fontes = [
+                args.p1,
+                raiz / "dados" / f"estudo_caso_{args.id}" /
+                    f"P1_componentes_{args.id}.geojson",
+                ROOT / "dados" / f"estudo_caso_{args.id}" /
+                    f"P1_componentes_{args.id}.geojson",
+            ]
+            fonte = next((p for p in fontes if p is not None and p.is_file()), None)
+            if fonte is None:
+                raise ErroPipeline(
+                    f"ID {args.id}: P1 original não localizado localmente. "
+                    "Nenhuma aquisição GEE foi iniciada."
+                )
+            from burngeoflow.processamento.metodologia_v2 import reconstruir
+            destino = raiz / "dados" / f"estudo_caso_{args.id}" / "derivados_v2"
+            print(f"[V2] Reconstruindo P1/P2 a partir de {fonte}", flush=True)
+            print(json.dumps(reconstruir(fonte, destino),
+                             ensure_ascii=False, indent=2), flush=True)
+            return 0
         if (args.p1 is None) != (args.p2 is None):
             raise ErroPipeline("--p1 e --p2 devem ser informados juntos.")
         if args.baixar_exemplo and args.origem in {"gee", "brutos"}:
