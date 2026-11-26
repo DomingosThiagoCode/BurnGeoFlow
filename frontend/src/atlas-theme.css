@@ -749,10 +749,10 @@ tbody tr:hover { background:#efede5; }
 .page-layout > .main-content { min-width:0; }
 .sidebar.atlas-rail {
   position: sticky;
-  top: 80px;
+  top: 88px;
   align-self: start;
   width: 68px;
-  height: calc(100dvh - 80px);
+  height: calc(100dvh - 88px);
   min-height: 440px;
   padding: 14px 8px;
   overflow: hidden;
