@@ -88,9 +88,10 @@ export default function App() {
     const hash = destino==="atlas" ? (abaDestino==="geral" ? "atlas" : "analise/"+abaDestino)
       : destino==="jobs" ? "processamento" : "catalogo";
     window.location.hash = hash;
-    window.scrollTo({top:0,behavior:"instant"});
+    window.scrollTo({top:0,behavior:"auto"});
   };
   const [analise, setAnalise] = useState<AnaliseEtapa4 | null>(null);
+  const [destaqueTR,setDestaqueTR]=useState<{ponto:string;dataAtual:string}|null>(null);
   const [carregandoAnalise, setCarregandoAnalise] = useState(false);
   const [erroAnalise, setErroAnalise] = useState<string | null>(null);
   const [resumo, setResumo] = useState<VisaoEvento | null>(null);
@@ -317,6 +318,32 @@ export default function App() {
     atualizarLista();
   }, [atualizarLista]);
 
+  const segmentoTR = useMemo(() => {
+    if(!destaqueTR||!analise?.disponivel)return null;
+    const segmento=analise.segmentos.find(r=>
+      r.ponto===destaqueTR.ponto&&r.data_atual===destaqueTR.dataAtual);
+    if(!segmento)return null;
+    const p0=analise.pontos.find(r=>r.ponto===destaqueTR.ponto&&r.data===segmento.data_anterior);
+    const p1=analise.pontos.find(r=>r.ponto===destaqueTR.ponto&&r.data===segmento.data_atual);
+    if(!p0||!p1)return null;
+    const a=[numero(p0,"longitude"),numero(p0,"latitude")];
+    const b=[numero(p1,"longitude"),numero(p1,"latitude")];
+    if([...a,...b].some(v=>v===null||!Number.isFinite(v)))return null;
+    const coords=[a,b] as [[number,number],[number,number]];
+    if(coords.some(([lon,lat])=>Math.abs(lon)>180||Math.abs(lat)>90))return null;
+    return {
+      coordenadas:coords,
+      rotulo:(destaqueTR.ponto+" · "+segmento.data_anterior+" → "+segmento.data_atual),
+    };
+  },[destaqueTR,analise]);
+  const abrirSegmento=(ponto:string,dataAtual:string)=>{
+    const existe=analise?.segmentos.some(s=>s.ponto===ponto&&s.data_atual===dataAtual);
+    if(!existe){setMensagem("Segmento geográfico indisponível para esta transição.");return;}
+    setDestaqueTR({ponto,dataAtual});
+    setData(dataAtual);
+    navegar("atlas","geral");
+    setMapaAtivo(true);
+  };
   const existeErro = Boolean(erroEvento);
   const navegaPara = (passo: number) => {
     if (!resumo) return;
@@ -514,11 +541,13 @@ export default function App() {
                   </div>}>
                     <MapPanel id={id} data={data} p1={p1} p2={p2}
                       mostrarP1={p1Ativo} mostrarP2={p2Ativo}
-                      mapaBase={mapaBase}/>
+                      mapaBase={mapaBase} destaque={segmentoTR}/>
                   </Suspense>
                 </>}
                 <div className="map-footer">
                   <p>Geometrias originais em EPSG:4326. Contatos e incrementos não representam frentes ativas do fogo.</p>
+                  {segmentoTR&&<button type="button" className="secondary-button compact"
+                    onClick={()=>setDestaqueTR(null)}>Limpar destaque TR</button>}
                   {mapaAtivo && <button type="button"
                     className="secondary-button compact"
                     onClick={() => { setMapaAtivo(false); setP1(null); setP2(null); }}
@@ -700,6 +729,7 @@ export default function App() {
               {aba !== "geral" && <ScientificPanels
                 aba={aba} serie={serie} transicoes={transicoes}
                 dia={data} selecionarData={setData}
+                mostrarSegmento={abrirSegmento}
                 analise={analise} carregando={carregandoAnalise}
                 erro={erroAnalise}/>}
               </div>
