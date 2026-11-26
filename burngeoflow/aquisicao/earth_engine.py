@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from hashlib import sha256
+from hashlib import file_digest
 import json
 import os
 from pathlib import Path
@@ -396,6 +396,11 @@ def salvar_bruto(pasta: Path, id_incendio: int, nome: str, fc: dict) -> Path:
     return destino
 
 
+def identificar_geojson(caminho: Path) -> dict[str, str]:
+    with caminho.open("rb") as arquivo:
+        return {"arquivo": caminho.name, "sha256": file_digest(arquivo, "sha256").hexdigest()}
+
+
 def preparar_e_publicar(
     pasta: Path, id_incendio: int, bruto_p1: dict, bruto_p2: dict,
     informar: Callable[[str], None] = informar_terminal,
@@ -407,6 +412,11 @@ def preparar_e_publicar(
     if not p2_bruto.exists():
         salvar_bruto(pasta, id_incendio, 'P2', bruto_p2)
     diagnostico = {
+        'versao_proveniencia': 1,
+        'geojsons_brutos': {
+            'P1': identificar_geojson(p1_bruto),
+            'P2': identificar_geojson(p2_bruto),
+        },
         'P1': diagnosticar(bruto_p1, 'P1'),
         'P2': diagnosticar(bruto_p2, 'P2'),
         'status': 'em_analise',
@@ -442,6 +452,10 @@ def preparar_e_publicar(
         ) from exc
     diagnostico['status'] = 'validado'
     diagnostico['verificacao'] = resumo
+    diagnostico['geojsons_publicados'] = {
+        'P1': identificar_geojson(caminho1),
+        'P2': identificar_geojson(caminho2),
+    }
     salvar_json_atomico(diagnostico_path, diagnostico)
     return caminho1, caminho2, resumo, auditoria
 
@@ -504,23 +518,27 @@ def obter_geojson(
             pasta_paginas / f"pagina_{indice_pagina:05d}.json"
             if pasta_paginas is not None else None
         )
-        if arquivo_pagina is not None and arquivo_pagina.is_file():
-            recuperado = json.loads(arquivo_pagina.read_text(encoding="utf-8"))
-            if (recuperado.get("chave_cache") != chave_cache
-                    or recuperado.get("token_entrada") != token):
+        do_cache = arquivo_pagina is not None and arquivo_pagina.is_file()
+        contexto = f"{rotulo}, página {indice_pagina}"
+        if do_cache:
+            contexto = f"{contexto}, cache {arquivo_pagina}"
+            try:
+                recuperado = json.loads(arquivo_pagina.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise ErroAquisicao(f"Cache GEE ilegível: {contexto}.") from exc
+            if (not isinstance(recuperado, dict)
+                    or recuperado.get("chave_cache") != chave_cache
+                    or "token_entrada" not in recuperado
+                    or recuperado["token_entrada"] != token):
                 raise ErroAquisicao(
-                    f"Cache GEE incompatível: {arquivo_pagina}. "
+                    f"Cache GEE incompatível: {contexto}. "
                     "Não será reutilizado para evitar misturar conjuntos diferentes."
                 )
-            resposta = recuperado["resposta"]
-            informar(f"[GEE] {rotulo}, página {indice_pagina}: "
-                    "reutilizada do cache local.")
+            resposta = recuperado.get("resposta")
         else:
             try:
                 with aviso_espera(
-                    f"{rotulo}, página {indice_pagina}",
-                    informar=informar,
-                    intervalo_s=intervalo_aviso_s,
+                    contexto, informar=informar, intervalo_s=intervalo_aviso_s,
                 ):
                     resposta = ee.data.computeFeatures(params)
             except Exception as exc:
@@ -528,38 +546,45 @@ def obter_geojson(
                     f"Falha na exportação paginada, após {len(feicoes)} feições: "
                     f"{type(exc).__name__}: {exc}"
                 ) from exc
-            if (arquivo_pagina is not None and isinstance(resposta, dict)
-                    and isinstance(resposta.get("features"), list)):
-                salvar_json_atomico(arquivo_pagina, {
-                    "chave_cache": chave_cache,
-                    "token_entrada": token,
-                    "resposta": resposta,
-                })
         if (not isinstance(resposta, dict)
                 or not isinstance(resposta.get("features"), list)):
-            raise ErroAquisicao("Resposta inválida de computeFeatures.")
-        feicoes.extend(resposta["features"])
-        informar(f"[GEE] {rotulo}: página {indice_pagina} recebida; "
-                f"{len(feicoes)} feições obtidas até agora.")
-        if len(feicoes) > limite:
+            raise ErroAquisicao(f"Resposta inválida de computeFeatures: {contexto}.")
+        novas_feicoes = resposta["features"]
+        for indice, feicao in enumerate(novas_feicoes, start=len(feicoes)):
+            if (not isinstance(feicao, dict) or feicao.get("type") != "Feature"
+                    or not isinstance(feicao.get("geometry"), dict)
+                    or not isinstance(feicao.get("properties"), dict)):
+                raise ErroAquisicao(f"Feição {indice} inválida: {contexto}.")
+        proximo = resposta.get("next_page_token")
+        if proximo is None:
+            proximo = resposta.get("nextPageToken")
+        if proximo is not None and not isinstance(proximo, str):
+            raise ErroAquisicao(f"Token de paginação inválido: {contexto}.")
+        if proximo in vistos:
+            raise ErroAquisicao(f"Paginação GEE repetiu um token: {contexto}.")
+        if len(feicoes) + len(novas_feicoes) > limite:
             raise ErroAquisicao(
                 f"Limite de {limite} feições excedido. "
                 "A exportação em lotes precisará ser habilitada para esse evento."
             )
-        proximo = resposta.get("next_page_token") or resposta.get("nextPageToken")
+        if not (feicoes or novas_feicoes or proximo):
+            raise ErroAquisicao(f"Nenhuma feição obtida pelo GEE: {contexto}.")
+        if do_cache:
+            informar(f"[GEE] {rotulo}, página {indice_pagina}: "
+                    "reutilizada do cache local.")
+        elif arquivo_pagina is not None:
+            salvar_json_atomico(arquivo_pagina, {
+                "chave_cache": chave_cache,
+                "token_entrada": token,
+                "resposta": resposta,
+            })
+        feicoes.extend(novas_feicoes)
+        informar(f"[GEE] {rotulo}: página {indice_pagina} recebida; "
+                f"{len(feicoes)} feições obtidas até agora.")
         if not proximo:
             break
-        if proximo in vistos:
-            raise ErroAquisicao("Paginação GEE repetiu um token.")
-        vistos.add(str(proximo))
-        token = str(proximo)
-    if not feicoes:
-        raise ErroAquisicao("Nenhuma feição obtida pelo GEE.")
-    for indice, f in enumerate(feicoes):
-        if (not isinstance(f, dict) or f.get("type") != "Feature"
-                or not isinstance(f.get("geometry"), dict)
-                or not isinstance(f.get("properties"), dict)):
-            raise ErroAquisicao(f"Feição {indice} inválida na resposta GEE.")
+        vistos.add(proximo)
+        token = proximo
     informar(f"[GEE] {rotulo}: extração concluída, "
             f"{len(feicoes)} feições recebidas.")
     return {"type": "FeatureCollection", "features": feicoes}
@@ -731,16 +756,15 @@ def adquirir(
         "validacao_estrutura": resumo,
         "validacao_independente": False,
         "metodo": "acumulado_union__p2_overlap_e_distancia_fallback",
+        "assinatura_aquisicao": assinatura_base,
         "brutos_gee": str(raiz_brutos),
+        "diagnostico_geometrias": str(diagnostico_path),
         "modificacoes_geometricas": {
             "colecoes_convertidas": len(auditoria["geometrias_convertidas"]),
             "feicoes_sem_area": len(auditoria["sem_area_excluidos"]),
         },
     }
-    (pasta / f"aquisicao_{id_incendio}.json").write_text(
-        json.dumps(metadados, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    salvar_json_atomico(pasta / f"aquisicao_{id_incendio}.json", metadados)
     # Limpeza não é pré-requisito para o resultado local ser válido.
     # Somente assets explicitamente criados por esta execução são removidos.
     if assets_batch is not None and checkpoint_batch is not None:

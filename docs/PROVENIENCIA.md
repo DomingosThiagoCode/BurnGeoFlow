@@ -27,3 +27,16 @@ selecionado pela maior sobreposição com a observação anterior, com
 fallback por distância. O processamento não representa movimento
 físico da frente de fogo. A equivalência numérica e geométrica com
 a exportação histórica requer teste autenticado, ainda não realizado.
+
+O arquivo `aquisicao_<ID>.json` registra a assinatura da aquisição e o
+caminho do diagnóstico. Em uma publicação ou revalidação local, o
+`brutos_gee/diagnostico_geometrias.json` registra o SHA-256 de cada
+GeoJSON bruto e, após a validação, dos produtos publicados. Esses hashes
+permitem verificar os arquivos usados e comparar os produtos entre execuções.
+
+Na aquisição GEE, o cache paginado registra a assinatura da consulta e o
+token de entrada de cada página. Uma página só é gravada após a validação
+da resposta, das feições, do token de saída e do limite de feições. Na
+retomada, o cache é verificado novamente. Em caso de incompatibilidade
+ou corrupção, a aquisição informa a página afetada e preserva o arquivo
+para investigação.
