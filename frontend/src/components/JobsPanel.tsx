@@ -8,6 +8,7 @@ import {
 import {
   criarJob, listarJobs, logsJob, interromperJob, type ExecucaoJob, type OrigemJob,
 } from "../services/jobs";
+import { PipelineStatusPanel } from "./PipelineStatusPanel";
 
 type Props = {
   eventoId: number | null;
@@ -223,6 +224,10 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
           </button>
         </form>
 
+        <PipelineStatusPanel incendio={
+          Number.isSafeInteger(Number(idDigitado)) && Number(idDigitado)>0
+            ? Number(idDigitado) : null
+        }/>
         {jobAtivo && <button type="button" className="secondary-button" style={{color:"#a53827",borderColor:"#a53827",marginTop:12}} disabled={interrompendo} onClick={()=>void interromper()}><Square size={15}/> {interrompendo?"Interrompendo…":"Forçar interrupção"}</button>}
         <p className="jobs-warning">
           <AlertCircle size={15}/>
