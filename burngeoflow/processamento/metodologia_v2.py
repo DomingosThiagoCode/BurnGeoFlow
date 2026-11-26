@@ -352,13 +352,15 @@ def reconstruir(p1_path: Path, pasta_saida: Path, *, id_esperado: int | None = N
         "sha256_p1_v2":_hash(p1_v2),
         "sha256_p2_v2":_hash(p2_v2),
     })
-    _salvar_json(pasta/"auditoria_cobertura_p1.json", {
+    auditoria_path = pasta/"auditoria_cobertura_p1.json"
+    _salvar_json(auditoria_path, {
         "id_incendio": incendio,
         "metodologia": VERSAO,
         "criterio": "area_da_uniao_sem_duplicacao",
         "requer_revisao_qualitativa": bool(auditoria_cobertura),
         "componentes": auditoria_cobertura,
     })
+    manifesto["sha256_auditoria_cobertura_p1"] = _hash(auditoria_path)
     _salvar_json(pasta/"manifesto_metodologia.json",manifesto)
     _salvar_json(estado_path, {
         "id_incendio":incendio, "versao":VERSAO,
