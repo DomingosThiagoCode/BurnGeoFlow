@@ -156,7 +156,7 @@ export default function App() {
     setTransicoes([]);
     setAnalise(null);
     setErroAnalise(null);
-    setAba("geral");
+    setDestaqueTR(null);
     setP1(null);
     setP2(null);
     setData("");
