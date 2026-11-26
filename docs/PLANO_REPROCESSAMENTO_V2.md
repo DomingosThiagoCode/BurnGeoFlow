@@ -98,8 +98,11 @@ A interface não afirma que esses resultados cumprem a nova metodologia.
 ## 4. Política de reuso e perda de arquivos
 
 - Brutos GEE e GeoJSONs de origem são intocados.
-- Caches e resultados antigos são mantidos como histórico, identificados
-  como legados.
+- O **pré-processador v2** mantém os produtos legados intocados e grava
+  em pasta exclusiva. Já a **execução normal do pipeline antigo** pode
+  substituir artefatos legados ao recalcular etapas; antes de executá-lo,
+  arquivar os resultados que precisem ser preservados. A política de
+  arquivamento automático continua pendente de implementação (#34).
 - Não reutilizar um passo se SHA de código/entrada divergir, se a assinatura
   estiver ausente, se qualquer artefato obrigatório desaparecer ou se
   uma etapa anterior foi reexecutada.
