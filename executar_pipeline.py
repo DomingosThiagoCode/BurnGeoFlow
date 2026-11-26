@@ -358,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
             from burngeoflow.processamento.metodologia_v2 import reconstruir
             destino = raiz / "dados" / f"estudo_caso_{args.id}" / "derivados_v2"
             print(f"[V2] Reconstruindo P1/P2 a partir de {fonte}", flush=True)
-            print(json.dumps(reconstruir(fonte, destino),
+            print(json.dumps(reconstruir(fonte, destino, id_esperado=args.id),
                              ensure_ascii=False, indent=2), flush=True)
             return 0
         if (args.p1 is None) != (args.p2 is None):
