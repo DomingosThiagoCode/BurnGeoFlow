@@ -234,6 +234,7 @@ export function JobsPanel({ eventoId, onConcluiu }: Props) {
           <span><strong>Atenção: o botão Executar ainda utiliza o pipeline científico legado</strong>
           (P1 sem conectividade por vértice e P2 progressivo). Não equivale à
           metodologia nova. Use Inspecionar arquivos antes de reprocessar.
+          Reexecutar etapas legadas pode substituir resultados derivados antigos.
           Uma execução ativa por vez; o GEE exige autenticação e não fornece
           percentual confiável das tarefas remotas.</span>
         </p>
