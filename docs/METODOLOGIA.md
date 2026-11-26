@@ -163,10 +163,20 @@ Utilizar inicialmente a série temporal da área queimada acumulada total do P1 
 
 **Pendências:** especificar família de modelos, verossimilhança, tratamento de datas irregulares e autocorrelação, contagem de parâmetros incluindo pontos de mudança quando aplicável, duração mínima dos segmentos e comparação com modelo sem mudanças. Verificar sensibilidade e não forçar segmentação quando os dados não a sustentarem. Interpretar fases como padrões da evolução observada da área queimada, não fases físicas da combustão.
 
+## D-013 — Tolerância numérica não equivale a tolerância espacial
+
+**Estado:** princípio conceitual aprovado; calibração e validação pendentes.
+
+Distinguir erros numéricos comprovadamente introduzidos por operações computacionais (reprojeção, precisão finita, interseção e união) de separações e diferenças espaciais presentes nos dados de origem. Admitir correção controlada e rastreável dos primeiros, sem conectar polígonos originalmente separados por mera proximidade e sem criar área queimada artificialmente (D-002, D-008).
+
+Não adotar limiar fixo arbitrário nem usar a resolução nominal de 500 m como tolerância topológica. Investigar a magnitude e a origem dos erros em casos sintéticos e reais, comparar geometrias antes e depois das operações e justificar tolerâncias de distância e área separadamente, incluindo o tratamento de empates da D-004. Registrar valores, unidades, método, efeitos sobre conectividade e indicadores, e testes de sensibilidade. Um empate residual deve ser resolvido de forma reprodutível, com critério explícito ainda a especificar.
+
+**Limite:** discrepâncias cuja origem não possa ser demonstrada devem ser sinalizadas para investigação; tolerâncias não podem mascarar inconsistências reais ou substituir a auditoria do P1 (issue #44).
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
-- Tolerância numérica e desempate residual.
+- Calibração das tolerâncias e especificação do desempate residual (D-013).
 - Tolerâncias, critérios quantitativos de reparo e auditoria topológica (issue #44).
 - Operacionalização quantitativa e validação dos cinco critérios da D-011.
 - Especificação estatística da segmentação D-012; validação e generalização.
