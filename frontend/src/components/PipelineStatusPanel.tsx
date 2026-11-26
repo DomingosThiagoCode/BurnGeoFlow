@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleHelp, ClipboardList, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleHelp, ClipboardList, RefreshCw } from "lucide-react";
 import { BASE_API } from "../services/api";
 
 type EstadoArquivo = {existe:boolean;bytes:number|null;estado:string};
