@@ -26,7 +26,7 @@ Este documento registra as decisões acordadas da pesquisa, independentemente da
 
 **Evidência da necessidade da revisão:** evento 24194371, 128 datas, área final total 17.908,2595 km² e P2 progressivo final 26,4019 km², conforme aquisição reportada. A implementação atual de aquisição em `burngeoflow/aquisicao/earth_engine.py` usa o maior componente inicial e rastreamento progressivo; portanto diverge desta decisão. O P2 retrospectivo ainda precisa ser implementado e testado, incluindo no caso original 24340828. Resultados dependentes de P2 antigo devem ser identificados como tal e recalculados após a revisão, preservando proveniência.
 
-**Ainda em discussão:** tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação de fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
+**Ainda em discussão:** tratamento de contato exclusivamente pontual entre datas, tolerâncias geométricas, interpretação dos indicadores durante fusões e representatividade ao longo do tempo. Não confundir crescimento do P2 por incorporação de áreas anteriormente queimadas com nova área queimada. Não fixar limiar de representatividade sem justificativa.
 
 ## D-002 — Conectividade por borda ou vértice no P1
 
@@ -60,11 +60,30 @@ A seleção retrospectiva usa a maior área de interseção como critério princ
 
 **Rastreabilidade:** registrar candidatos empatados, áreas de interseção e totais, distâncias e critério aplicado. A tolerância numérica para identificar empates e o critério residual para igualdade em todos os critérios ainda devem ser especificados na implementação e documentados. A regra não autoriza saltos sem continuidade espacial (D-003).
 
+## D-005 — Separar expansão observada e incorporação por fusão no P2
+
+**Estado:** decisão conceitual aprovada; implementação e validação pendentes.
+
+Manter a geometria integral do componente selecionado como P2 após uma fusão. Usar a área acumulada total do P1 da observação anterior para distinguir área recém-mapeada como queimada de área anteriormente queimada incorporada ao P2.
+
+Se R0 e R1 representam o P2 anterior e atual, e U0 é a união dos componentes do P1 anterior, calcular:
+- Expansão geométrica bruta: área(R1 ∖ R0).
+- Área nova observada no P2: área(R1 ∖ U0).
+- Área previamente queimada incorporada: área((R1 ∖ R0) ∩ U0).
+- Diagnóstico de perda geométrica: área(R0 ∖ R1); a variação líquida de área é a expansão bruta menos essa perda.
+
+Como R0 integra U0, a expansão bruta corresponde à soma da área nova e da área incorporada, ressalvadas inconsistências geométricas e tolerâncias a definir. Não atribuir automaticamente toda a área nova do P1 ao P2: ela pode pertencer a outros componentes. Calcular em sistema de referência de área adequado, com união para evitar dupla contagem.
+
+**Justificativa:** o P1 já contém o histórico espacial necessário. A distinção evita interpretar crescimento geométrico por fusão como queima nova no intervalo. A área nova representa mudança observada no produto acumulado, não medição independente da combustão ou do instante exato de queima.
+
+**Exemplo:** P2 anterior com 80 km² incorpora um patch de 40 km² já queimado e 5 km² recém-mapeados, resultando em 125 km². Crescimento bruto de 45 km², dos quais 40 incorporados e 5 novos.
+
+**Implicações:** manter TR/IGT sobre a região selecionada, identificar intervalos com incorporação/fusão para contextualizar seus resultados e não confundir deslocamento geométrico com propagação física. Validar conservação das áreas em casos sintéticos e reais, incluindo perdas e lacunas entre datas.
+
 ## Próximas decisões
 
 Discutir individualmente, sem antecipar consenso:
 - Contato exclusivamente pontual entre datas no rastreamento; tolerância numérica e desempate residual.
-- Fusões e distinção entre incorporação e expansão.
 - Regularização, tolerâncias e auditoria topológica (issue #44).
 - Representatividade, interpretação e seleção de indicadores TR/IGT.
 - Segmentação temporal/BIC, validação e generalização.
